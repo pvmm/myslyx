@@ -7,6 +7,21 @@
 - Hints/autocomplete — verify the hints window shows language-appropriate suggestions.
 - Drag-and-drop upload — feature not implemented yet; add DnD handlers.
 
+Status updates
+- Editor focus: implemented (focus polling added in `_load_file_into_editor`).
+- Font switching: implemented via CSS variable and `localStorage` restore.
+- Save behavior: implemented; files persist to the dock and to `WBStorage`.
+- Undo/Redo: keyboard works; buttons are wired to dispatch native events (verify in each browser).
+- Hints/autocomplete: popup and hints panel wired; validate for target languages.
+- Drag-and-drop upload: implemented; dropped files are read as text and saved to `WBStorage` then the page reloads to show them.
+
+Remaining / follow-ups
+- Convert DnD flow to live-insert (avoid page reload after drop) for smoother UX.
+- Reduce WatchFiles reload churn when editing `pages/*.py` (investigate tooling or file-watching globs).
+- Investigate ASGI/engineio KeyError `'REQUEST_METHOD'` seen in server logs under some requests.
+- Add browser acceptance tests and note any browser-specific quirks.
+
+
 Testing tips
 - Hard-refresh browser after modifying `static/` files to avoid caching issues.
 - Capture browser console logs if a feature fails.
