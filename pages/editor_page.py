@@ -362,6 +362,7 @@ def _autocomplete_inject_js(hints_content_id: str) -> str:
     '''
 
 
+
 def _storage_io_js() -> str:
     """Return JS that exposes file pool operations via window.__wbPyBridge."""
     return '''
@@ -395,6 +396,19 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/retro.js"></script>')
 
     hints_content_id = 'hints-content'
+
+    # ===== Delete dialog (defined early so toolbar handlers can reference it) =====
+    delete_dialog = ui.dialog()
+    with delete_dialog:
+        with ui.element('div').classes('wb-dialog'):
+            with ui.element('div').classes('wb-title-bar'):
+                ui.label('Delete current file?').classes('title-text')
+            with ui.element('div').classes('wb-dialog-body'):
+                ui.label('This will permanently remove the current file from the file pool.').style('white-space:pre-line;')
+            with ui.element('div').classes('wb-dialog-buttons'):
+                ui.button('Cancel', on_click=lambda: delete_dialog.close()).classes('wb-button')
+                ui.button('Delete', on_click=lambda: _confirm_delete()).classes('wb-button')
+
 
     with ui.element('div').classes('wb-root'):
         # === App Header ===
@@ -444,13 +458,21 @@ def editor_page() -> None:
             )
 
             with ui.element('div').style('margin-left:auto;display:flex;gap:4px;'):
-                ui.button('UNDO', on_click=lambda: _undo()).classes('wb-button').props('id=wb-undo-btn')
-                ui.button('REDO', on_click=lambda: _redo()).classes('wb-button').props('id=wb-redo-btn')
+                # Client-side immediate dispatch for snappy undo/redo (fallback to server handlers remain)
+                undo_js = "(function(){var el=document.querySelector('.cm-editor .cm-content'); if(!el){var v=window.__wbCM && window.__wbCM.getCmView && window.__wbCM.getCmView(); if(v && v.dom) el=v.dom.querySelector('.cm-content');} if(!el) return; el.dispatchEvent(new KeyboardEvent('keydown',{key:'z',ctrlKey:true,metaKey:true,bubbles:true,cancelable:true}));})()"
+                redo_js = "(function(){var el=document.querySelector('.cm-editor .cm-content'); if(!el){var v=window.__wbCM && window.__wbCM.getCmView && window.__wbCM.getCmView(); if(v && v.dom) el=v.dom.querySelector('.cm-content');} if(!el) return; el.dispatchEvent(new KeyboardEvent('keydown',{key:'y',ctrlKey:true,metaKey:true,bubbles:true,cancelable:true}));})()"
+                undo_btn = ui.button('UNDO').classes('wb-button')
+                undo_btn.props('id=wb-undo-btn')
+                redo_btn = ui.button('REDO').classes('wb-button')
+                redo_btn.props('id=wb-redo-btn')
                 # separator between undo/redo and other actions
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
-                ui.button('SAVE', on_click=lambda: _save_current_file()).classes('wb-button')
-                ui.button('RENAME', on_click=lambda: _open_rename_dialog()).classes('wb-button')
-                ui.button('DELETE', on_click=lambda: _open_delete_dialog(), color='red').classes('wb-button')
+                save_btn = ui.button('SAVE', on_click=lambda: _save_current_file()).classes('wb-button')
+                save_btn.props('id=wb-save-btn')
+                rename_btn = ui.button('RENAME', on_click=lambda: _open_rename_dialog()).classes('wb-button')
+                rename_btn.props('id=wb-rename-btn')
+                delete_btn = ui.button('DELETE', on_click=lambda: _open_delete_dialog(), color='red').classes('wb-button')
+                delete_btn.props('id=wb-delete-btn')
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
                 ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button')
@@ -593,8 +615,11 @@ def editor_page() -> None:
                 client_state['active_id'] = None
                 code_editor.set_value('')
                 file_name_label.set_text('no files')
-        _refresh_file_pool()
+        # Persist state before mutating UI elements. If we refresh (delete)
+        # UI elements while this click handler's slot is still active, NiceGUI
+        # may raise "The parent element this slot belongs to has been deleted.".
         _save_to_storage()
+        _refresh_file_pool()
 
     def _switch_to_file(fid: str) -> None:
         if fid == client_state['active_id']:
@@ -610,7 +635,9 @@ def editor_page() -> None:
 
     def _load_file_into_editor(f: dict[str, Any]) -> None:
         code_editor.set_value(f.get('content', ''))
-        file_name_label.set_text(f['name'])
+        # Indicate read-only files in the UI and update toolbar state.
+        readonly = bool(f.get('readonly', False))
+        file_name_label.set_text(f['name'] + (' (read-only)' if readonly else ''))
         cm_lang = f.get('language', 'Text')
         code_editor.set_language(cm_lang)
         ui.run_javascript(f"window.__wbCurrentLang = '{cm_lang}';")
@@ -650,6 +677,40 @@ def editor_page() -> None:
                 } catch(e) {}
             })();
         ''')
+        # Prevent editing in the editor for read-only files by attaching
+        # a short-circuiting input handler directly to the CM content element.
+        readonly_js = str(readonly).lower()
+        ui.run_javascript((
+            """
+            (function(){
+                try{
+                    var r = {{READONLY}};
+                    function makeHandler(){
+                        return function(e){
+                            // Allow navigation keys but block text input and commands
+                            var blocked = !(e.key && (e.key.startsWith('Arrow') || e.key==='Tab' || e.key==='Escape' || e.ctrlKey || e.metaKey));
+                            if (blocked) { e.preventDefault(); e.stopPropagation(); return false; }
+                        };
+                    }
+                    var wrap = document.querySelector('.cm-editor');
+                    if (wrap){
+                        var el = wrap.querySelector('.cm-content');
+                        if (el){
+                            // Remove any previous handler
+                            if (el._wbReadOnlyHandler) { el.removeEventListener('keydown', el._wbReadOnlyHandler, true); el.removeEventListener('beforeinput', el._wbReadOnlyHandler, true); el._wbReadOnlyHandler = null; }
+                            if (r){
+                                el._wbReadOnlyHandler = makeHandler();
+                                el.addEventListener('keydown', el._wbReadOnlyHandler, true);
+                                el.addEventListener('beforeinput', el._wbReadOnlyHandler, true);
+                            }
+                        }
+                    }
+                }catch(e){}
+            })();
+            """
+        ).replace("{{READONLY}}", readonly_js))
+        # Disable/enable toolbar buttons for read-only files by ID
+        ui.run_javascript(f"(function(){{try{{var r={str(readonly).lower()}; var s=document.getElementById('wb-save-btn'); if(s) s.disabled = r; var rn=document.getElementById('wb-rename-btn'); if(rn) rn.disabled = r; var d=document.getElementById('wb-delete-btn'); if(d) d.disabled = r; }}catch(e){{}}}})()")
 
     def _sync_editor_to_active() -> None:
         if not client_state['active_id']:
@@ -661,6 +722,12 @@ def editor_page() -> None:
 
     def _save_current_file() -> None:
         # If there's no active file, create one from the current editor contents
+        # Prevent saving over read-only files
+        if client_state['active_id']:
+            cur = next((f for f in client_state['files'] if f['id'] == client_state['active_id']), None)
+            if cur and cur.get('readonly'):
+                return
+
         if not client_state['active_id']:
             import random
             fid = f'file_{random.randint(100000, 999999)}'
@@ -684,6 +751,10 @@ def editor_page() -> None:
     def _on_editor_change(value: str) -> None:
         # Maintain simple per-file undo/redo stacks and persist
         if client_state['active_id']:
+            # Ignore edits on read-only files
+            cur = next((f for f in client_state['files'] if f['id'] == client_state['active_id']), None)
+            if cur and cur.get('readonly'):
+                return
             for f in client_state['files']:
                 if f['id'] == client_state['active_id']:
                     undos = f.setdefault('undos', [])
@@ -738,39 +809,36 @@ def editor_page() -> None:
 
     # ===== Editor actions: undo/redo, download, upload =====
     def _undo() -> None:
-        if not client_state['active_id']:
-            return
-        for f in client_state['files']:
-            if f['id'] == client_state['active_id']:
-                undos = f.get('undos', [])
-                redos = f.get('redos', [])
-                if not undos:
-                    return
-                current = f.get('content', '')
-                redos.append(current)
-                last = undos.pop()
-                f['content'] = last
-                code_editor.set_value(last)
-                _save_to_storage()
-                _refresh_file_pool()
-                return
+        # Use CodeMirror's native undo by dispatching a keyboard event to the editor
+        ui.run_javascript('''
+            (function() {
+                try {
+                    var v = window.__wbCM && window.__wbCM.getCmView && window.__wbCM.getCmView();
+                    var el = null;
+                    if (v && v.dom) el = v.dom.querySelector('.cm-content');
+                    if (!el) el = document.querySelector('.cm-editor .cm-content');
+                    if (!el) return;
+                    var ev = new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, metaKey: true, bubbles: true, cancelable: true});
+                    el.dispatchEvent(ev);
+                } catch(e) {}
+            })();
+        ''')
 
     def _redo() -> None:
-        if not client_state['active_id']:
-            return
-        for f in client_state['files']:
-            if f['id'] == client_state['active_id']:
-                redos = f.get('redos', [])
-                if not redos:
-                    return
-                current = f.get('content', '')
-                f.setdefault('undos', []).append(current)
-                nxt = redos.pop()
-                f['content'] = nxt
-                code_editor.set_value(nxt)
-                _save_to_storage()
-                _refresh_file_pool()
-                return
+        # Use CodeMirror's native redo by dispatching a keyboard event to the editor
+        ui.run_javascript('''
+            (function() {
+                try {
+                    var v = window.__wbCM && window.__wbCM.getCmView && window.__wbCM.getCmView();
+                    var el = null;
+                    if (v && v.dom) el = v.dom.querySelector('.cm-content');
+                    if (!el) el = document.querySelector('.cm-editor .cm-content');
+                    if (!el) return;
+                    var ev = new KeyboardEvent('keydown', {key: 'y', ctrlKey: true, metaKey: true, bubbles: true, cancelable: true});
+                    el.dispatchEvent(ev);
+                } catch(e) {}
+            })();
+        ''')
 
     def _download_current_file() -> None:
         # Determine content and filename
@@ -828,9 +896,42 @@ def editor_page() -> None:
     def _init() -> None:
         ui.run_javascript('''
             (function() {
-                if (window.__wbPyBridge && !window.__wbPyBridge.hasFiles()) {
-                    window.__wbPyBridge.initDefaults();
-                }
+                try {
+                    const SCHEMA_KEY = 'wb_editor_schema_v';
+                    const SCHEMA_VERSION = '2';
+
+                    // If the URL contains ?reset=1 force reinitialization of client storage
+                    try {
+                        const params = new URLSearchParams(window.location.search || '');
+                        if (params.get('reset') === '1') {
+                            if (window.__wbPyBridge && window.__wbPyBridge.initDefaults) {
+                                window.__wbPyBridge.initDefaults();
+                            }
+                            localStorage.setItem(SCHEMA_KEY, SCHEMA_VERSION);
+                            // Remove the query param from the URL to avoid repeated resets
+                            try {
+                                const url = new URL(window.location.href);
+                                url.searchParams.delete('reset');
+                                window.history.replaceState({}, '', url.toString());
+                            } catch(e) {}
+                            return;
+                        }
+                    } catch(e) {}
+
+                    // If schema changed or missing, reinitialize client storage
+                    if (localStorage.getItem(SCHEMA_KEY) !== SCHEMA_VERSION) {
+                        try {
+                            if (window.__wbPyBridge && window.__wbPyBridge.initDefaults) {
+                                window.__wbPyBridge.initDefaults();
+                            }
+                        } catch(e) {}
+                        localStorage.setItem(SCHEMA_KEY, SCHEMA_VERSION);
+                    } else {
+                        if (window.__wbPyBridge && !window.__wbPyBridge.hasFiles()) {
+                            window.__wbPyBridge.initDefaults();
+                        }
+                    }
+                } catch(e) {}
                 // Do not rely on server-side callback here; storage will be read
                 // when the client interacts or on subsequent syncs.
             })()
@@ -857,6 +958,25 @@ def editor_page() -> None:
                         const b = document.getElementById('wb-redo-btn'); if (b) b.click();
                     }
                 });
+                // Attach client-side click handlers that dispatch native editor undo/redo
+                setTimeout(function(){
+                    try {
+                        var undoBtn = document.getElementById('wb-undo-btn');
+                        var redoBtn = document.getElementById('wb-redo-btn');
+                        var attach = function(btn, key) {
+                            if (!btn) return;
+                            btn.addEventListener('click', function(ev){
+                                try {
+                                    var k = key === 'undo' ? 'z' : 'y';
+                                    // Dispatch on document so global key handler picks it up
+                                    document.dispatchEvent(new KeyboardEvent('keydown',{key:k,ctrlKey:true,metaKey:true,bubbles:true,cancelable:true}));
+                                } catch(e) {}
+                            });
+                        };
+                        attach(undoBtn, 'undo');
+                        attach(redoBtn, 'redo');
+                    } catch(e) {}
+                }, 100);
             })()
         ''')
 
@@ -868,12 +988,31 @@ def editor_page() -> None:
                 data = json.loads(result) if isinstance(result, str) else result
         except (json.JSONDecodeError, TypeError):
             data = {'files': [], 'active': None}
-
         client_state['files'] = data.get('files', [])
         client_state['active_id'] = data.get('active')
 
+        # If there are no files in storage, create a starter file so the UI
+        # shows an initial file next to the '+ NEW' button and loads it into
+        # the editor. Persist to client storage so page reloads keep it.
+        if not client_state['files']:
+            import random
+            # Only create a single README starter file and make it active (read-only)
+            fid_readme = f'file_{random.randint(100000, 999999)}'
+            starter_readme = {
+                'id': fid_readme,
+                'name': 'README.md',
+                'language': 'Markdown',
+                'content': '# HITBASIC Editor\n\n- Use the \'+ NEW\' button to create files.\n- Click a file in the dock to open it.\n- Use the toolbar for Save/Rename/Delete.\n- Drag-and-drop text files onto the editor page to import.\n',
+                'undos': [],
+                'redos': [],
+                'readonly': True,
+            }
+            client_state['files'] = [starter_readme]
+            client_state['active_id'] = starter_readme['id']
+
         _refresh_file_pool()
 
+        # Load the active file into the editor if present
         if client_state['files'] and client_state['active_id']:
             target = next(
                 (f for f in client_state['files'] if f['id'] == client_state['active_id']),
@@ -881,9 +1020,10 @@ def editor_page() -> None:
             )
             client_state['active_id'] = target['id']
             _load_file_into_editor(target)
-        elif client_state['files']:
-            client_state['active_id'] = client_state['files'][0]['id']
-            _load_file_into_editor(client_state['files'][0])
+
+        # Ensure server-side state is persisted to client localStorage so the
+        # newly created starter file remains available on subsequent loads.
+        _save_to_storage()
 
     ui.timer(0.8, _init, once=True)
 

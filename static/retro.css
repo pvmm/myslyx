@@ -337,6 +337,15 @@ html, body {
     background: #cc0000;
 }
 
+/* Read-only padlock indicator inside file tabs */
+.wb-file-tab .file-lock {
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    font-size: 10px;
+    opacity: 0.95;
+}
+
 /* ===== File pool "New File" button ===== */
 .wb-new-file {
     font-family: var(--wb-font);
@@ -465,10 +474,22 @@ html, body {
     font-family: var(--wb-editor-font, 'Press Start 2P') !important;
     font-size: calc(var(--wb-editor-font-size, 13px)) !important;
     line-height: 1.35;
+    padding-top: 6px;
+    padding-bottom: 6px;
 }
 .cm-editor .cm-gutters {
     font-family: var(--wb-editor-font, 'Press Start 2P') !important;
-    font-size: calc(var(--wb-editor-font-size, 13px) - 2px);
+    font-size: calc(var(--wb-editor-font-size, 13px)) !important;
+    line-height: 1.35;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+/* Ensure the scroller and gutters use the same box model so line heights align */
+.cm-editor .cm-scroller {
+    box-sizing: border-box;
+    padding-top: 6px;
+    padding-bottom: 6px;
 }
 
 .wb-main-area {
@@ -482,6 +503,12 @@ html, body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+
+/* Visual indicator when dragging files over the editor */
+.wb-editor-area.wb-drag-over {
+    outline: 3px dashed var(--wb-blue);
+    background-color: rgba(0,85,170,0.03);
 }
 
 .wb-hints-sidebar {
