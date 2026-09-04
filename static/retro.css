@@ -187,6 +187,22 @@ html, body {
         inset 1px 1px 0 var(--wb-border-dark);
 }
 
+/* Delete button variant */
+.wb-button.wb-delete {
+    background: #cc0000;
+    color: #ffffff;
+    border-color: #000000;
+}
+.wb-button.wb-delete:hover {
+    background: #ff3333;
+    color: #ffffff;
+}
+.wb-button.wb-delete:active {
+    box-shadow:
+        inset -1px -1px 0 var(--wb-border-light),
+        inset 1px 1px 0 var(--wb-border-dark);
+}
+
 /* ===== WB Toolbar ===== */
 .wb-toolbar {
     background: var(--wb-bg-dark);

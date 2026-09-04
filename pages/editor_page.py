@@ -243,12 +243,8 @@ def _autocomplete_inject_js(hints_content_id: str) -> str:
             const langHints = window.WBHints ? window.WBHints[hintLang] : null;
             const matches = getCompletions(word, langHints);
             if (matches.length > 0) {
-                matches.forEach(function(m) { popupItems._match = m; });
                 /* We need to tag each match with itself */
-                const tagged = matches.map(function(m) {
-                    const taggedItem = m;
-                    return taggedItem;
-                });
+                const tagged = matches.map(function(m) { return m; });
                 /* Rewrite popup items to have _match reference */
                 showPopup(cm, tagged, line.from + start);
                 /* Re-tag items on popup */
@@ -392,7 +388,7 @@ def _storage_io_js() -> str:
     '''
 
 
-@ui.page('/editor', favicon='/static/favicon.ico')
+@ui.page('/editor', favicon='/static/favicon.svg')
 def editor_page() -> None:
     ui.add_head_html('<link rel="stylesheet" href="/static/retro.css">')
     ui.add_head_html(_storage_io_js())
@@ -448,9 +444,16 @@ def editor_page() -> None:
             )
 
             with ui.element('div').style('margin-left:auto;display:flex;gap:4px;'):
+                ui.button('UNDO', on_click=lambda: _undo()).classes('wb-button').props('id=wb-undo-btn')
+                ui.button('REDO', on_click=lambda: _redo()).classes('wb-button').props('id=wb-redo-btn')
+                # separator between undo/redo and other actions
+                ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 ui.button('SAVE', on_click=lambda: _save_current_file()).classes('wb-button')
-                ui.button('NEW', on_click=lambda: _new_file()).classes('wb-button')
-                ui.button('HOME', on_click=lambda: ui.navigate.to('/')).classes('wb-button')
+                ui.button('RENAME', on_click=lambda: _open_rename_dialog()).classes('wb-button')
+                ui.button('DELETE', on_click=lambda: _open_delete_dialog(), color='red').classes('wb-button')
+                ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
+                ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
+                ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button')
 
         # === Main area: editor + hints sidebar ===
         with ui.element('div').classes('wb-main-area'):
@@ -527,7 +530,7 @@ def editor_page() -> None:
     # ===== File pool management =====
 
     def _refresh_file_pool() -> None:
-        nonlocal file_tabs
+        nonlocal file_tabs, dock
         for tab_id, tab_el in file_tabs.items():
             try:
                 tab_el.delete()
@@ -535,20 +538,22 @@ def editor_page() -> None:
                 pass
         file_tabs.clear()
 
-        for f in client_state['files']:
-            is_active = f['id'] == client_state['active_id']
-            tab = ui.element('div').classes(
-                'wb-file-tab' + (' active' if is_active else '')
-            )
-            with tab:
-                ui.label(_file_icon(f.get('language', 'Text'))).classes('file-icon')
-                ui.label(f['name']).classes('file-name')
-                close_btn = ui.element('div').classes('file-close')
-                with close_btn:
-                    ui.label('X')
-                close_btn.on('click', lambda e, fid=f['id']: _close_file(fid))
-            tab.on('click', lambda e, fid=f['id']: _switch_to_file(fid))
-            file_tabs[f['id']] = tab
+        # Create tabs inside the bottom dock so files appear in the dock area
+        with dock:
+            for f in client_state['files']:
+                is_active = f['id'] == client_state['active_id']
+                tab = ui.element('div').classes(
+                    'wb-file-tab' + (' active' if is_active else '')
+                )
+                with tab:
+                    ui.label(_file_icon(f.get('language', 'Text'))).classes('file-icon')
+                    ui.label(f['name']).classes('file-name')
+                    close_btn = ui.element('div').classes('file-close')
+                    with close_btn:
+                        ui.label('X')
+                    close_btn.on('click', lambda e, fid=f['id']: _close_file(fid))
+                tab.on('click', lambda e, fid=f['id']: _switch_to_file(fid))
+                file_tabs[f['id']] = tab
 
         n = len(client_state['files'])
         status_files.set_text(f'{n} file{"s" if n != 1 else ""}')
@@ -611,11 +616,39 @@ def editor_page() -> None:
         ui.run_javascript(f"window.__wbCurrentLang = '{cm_lang}';")
         ui.run_javascript(_autocomplete_inject_js(hints_content_id))
         status_lang.set_text(LANGUAGES.get(cm_lang, cm_lang))
+        # ensure undo/redo stacks exist for this file
+        f.setdefault('undos', [])
+        f.setdefault('redos', [])
         ui.run_javascript('''
             (function() {
-                const el = document.querySelector('.cm-editor .cm-content');
-                if (el) el.focus();
-            })()
+                try {
+                    function tryFocus() {
+                        // Prefer the CM6 view focus method if available
+                        try {
+                            if (window.__wbCM && window.__wbCM.getCmView) {
+                                const v = window.__wbCM.getCmView();
+                                if (v && typeof v.focus === 'function') { v.focus(); return true; }
+                            }
+                        } catch(e) {}
+                        // Fallback: look for the editor DOM and focus its content element
+                        const el = document.querySelector('.cm-editor .cm-content');
+                        if (el) { el.focus(); return true; }
+                        // Last resort: try to access cmView attached to .cm-editor
+                        const wrap = document.querySelector('.cm-editor');
+                        if (wrap && wrap.cmView && wrap.cmView.view && typeof wrap.cmView.view.focus === 'function') {
+                            wrap.cmView.view.focus(); return true;
+                        }
+                        return false;
+                    }
+
+                    if (!tryFocus()) {
+                        let retries = 0;
+                        const iv = setInterval(function() {
+                            if (tryFocus() || ++retries > 30) clearInterval(iv);
+                        }, 150);
+                    }
+                } catch(e) {}
+            })();
         ''')
 
     def _sync_editor_to_active() -> None:
@@ -627,11 +660,41 @@ def editor_page() -> None:
                 break
 
     def _save_current_file() -> None:
-        _sync_editor_to_active()
+        # If there's no active file, create one from the current editor contents
+        if not client_state['active_id']:
+            import random
+            fid = f'file_{random.randint(100000, 999999)}'
+            lang = lang_select.value or 'Text'
+            new = {
+                'id': fid,
+                'name': f'untitled_{len(client_state["files"]) + 1}.{_ext_for_lang(lang)}',
+                'language': lang,
+                'content': code_editor.value,
+                'undos': [],
+                'redos': [],
+            }
+            client_state['files'].append(new)
+            client_state['active_id'] = fid
+            _refresh_file_pool()
+            _load_file_into_editor(new)
+        else:
+            _sync_editor_to_active()
         _save_to_storage()
 
     def _on_editor_change(value: str) -> None:
-        _sync_editor_to_active()
+        # Maintain simple per-file undo/redo stacks and persist
+        if client_state['active_id']:
+            for f in client_state['files']:
+                if f['id'] == client_state['active_id']:
+                    undos = f.setdefault('undos', [])
+                    # push previous content to undos (avoid duplicates)
+                    prev = f.get('content', '')
+                    if not undos or undos[-1] != prev:
+                        undos.append(prev)
+                    # clear redo stack on new edit
+                    f['redos'] = []
+                    f['content'] = value
+                    break
         _save_to_storage()
 
     def _on_language_change(language: str) -> None:
@@ -650,8 +713,9 @@ def editor_page() -> None:
 
     def _apply_editor_font(font: str) -> None:
         """Apply the chosen font to the CodeMirror editor via a CSS variable."""
+        safe = f"'{font}', monospace"
         ui.run_javascript(
-            f"document.documentElement.style.setProperty('--wb-editor-font', '{font}');"
+            f"document.documentElement.style.setProperty('--wb-editor-font', \"{safe}\");"
         )
 
     def _on_font_change(font: str) -> None:
@@ -672,6 +736,94 @@ def editor_page() -> None:
             f"localStorage.setItem('wb_editor_font_size', '{int(font_size)}');"
         )
 
+    # ===== Editor actions: undo/redo, download, upload =====
+    def _undo() -> None:
+        if not client_state['active_id']:
+            return
+        for f in client_state['files']:
+            if f['id'] == client_state['active_id']:
+                undos = f.get('undos', [])
+                redos = f.get('redos', [])
+                if not undos:
+                    return
+                current = f.get('content', '')
+                redos.append(current)
+                last = undos.pop()
+                f['content'] = last
+                code_editor.set_value(last)
+                _save_to_storage()
+                _refresh_file_pool()
+                return
+
+    def _redo() -> None:
+        if not client_state['active_id']:
+            return
+        for f in client_state['files']:
+            if f['id'] == client_state['active_id']:
+                redos = f.get('redos', [])
+                if not redos:
+                    return
+                current = f.get('content', '')
+                f.setdefault('undos', []).append(current)
+                nxt = redos.pop()
+                f['content'] = nxt
+                code_editor.set_value(nxt)
+                _save_to_storage()
+                _refresh_file_pool()
+                return
+
+    def _download_current_file() -> None:
+        # Determine content and filename
+        if client_state['active_id']:
+            target = next((f for f in client_state['files'] if f['id'] == client_state['active_id']), None)
+            if target:
+                content = target.get('content', '')
+                filename = target.get('name', 'untitled.txt')
+            else:
+                content = code_editor.value
+                filename = 'untitled.txt'
+        else:
+            content = code_editor.value
+            filename = 'untitled.txt'
+        # Trigger browser download
+        ui.run_javascript(f"""
+            (function() {{
+                const content = {json.dumps(content)};
+                const filename = {json.dumps(filename)};
+                const blob = new Blob([content], {{type:'text/plain'}});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = filename;
+                document.body.appendChild(a); a.click(); a.remove();
+                URL.revokeObjectURL(url);
+            }})()
+        """)
+
+    def _upload_file() -> None:
+        # Use client-side file picker, store into WBStorage and reload page
+        ui.run_javascript('''
+            (function() {
+                const inp = document.createElement('input');
+                inp.type = 'file'; inp.accept = '*/*';
+                inp.onchange = function(ev) {
+                    const f = ev.target.files[0];
+                    if (!f) return;
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        var files = WBStorage.loadFiles() || [];
+                        var newid = WBStorage.generateId();
+                        var newfile = { id: newid, name: f.name, language: 'Text', content: e.target.result };
+                        files.push(newfile);
+                        WBStorage.saveFiles(files);
+                        WBStorage.saveActive(newid);
+                        location.reload();
+                    };
+                    reader.readAsText(f);
+                };
+                inp.click();
+            })();
+        ''')
+
     # ===== Initialize from localStorage =====
     def _init() -> None:
         ui.run_javascript('''
@@ -679,26 +831,41 @@ def editor_page() -> None:
                 if (window.__wbPyBridge && !window.__wbPyBridge.hasFiles()) {
                     window.__wbPyBridge.initDefaults();
                 }
-                var font = localStorage.getItem('wb_editor_font') || 'Press Start 2P';
-                return JSON.stringify({
-                    files: window.__wbPyBridge ? window.__wbPyBridge.getFiles() : [],
-                    active: window.__wbPyBridge ? window.__wbPyBridge.getActive() : null
-                });
+                // Do not rely on server-side callback here; storage will be read
+                // when the client interacts or on subsequent syncs.
             })()
-        ''', callback=_on_storage_loaded)
+        ''')
+        # Fallback: call storage loader without client result; client storage will
+        # be used by client-side code and saved back to server on changes.
+        _on_storage_loaded(None)
         # Restore the saved font preference
         ui.run_javascript('''
             (function() {
                 const f = localStorage.getItem('wb_editor_font') || 'Press Start 2P';
-                document.documentElement.style.setProperty('--wb-editor-font', f);
+                document.documentElement.style.setProperty('--wb-editor-font', "'" + f + "', monospace");
                 const fs = localStorage.getItem('wb_editor_font_size') || '13';
                 document.documentElement.style.setProperty('--wb-editor-font-size', fs + 'px');
+                // Global keybindings for undo/redo (Ctrl/Cmd+Z, Ctrl/Cmd+Y or Ctrl+Shift+Z)
+                document.addEventListener('keydown', function(e) {
+                    const mod = e.ctrlKey || e.metaKey;
+                    if (!mod) return;
+                    if (e.key === 'z' && !e.shiftKey) {
+                        e.preventDefault();
+                        const b = document.getElementById('wb-undo-btn'); if (b) b.click();
+                    } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+                        e.preventDefault();
+                        const b = document.getElementById('wb-redo-btn'); if (b) b.click();
+                    }
+                });
             })()
         ''')
 
     def _on_storage_loaded(result: Any) -> None:
         try:
-            data = json.loads(result) if isinstance(result, str) else result
+            if result is None:
+                data = {'files': [], 'active': None}
+            else:
+                data = json.loads(result) if isinstance(result, str) else result
         except (json.JSONDecodeError, TypeError):
             data = {'files': [], 'active': None}
 
@@ -719,3 +886,66 @@ def editor_page() -> None:
             _load_file_into_editor(client_state['files'][0])
 
     ui.timer(0.8, _init, once=True)
+
+    # ===== Rename dialog =====
+    rename_dialog = ui.dialog()
+    with rename_dialog:
+        with ui.element('div').classes('wb-dialog'):
+            with ui.element('div').classes('wb-title-bar'):
+                ui.label('Rename current file').classes('title-text')
+            with ui.element('div').classes('wb-dialog-body'):
+                rename_input = ui.input(label='New file name').props('id=wb-rename-input')
+            with ui.element('div').classes('wb-dialog-buttons'):
+                ui.button('Cancel', on_click=lambda: rename_dialog.close()).classes('wb-button')
+                ui.button('OK', on_click=lambda: _confirm_rename()).classes('wb-button')
+
+    def _open_rename_dialog() -> None:
+        if not client_state['active_id']:
+            return
+        target = next((f for f in client_state['files'] if f['id'] == client_state['active_id']), None)
+        if not target:
+            return
+        rename_input.set_value(target.get('name', ''))
+        rename_dialog.open()
+        # focus the input inside the dialog after a short delay
+        ui.run_javascript("setTimeout(function(){const el=document.getElementById('wb-rename-input'); if (el) { const inp = el.querySelector('input'); if (inp) inp.focus(); } }, 50);")
+
+    def _confirm_rename() -> None:
+        val = rename_input.value.strip() if hasattr(rename_input, 'value') else None
+        if not val:
+            rename_dialog.close()
+            return
+        if client_state['active_id']:
+            for f in client_state['files']:
+                if f['id'] == client_state['active_id']:
+                    f['name'] = val
+                    break
+        file_name_label.set_text(val)
+        _refresh_file_pool()
+        _save_to_storage()
+        rename_dialog.close()
+
+    # ===== Delete dialog =====
+    delete_dialog = ui.dialog()
+    with delete_dialog:
+        with ui.element('div').classes('wb-dialog'):
+            with ui.element('div').classes('wb-title-bar'):
+                ui.label('Delete current file?').classes('title-text')
+            with ui.element('div').classes('wb-dialog-body'):
+                ui.label('This will permanently remove the current file from the file pool.').style('white-space:pre-line;')
+            with ui.element('div').classes('wb-dialog-buttons'):
+                ui.button('Cancel', on_click=lambda: delete_dialog.close()).classes('wb-button')
+                ui.button('Delete', on_click=lambda: _confirm_delete()).classes('wb-button')
+
+    def _open_delete_dialog() -> None:
+        if not client_state['active_id']:
+            return
+        delete_dialog.open()
+
+    def _confirm_delete() -> None:
+        if not client_state['active_id']:
+            delete_dialog.close()
+            return
+        fid = client_state['active_id']
+        _close_file(fid)
+        delete_dialog.close()

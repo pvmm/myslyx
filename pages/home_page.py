@@ -1,7 +1,7 @@
 from nicegui import ui
 
 
-@ui.page('/', favicon='/static/favicon.ico')
+@ui.page('/', favicon='/static/favicon.svg')
 def home_page() -> None:
     ui.add_head_html(
         '<link rel="stylesheet" href="/static/retro.css">'
