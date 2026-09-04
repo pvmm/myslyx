@@ -1,0 +1,577 @@
+/* Amiga Workbench 2.0/3.0 inspired theme */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Source+Code+Pro:wght@400;700&family=Fira+Code:wght@400;700&family=Courier+Prime:wght@400;700&display=swap');
+
+:root {
+    --wb-bg: #cccccc;
+    --wb-bg-dark: #999999;
+    --wb-blue: #0055aa;
+    --wb-orange: #ff8800;
+    --wb-white: #ffffff;
+    --wb-black: #000000;
+    --wb-highlight: #ff8800;
+    --wb-highlight-text: #000000;
+    --wb-border-light: #ffffff;
+    --wb-border-dark: #555555;
+    --wb-window-bg: #cccccc;
+    --wb-title-bar: #0055aa;
+    --wb-title-text: #ffffff;
+    --wb-text: #000000;
+    --wb-gadget-bg: #888888;
+    --wb-gadget-border-light: #cccccc;
+    --wb-gadget-border-dark: #444444;
+    --wb-font: 'Press Start 2P', monospace;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--wb-bg);
+    background-image: url("data:image/svg+xml,%3Csvg width='2' height='2' viewBox='0 0 2 2' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='1' height='1' fill='%23a0a0a0'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23a0a0a0'/%3E%3C/svg%3E");
+    font-family: var(--wb-font);
+    font-size: 10px;
+    color: var(--wb-text);
+    height: 100vh;
+    overflow: hidden;
+    image-rendering: pixelated;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: unset;
+}
+
+/* ===== WB Window Chrome ===== */
+.wb-window {
+    background: var(--wb-window-bg);
+    border: 3px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark),
+        3px 3px 0 rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.wb-title-bar {
+    background: var(--wb-blue);
+    color: var(--wb-title-text);
+    font-family: var(--wb-font);
+    font-size: 10px;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+    min-height: 22px;
+    border-bottom: 2px solid var(--wb-black);
+}
+
+.wb-title-bar .title-text {
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+}
+
+/* WB close gadget (back-arrow style) */
+.wb-close-gadget {
+    width: 20px;
+    height: 20px;
+    background: var(--wb-gadget-bg);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--wb-black);
+    font-family: var(--wb-font);
+}
+
+.wb-close-gadget:hover {
+    background: var(--wb-orange);
+    color: var(--wb-white);
+}
+
+.wb-close-gadget:active {
+    box-shadow:
+        inset -1px -1px 0 var(--wb-border-light),
+        inset 1px 1px 0 var(--wb-border-dark);
+}
+
+.wb-window-body {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ===== WB Scrollbar Gadget ===== */
+::-webkit-scrollbar {
+    width: 18px;
+    height: 18px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--wb-gadget-bg);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--wb-gadget-bg);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--wb-orange);
+}
+
+::-webkit-scrollbar-button {
+    background: var(--wb-gadget-bg);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark);
+    display: block;
+    height: 18px;
+    width: 18px;
+}
+
+::-webkit-scrollbar-button:hover {
+    background: var(--wb-orange);
+}
+
+/* ===== WB Buttons / Gadgets ===== */
+.wb-button {
+    font-family: var(--wb-font);
+    font-size: 9px;
+    background: var(--wb-gadget-bg);
+    color: var(--wb-black);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark);
+    padding: 6px 12px;
+    cursor: pointer;
+    user-select: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wb-button:hover {
+    background: var(--wb-orange);
+    color: var(--wb-white);
+}
+
+.wb-button:active {
+    box-shadow:
+        inset -1px -1px 0 var(--wb-border-light),
+        inset 1px 1px 0 var(--wb-border-dark);
+}
+
+.wb-button.active {
+    background: var(--wb-blue);
+    color: var(--wb-white);
+    box-shadow:
+        inset -1px -1px 0 var(--wb-border-light),
+        inset 1px 1px 0 var(--wb-border-dark);
+}
+
+/* ===== WB Toolbar ===== */
+.wb-toolbar {
+    background: var(--wb-bg-dark);
+    border-bottom: 2px solid var(--wb-black);
+    padding: 4px 6px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* ===== WB Input / Text fields ===== */
+.wb-input {
+    font-family: var(--wb-font);
+    font-size: 10px;
+    background: var(--wb-white);
+    color: var(--wb-black);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-dark),
+        inset -1px -1px 0 var(--wb-border-light);
+    padding: 4px 6px;
+    outline: none;
+}
+
+.wb-input:focus {
+    background: #ffffcc;
+}
+
+/* ===== WB Select ===== */
+.wb-select {
+    font-family: var(--wb-font);
+    font-size: 9px;
+    background: var(--wb-white);
+    color: var(--wb-black);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-dark),
+        inset -1px -1px 0 var(--wb-border-light);
+    padding: 4px 6px;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+/* ===== File Pool (bottom dock) ===== */
+.wb-dock {
+    background: var(--wb-bg-dark);
+    border-top: 3px solid var(--wb-black);
+    box-shadow:
+        inset 0 1px 0 var(--wb-border-light);
+    padding: 6px;
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+    min-height: 80px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.wb-file-tab {
+    font-family: var(--wb-font);
+    font-size: 8px;
+    background: var(--wb-gadget-bg);
+    color: var(--wb-black);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark);
+    padding: 8px 10px;
+    cursor: pointer;
+    user-select: none;
+    min-width: 80px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    position: relative;
+    white-space: nowrap;
+}
+
+.wb-file-tab:hover {
+    background: var(--wb-orange);
+    color: var(--wb-white);
+}
+
+.wb-file-tab.active {
+    background: var(--wb-blue);
+    color: var(--wb-white);
+    box-shadow:
+        inset -1px -1px 0 var(--wb-border-light),
+        inset 1px 1px 0 var(--wb-border-dark);
+}
+
+.wb-file-tab .file-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.wb-file-tab .file-name {
+    font-size: 7px;
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wb-file-tab .file-close {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    background: var(--wb-orange);
+    border: 1px solid var(--wb-black);
+    color: var(--wb-white);
+    font-size: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.wb-file-tab:hover .file-close {
+    opacity: 1;
+}
+
+.wb-file-tab .file-close:hover {
+    background: #cc0000;
+}
+
+/* ===== File pool "New File" button ===== */
+.wb-new-file {
+    font-family: var(--wb-font);
+    font-size: 8px;
+    background: var(--wb-gadget-bg);
+    color: var(--wb-black);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark);
+    padding: 8px 10px;
+    cursor: pointer;
+    min-width: 80px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    user-select: none;
+}
+
+.wb-new-file:hover {
+    background: var(--wb-orange);
+    color: var(--wb-white);
+}
+
+.wb-new-file:active {
+    box-shadow:
+        inset -1px -1px 0 var(--wb-border-light),
+        inset 1px 1px 0 var(--wb-border-dark);
+}
+
+/* ===== Monaco Editor Overrides for Retro Theme ===== */
+.monaco-editor .margin,
+.monaco-editor .minimap {
+    image-rendering: pixelated;
+}
+
+/* Status bar at the bottom of the editor */
+.wb-status-bar {
+    background: var(--wb-blue);
+    color: var(--wb-title-text);
+    font-family: var(--wb-font);
+    font-size: 8px;
+    padding: 3px 8px;
+    border-top: 2px solid var(--wb-black);
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    user-select: none;
+}
+
+.wb-status-bar .status-item {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+/* ===== Hints Panel ===== */
+.wb-hints-panel {
+    background: var(--wb-white);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-dark),
+        inset -1px -1px 0 var(--wb-border-light);
+    padding: 6px;
+    font-family: var(--wb-font);
+    font-size: 8px;
+    color: var(--wb-text);
+    overflow-y: auto;
+    max-height: 200px;
+}
+
+.wb-hints-panel .hint-title {
+    color: var(--wb-blue);
+    font-weight: bold;
+    margin-bottom: 4px;
+    font-size: 9px;
+}
+
+.wb-hints-panel .hint-text {
+    line-height: 1.6;
+    color: #333;
+}
+
+.wb-hints-panel .hint-empty {
+    color: #888;
+    font-style: italic;
+}
+
+/* ===== Autocomplete Popup Override ===== */
+.monaco-editor .suggest-widget {
+    font-family: var(--wb-font) !important;
+    font-size: 9px !important;
+    background: var(--wb-white) !important;
+    border: 2px solid var(--wb-black) !important;
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-dark),
+        3px 3px 0 rgba(0,0,0,0.3) !important;
+}
+
+/* ===== Animations ===== */
+@keyframes wb-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+.wb-cursor-blink {
+    animation: wb-blink 1s step-end infinite;
+}
+
+/* ===== Layout Helpers ===== */
+.wb-root {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+/* Editor font override — set via JS on .cm-editor */
+.cm-editor .cm-content {
+    font-family: var(--wb-editor-font, 'Press Start 2P') !important;
+    font-size: calc(var(--wb-editor-font-size, 13px)) !important;
+    line-height: 1.35;
+}
+.cm-editor .cm-gutters {
+    font-family: var(--wb-editor-font, 'Press Start 2P') !important;
+    font-size: calc(var(--wb-editor-font-size, 13px) - 2px);
+}
+
+.wb-main-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.wb-editor-area {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.wb-hints-sidebar {
+    width: 260px;
+    background: var(--wb-window-bg);
+    border-left: 3px solid var(--wb-black);
+    box-shadow:
+        inset 1px 0 0 var(--wb-border-light);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.wb-hints-sidebar .hints-header {
+    background: var(--wb-blue);
+    color: var(--wb-title-text);
+    font-family: var(--wb-font);
+    font-size: 9px;
+    padding: 4px 8px;
+    border-bottom: 2px solid var(--wb-black);
+    user-select: none;
+}
+
+.wb-hints-sidebar .hints-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    background: var(--wb-white);
+    border: 2px solid var(--wb-black);
+    margin: 4px;
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-dark);
+    font-family: var(--wb-font);
+    font-size: 8px;
+    line-height: 1.8;
+    color: var(--wb-text);
+}
+
+/* ===== App Header ===== */
+.wb-app-header {
+    background: var(--wb-blue);
+    color: var(--wb-title-text);
+    padding: 6px 12px;
+    border-bottom: 3px solid var(--wb-black);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    user-select: none;
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.wb-app-header .app-title {
+    font-family: var(--wb-font);
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+}
+
+.wb-app-header .app-version {
+    font-family: var(--wb-font);
+    font-size: 7px;
+    color: var(--wb-orange);
+}
+
+/* ===== Dialogs / Overlays ===== */
+.wb-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.wb-dialog {
+    background: var(--wb-window-bg);
+    border: 3px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark),
+        6px 6px 0 rgba(0,0,0,0.4);
+    min-width: 300px;
+    max-width: 500px;
+}
+
+.wb-dialog .wb-title-bar {
+    cursor: default;
+}
+
+.wb-dialog-body {
+    padding: 12px;
+    font-family: var(--wb-font);
+    font-size: 9px;
+}
+
+.wb-dialog-buttons {
+    padding: 8px 12px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    border-top: 2px solid var(--wb-black);
+}

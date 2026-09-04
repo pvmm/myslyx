@@ -1,0 +1,6 @@
+- changing font from "Press Start 2P" and back to it doesn't set the right font in the editor window.
+- save button doesn't seem to work. It should create a file icon below the text editor, like pressing the "+ NEW" button.
+- add undo and redo buttons and default shortcuts.
+- The hints window doesn't work.
+- Remove the "HOME".
+- Add download button and drag to upload to editor (or a button that opens a open file in the editor).
