@@ -2,8 +2,8 @@ from pathlib import Path
 
 from nicegui import ui
 
-FAVICON_PATH = str(Path(__file__).resolve().parents[1] / 'static' / 'favicon.svg')
 
+FAVICON_PATH = str(Path(__file__).resolve().parents[1] / 'static' / 'favicon.svg')
 
 @ui.page('/', favicon=FAVICON_PATH)
 def home_page() -> None:
@@ -23,10 +23,7 @@ def home_page() -> None:
                 with ui.element('div').classes('wb-title-bar'):
                     ui.label('Welcome').classes('title-text')
                 with ui.element('div').style('padding:24px;text-align:center;'):
-                    ui.label('Myslyx Text Editor').style(
-                        'font-family:var(--wb-font);font-size:14px;color:var(--wb-blue);'
-                        'margin-bottom:16px;display:block;'
-                    )
+                    ui.html('Myslyx Text <img src="/static/favicon.svg" alt="" style="vertical-align:middle; width:1em;height:1em;"> Editor')
                     ui.label('A retro-styled code editor').style(
                         'font-family:var(--wb-font);font-size:8px;color:#555;'
                         'display:block;margin-bottom:20px;'

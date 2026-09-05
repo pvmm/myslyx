@@ -664,3 +664,13 @@ html, body {
     justify-content: flex-end;
     border-top: 2px solid var(--wb-black);
 }
+
+/* Favicon as text decoration – shows the favicon inside the element's text */
+.app-title {
+    -webkit-background-clip: text;
+    background-clip: text;
+    background-image: url('/static/favicon.svg');
+    color: transparent;
+    background-size: contain;
+    background-repeat: no-repeat;
+}
