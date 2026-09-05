@@ -832,6 +832,7 @@ def editor_page() -> None:
             const p = await getElement({id}).editorPromise;
             const CM = await import('nicegui-codemirror');
             CM.undo(p);
+            p.focus();
         ''')
 
     def _redo(id: int) -> None:
@@ -845,6 +846,7 @@ def editor_page() -> None:
             const p = await getElement({id}).editorPromise;
             const CM = await import('nicegui-codemirror');
             CM.redo(p);
+            p.focus();
         ''')
 
     def _download_current_file() -> None:
@@ -1102,6 +1104,33 @@ def editor_page() -> None:
                     } catch(e) {}
                 }, 100);
             })()
+        ''')
+        # Give focus back to the editor after toolbar button clicks so the user
+        # can keep typing. Rename/Delete open dialogs with their own focus, so
+        # they are excluded.
+        ui.run_javascript(f'''
+            (function() {{
+                var cmId = {code_editor.id};
+                window.wbRefocusEditor = function() {{
+                    try {{
+                        var el = getElement(cmId);
+                        if (el && el.editorPromise) {{
+                            el.editorPromise.then(function(v) {{ try {{ v.focus(); }} catch(e) {{}} }});
+                            return true;
+                        }}
+                    }} catch(e) {{}}
+                    return false;
+                }};
+                document.addEventListener('click', function(e) {{
+                    try {{
+                        var t = e.target && e.target.closest ? e.target.closest('button') : null;
+                        if (!t) return;
+                        var id = t.id || '';
+                        if (id === 'wb-rename-btn' || id === 'wb-delete-btn') return;
+                        window.wbRefocusEditor();
+                    }} catch(e) {{}}
+                }}, true);
+            }})();
         ''')
 
     def _on_storage_loaded(result: Any) -> None:
