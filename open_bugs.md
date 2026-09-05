@@ -12,7 +12,7 @@ Status updates
 - Font switching: implemented via CSS variable and `localStorage` restore.
 - Save behavior: implemented; files persist to the dock and to `WBStorage`.
 - Undo/Redo: keyboard works; buttons are wired to dispatch native events (verify in each browser).
-- Hints/autocomplete: popup and hints panel wired; validate for target languages.
+- Hints/autocomplete: popup and hints panel wired via a native CM6 update listener (`static/hints.js`); hint data is pluggable — edit `/static/hints/<key>.json` (markdown `tips`/`patterns`) without touching code. User-defined `FUNCTION`/`SUB`/`DEF FN` names are discovered from all pool files and persisted per file id in localStorage (`wb_editor_symbols`).
 - Drag-and-drop upload: implemented; dropped files are read as text and saved to `WBStorage` then the page reloads to show them.
 
 Remaining / follow-ups

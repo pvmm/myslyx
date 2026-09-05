@@ -14,6 +14,13 @@ LANGUAGES: dict[str, str] = {
     'Text': 'Text',
 }
 
+# Maps stored CodeMirror language values to hint dictionary keys (files under
+# static/hints/<key>.json). Unknown languages fall back to plain text.
+HINT_KEYS: dict[str, str] = {
+    'VBScript': 'basic',
+    'Text': 'plaintext',
+}
+
 # Editor font choices (CSS font-family values)
 FONTS: dict[str, str] = {
     'Press Start 2P': 'Press Start 2P',
@@ -30,330 +37,6 @@ DEFAULT_FONT_SIZE = 13
 MIN_FONT_SIZE = 8
 MAX_FONT_SIZE = 28
 
-
-def _autocomplete_inject_js(hints_content_id: str) -> str:
-    """Return JS that injects a custom autocomplete overlay for CodeMirror 6
-    and wires up the hints panel to update on cursor changes."""
-    return '''
-    (function() {
-        /* ===== CM6 EditorView finder ===== */
-        function getCmView() {
-            const el = document.querySelector('.cm-editor');
-            if (!el) return null;
-            return el.cmView ? el.cmView.view : null;
-        }
-
-        /* ===== Autocomplete popup state ===== */
-        let popup = null;
-        let popupItems = [];
-        let popupIndex = 0;
-
-        function removePopup() {
-            if (popup) { popup.remove(); popup = null; }
-            popupItems = [];
-            popupIndex = 0;
-        }
-
-        function showPopup(cm, matches, pos) {
-            removePopup();
-            if (matches.length === 0) return;
-
-            popup = document.createElement('div');
-            popup.className = 'wb-autocomplete-popup';
-            popup.style.cssText =
-                'position:fixed;z-index:10000;background:#fff;border:2px solid #000;' +
-                'box-shadow:inset 1px 1px 0 #555,3px 3px 0 rgba(0,0,0,0.3);' +
-                'font-family:"Press Start 2P",monospace;font-size:9px;max-height:180px;' +
-                'overflow-y:auto;min-width:160px;';
-
-            matches.forEach(function(m, i) {
-                const item = document.createElement('div');
-                item.style.cssText =
-                    'padding:5px 8px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;';
-                if (i === 0) {
-                    item.style.background = '#0055aa';
-                    item.style.color = '#fff';
-                }
-                const label = document.createElement('span');
-                label.textContent = m.label;
-                const kind = document.createElement('span');
-                kind.textContent = m.detail || '';
-                kind.style.opacity = '0.6';
-                kind.style.fontSize = '7px';
-                item.appendChild(label);
-                item.appendChild(kind);
-                item.addEventListener('mouseenter', function() {
-                    popupItems.forEach(function(p) {
-                        p.style.background = '';
-                        p.style.color = '';
-                    });
-                    item.style.background = '#0055aa';
-                    item.style.color = '#fff';
-                    popupIndex = i;
-                });
-                item.addEventListener('click', function() {
-                    insertCompletion(cm, m);
-                });
-                popup.appendChild(item);
-                popupItems.push(item);
-            });
-
-            document.body.appendChild(popup);
-
-            /* Position near cursor */
-            const coords = cm.coordsAtPos(pos);
-            if (coords) {
-                popup.style.left = coords.left + 'px';
-                popup.style.top = (coords.bottom + 4) + 'px';
-            }
-            popupIndex = 0;
-        }
-
-        function insertCompletion(cm, match) {
-            const state = cm.state;
-            const sel = state.selection.main;
-            const line = state.doc.lineAt(sel.head);
-            const lineText = line.text;
-            const cursorCol = sel.head - line.from;
-
-            /* Find the start of the current word */
-            let wordStart = cursorCol;
-            while (wordStart > 0 && /[a-zA-Z0-9_]/.test(lineText[wordStart - 1])) {
-                wordStart--;
-            }
-            const prefix = lineText.slice(wordStart, cursorCol);
-
-            /* Calculate replacement range */
-            const from = line.from + wordStart;
-            const to = sel.head;
-
-            cm.dispatch({
-                changes: { from: from, to: to, insert: match.label },
-                selection: { anchor: from + match.label.length }
-            });
-            removePopup();
-            cm.focus();
-        }
-
-        function getCompletions(word, langHints) {
-            if (!langHints || !word) return [];
-            const all = (langHints.keywords || []).concat(langHints.builtins || []);
-            const lower = word.toLowerCase();
-            return all.filter(function(w) {
-                return w.toLowerCase().startsWith(lower) && w !== word;
-            }).slice(0, 12).map(function(w) {
-                const isKw = (langHints.keywords || []).indexOf(w) >= 0;
-                return { label: w, detail: isKw ? 'keyword' : 'builtin' };
-            });
-        }
-
-        /* ===== Wire up CM6 key events ===== */
-        let debounceTimer = null;
-
-        function wireEvents() {
-            const cm = getCmView();
-            if (!cm) return false;
-
-            /* Prevent double-wiring */
-            if (cm._wbWired) return true;
-            cm._wbWired = true;
-
-            /* Listen for DOM events on the CM content */
-            const contentEl = cm.dom.querySelector('.cm-content');
-            if (!contentEl) return false;
-
-            contentEl.addEventListener('input', function() {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(function() { checkCompletions(cm); }, 80);
-            });
-
-            contentEl.addEventListener('keydown', function(e) {
-                if (!popup) return;
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    movePopup(cm, 1);
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    movePopup(cm, -1);
-                } else if (e.key === 'Enter' || e.key === 'Tab') {
-                    if (popupItems.length > 0) {
-                        e.preventDefault();
-                        insertCompletion(cm, popupItems[popupIndex]._match);
-                    }
-                } else if (e.key === 'Escape') {
-                    removePopup();
-                }
-            });
-
-            /* Close popup on blur */
-            contentEl.addEventListener('blur', function() {
-                setTimeout(removePopup, 150);
-            });
-
-            /* Update hints panel on cursor activity */
-            cm.dispatch = (function(origDispatch) {
-                return function(tr) {
-                    origDispatch.call(cm, tr);
-                    if (tr.selection || tr.docChanged) {
-                        updateHintsPanel(cm);
-                    }
-                };
-            })(cm.dispatch.bind(cm));
-
-            return true;
-        }
-
-        function movePopup(cm, dir) {
-            if (popupItems.length === 0) return;
-            popupItems[popupIndex].style.background = '';
-            popupItems[popupIndex].style.color = '';
-            popupIndex = (popupIndex + dir + popupItems.length) % popupItems.length;
-            popupItems[popupIndex].style.background = '#0055aa';
-            popupItems[popupIndex].style.color = '#fff';
-            popupItems[popupIndex].scrollIntoView({ block: 'nearest' });
-        }
-
-        function checkCompletions(cm) {
-            const state = cm.state;
-            const sel = state.selection.main;
-            const line = state.doc.lineAt(sel.head);
-            const lineText = line.text;
-            const cursorCol = sel.head - line.from;
-
-            /* Get current word */
-            let end = cursorCol;
-            while (end < lineText.length && /[a-zA-Z0-9_]/.test(lineText[end])) end++;
-            let start = cursorCol;
-            while (start > 0 && /[a-zA-Z0-9_]/.test(lineText[start - 1])) start--;
-            const word = lineText.slice(start, end);
-            if (!word || word.length < 1) { removePopup(); return; }
-
-            /* Determine language from CM state */
-            const lang = getLanguageFromView(cm);
-            /* Map CodeMirror language names to hint keys */
-            const langMap = {
-                'vbscript': 'basic', 'VBScript': 'basic',
-                'plaintext': 'plaintext', 'Text': 'plaintext'
-            };
-            const hintLang = langMap[lang] || langMap[window.__wbCurrentLang] || 'plaintext';
-            const langHints = window.WBHints ? window.WBHints[hintLang] : null;
-            const matches = getCompletions(word, langHints);
-            if (matches.length > 0) {
-                /* We need to tag each match with itself */
-                const tagged = matches.map(function(m) { return m; });
-                /* Rewrite popup items to have _match reference */
-                showPopup(cm, tagged, line.from + start);
-                /* Re-tag items on popup */
-                const items = popup.querySelectorAll('div');
-                items.forEach(function(item, i) {
-                    item._match = tagged[i];
-                });
-            } else {
-                removePopup();
-            }
-        }
-
-        /* ===== Hints panel updater ===== */
-        function getLanguageFromView(cm) {
-            /* Try to extract language from CM6 state */
-            try {
-                const langFacet = cm.state.facet ? cm.state.facet(cm.state.facet.constructor) : null;
-            } catch(e) {}
-            /* Fallback: look at the data-lang attribute or class */
-            const el = cm.dom;
-            if (el) {
-                const cls = el.className || '';
-                const m = cls.match(/lang-(\\w+)/);
-                if (m) return m[1];
-            }
-            return window.__wbCurrentLang || 'plaintext';
-        }
-
-        function updateHintsPanel(cm) {
-            const hintsEl = document.getElementById("''' + hints_content_id + '''");
-            if (!hintsEl) return;
-
-            const state = cm.state;
-            const sel = state.selection.main;
-            const line = state.doc.lineAt(sel.head);
-            const lineText = line.text;
-            const cursorCol = sel.head - line.from;
-
-            /* Get current word */
-            let end = cursorCol;
-            while (end < lineText.length && /[a-zA-Z0-9_]/.test(lineText[end])) end++;
-            let start = cursorCol;
-            while (start > 0 && /[a-zA-Z0-9_]/.test(lineText[start - 1])) start--;
-            const word = lineText.slice(start, end);
-
-            if (!word || !window.WBHints) {
-                hintsEl.innerHTML = '<div class="hint-empty">Type code and move cursor to see hints.</div>';
-                return;
-            }
-
-            const rawLang = getLanguageFromView(cm);
-            const langMap = {
-                'vbscript': 'basic', 'VBScript': 'basic',
-                'plaintext': 'plaintext', 'Text': 'plaintext'
-            };
-            const lang = langMap[rawLang] || langMap[window.__wbCurrentLang] || 'plaintext';
-            const hints = window.WBHints[lang];
-            if (!hints) {
-                hintsEl.innerHTML = '<div class="hint-empty">No hints for ' + rawLang + '.</div>';
-                return;
-            }
-
-            /* Check word tips */
-            let tip = hints.tips ? hints.tips[word] : null;
-
-            /* Check pattern-based tips */
-            if (!tip && hints.patterns) {
-                for (let i = 0; i < hints.patterns.length; i++) {
-                    try {
-                        const re = new RegExp(hints.patterns[i].re);
-                        const m = lineText.match(re);
-                        if (m) {
-                            tip = hints.patterns[i].tip;
-                            break;
-                        }
-                    } catch(e) {}
-                }
-            }
-
-            if (tip) {
-                const lines = tip.split('\\n').map(function(l) { return '<div>' + l + '</div>'; }).join('');
-                hintsEl.innerHTML =
-                    '<div class="hint-title">' + word + '</div>' +
-                    '<div class="hint-text">' + lines + '</div>';
-            } else if ((hints.keywords || []).indexOf(word) >= 0) {
-                hintsEl.innerHTML =
-                    '<div class="hint-title">' + word + '</div>' +
-                    '<div class="hint-text">' + word + ' is a language keyword.</div>';
-            } else if ((hints.builtins || []).indexOf(word) >= 0) {
-                hintsEl.innerHTML =
-                    '<div class="hint-title">' + word + '</div>' +
-                    '<div class="hint-text">' + word + ' is a builtin function/object.</div>';
-            } else {
-                hintsEl.innerHTML = '<div class="hint-empty">No hint for "' + word + '".</div>';
-            }
-        }
-
-        /* ===== Public API ===== */
-        window.__wbCM = {
-            wireEvents: wireEvents,
-            getCmView: getCmView,
-            removePopup: removePopup
-        };
-
-        /* Try wiring immediately, else retry */
-        if (!wireEvents()) {
-            let retries = 0;
-            const iv = setInterval(function() {
-                if (wireEvents() || ++retries > 30) clearInterval(iv);
-            }, 200);
-        }
-    })();
-    '''
 
 
 
@@ -388,6 +71,8 @@ def editor_page() -> None:
     ui.add_head_html('<link rel="stylesheet" href="/static/retro.css">')
     ui.add_head_html(_storage_io_js())
     ui.add_head_html('<script src="/static/retro.js"></script>')
+    ui.add_head_html('<script src="/static/vendor/marked.min.js"></script>')
+    ui.add_head_html('<script src="/static/hints.js"></script>')
 
     hints_content_id = 'hints-content'
 
@@ -585,6 +270,8 @@ def editor_page() -> None:
         _load_file_into_editor(new)
 
     def _close_file(fid: str) -> None:
+        # Drop any persisted user symbols for this file.
+        ui.run_javascript(f'window.__wbPruneSymbols && window.__wbPruneSymbols("{fid}");')
         client_state['files'] = [f for f in client_state['files'] if f['id'] != fid]
         if client_state['active_id'] == fid:
             if client_state['files']:
@@ -630,7 +317,10 @@ def editor_page() -> None:
         else:
             code_editor.set_language(cm_lang)
         ui.run_javascript(f"window.__wbCurrentLang = '{cm_lang}';")
-        ui.run_javascript(_autocomplete_inject_js(hints_content_id))
+        ui.run_javascript(
+            f"window.__wbHintKey = '{HINT_KEYS.get(cm_lang, 'plaintext')}';"
+            f"window.__wbActiveFid = '{f['id']}';"
+        )
         status_lang.set_text(LANGUAGES.get(cm_lang, cm_lang))
         # ensure undo/redo stacks exist for this file
         f.setdefault('undos', [])
@@ -961,6 +651,7 @@ def editor_page() -> None:
                         const name = document.createElement('div'); name.className='file-name'; name.textContent = f.name + (f.readonly ? ' 🔒' : '');
                         const close = document.createElement('div'); close.className='file-close'; close.textContent='X';
                         close.addEventListener('click', function(ev){ ev.stopPropagation(); try{
+                            window.__wbPruneSymbols && window.__wbPruneSymbols(f.id);
                             var files = WBStorage.loadFiles() || [];
                             var idx = files.findIndex(function(x){ return x.id===f.id; });
                             if (idx>=0) { files.splice(idx,1); WBStorage.saveFiles(files); }
@@ -1019,6 +710,8 @@ def editor_page() -> None:
                 document.documentElement.style.setProperty('--wb-editor-font', "'" + f + "', monospace");
                 const fs = localStorage.getItem('wb_editor_font_size') || '13';
                 document.documentElement.style.setProperty('--wb-editor-font-size', fs + 'px');
+                // Expose the CM element id for static hints.js to hook into.
+                window.__wbEditorId = @CMID@;
                 // Global undo/redo operating directly on the editor view.
                 // CodeMirror handles Ctrl/Cmd+Z and Ctrl/Cmd+Y natively while the
                 // editor is focused; these helpers cover focus elsewhere.

@@ -11,6 +11,8 @@ Guidelines for agents
 Key files
 - `pages/editor_page.py` — main NiceGUI page for the editor and toolbar.
 - `static/retro.js` — client-side helpers and storage (`WBStorage`, `WBHints`).
+- `static/hints/` — language hint dictionaries (JSON). To add/change keyword or builtin help texts, see `static/hints/README.md`.
+- `static/hints.js` — hints sidebar, autocomplete popup and user-symbol scanner.
 - `static/retro.css` — theme and editor gutter alignment.
 
 If you need to persist agent notes, add them under `/docs/agents/` and reference this file.
