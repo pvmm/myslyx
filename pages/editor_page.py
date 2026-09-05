@@ -535,8 +535,8 @@ def editor_page() -> None:
 
     def _file_icon(language: str) -> str:
         return {
-            'vbscript': 'HB', 'VBScript': 'HB',
-            'plaintext': 'TX', 'Text': 'TX',
+            'vbscript': 'BAS', 'VBScript': 'BAS',
+            'plaintext': 'TXT', 'Text': 'TXT',
         }.get(language, '??')
 
     # ===== File pool management =====
@@ -635,7 +635,12 @@ def editor_page() -> None:
             # Migrate files saved with a language that no longer exists.
             cm_lang = 'Text'
             f['language'] = 'Text'
-        code_editor.set_language(cm_lang)
+        if cm_lang == 'Text':
+            # Plain text: clear the language extension instead of passing the
+            # name 'Text' (which CodeMirror does not know) to set_language.
+            code_editor.set_language(None)
+        else:
+            code_editor.set_language(cm_lang)
         ui.run_javascript(f"window.__wbCurrentLang = '{cm_lang}';")
         ui.run_javascript(_autocomplete_inject_js(hints_content_id))
         status_lang.set_text(LANGUAGES.get(cm_lang, cm_lang))
