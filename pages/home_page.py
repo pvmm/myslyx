@@ -14,7 +14,7 @@ def home_page() -> None:
     with ui.element('div').classes('wb-root'):
         # App header bar
         with ui.element('div').classes('wb-app-header'):
-            ui.label('HITBASIC').classes('app-title')
+            ui.label('Myslyx Text').classes('app-title')
             ui.label('EDITOR v1.0').classes('app-version')
 
         # Main content area
@@ -23,7 +23,7 @@ def home_page() -> None:
                 with ui.element('div').classes('wb-title-bar'):
                     ui.label('Welcome').classes('title-text')
                 with ui.element('div').style('padding:24px;text-align:center;'):
-                    ui.label('HITBASIC EDITOR').style(
+                    ui.label('Myslyx Text Editor').style(
                         'font-family:var(--wb-font);font-size:14px;color:var(--wb-blue);'
                         'margin-bottom:16px;display:block;'
                     )
@@ -34,7 +34,8 @@ def home_page() -> None:
                     ui.label(
                         'Multiple files in memory with browser persistence.\n'
                         'Syntax highlighting and autocomplete hints.\n'
-                        'Contextual tips panel for coding help.'
+                        'Contextual tips panel for coding help.\n'
+                        'Inline browsable documentation support.'
                     ).style(
                         'font-family:var(--wb-font);font-size:8px;color:#333;'
                         'line-height:2;display:block;margin-bottom:24px;white-space:pre-line;'

@@ -79,7 +79,7 @@ def editor_page() -> None:
     with ui.element('div').classes('wb-root'):
         # === App Header ===
         with ui.element('div').classes('wb-app-header'):
-            ui.label('HITBASIC').classes('app-title')
+            ui.label('Myslyx Text').classes('app-title')
             ui.label('EDITOR v1.0').classes('app-version')
 
         # === Toolbar ===
@@ -825,8 +825,8 @@ def editor_page() -> None:
                 readme_content = readme_path.read_text(encoding='utf-8')
             except (OSError, UnicodeDecodeError):
                 readme_content = (
-                    '# HITBASIC Editor\n\n'
-                    'Welcome to HITBASIC Editor.\n'
+                    '# Myslyx Text Editor\n\n'
+                    'Welcome to Myslyx Text Editor.\n'
                     'Edit STARTUP.txt in the project folder to customize this page.\n'
                 )
             # Only create a single INITIAL starter file and make it active (read-only)

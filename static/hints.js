@@ -1,4 +1,4 @@
-// HITBASIC Editor - hints sidebar, autocomplete popup and user-symbol scanner.
+// Myslyx Text Editor - hints sidebar, autocomplete popup and user-symbol scanner.
 // Data comes from /static/hints/<key>.json (see WBHints.get in retro.js) and the
 // current editor language key + active file id come from server-set globals
 // window.__wbHintKey / window.__wbActiveFid.

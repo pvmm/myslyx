@@ -57,7 +57,7 @@ def _get_server_options() -> tuple[str, int]:
 HOST, PORT = _get_server_options()
 # Auto-reload via uvicorn when code or static files change during development.
 ui.run(
-    title='HITBASIC Editor',
+    title='Myslyx Text Editor',
     host=HOST,
     port=PORT,
     reload=True,

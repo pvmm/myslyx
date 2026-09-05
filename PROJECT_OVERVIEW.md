@@ -38,4 +38,5 @@ Current status (summary)
 	- Intermittent ASGI/engineio error in logs: KeyError `'REQUEST_METHOD'` (needs investigation when certain requests arrive).
 	- Browser favicon requests produce 404s (non-critical).
 	- Cross-browser acceptance testing (Firefox, Chrome) to confirm undo/redo button behavior and DnD UX.
+- Inline browsable documentation support.
 

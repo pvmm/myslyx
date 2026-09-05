@@ -1,4 +1,4 @@
-// HITBASIC Editor - localStorage persistence & editor helpers
+// Myslyx Text Editor - localStorage persistence & editor helpers
 (function() {
     'use strict';
 
@@ -54,11 +54,11 @@
                     name: 'hello.bas',
                     language: 'VBScript',
                     content: [
-                        '10 REM Welcome to HITBASIC Editor',
+                        '10 REM Welcome to Myslyx Text Editor',
                         '20 CLS',
                         '30 INPUT "What is your name? "; N$',
                         '40 PRINT "Hello, "; N$',
-                        '50 PRINT "Welcome to HITBASIC."',
+                        '50 PRINT "Welcome to Myslyx Text."',
                         '60 FOR I = 1 TO 3',
                         '70   SOUND 1, (9 - I) * 100 + 440',
                         '80   FOR J = 1 TO 1000: NEXT J',
@@ -71,7 +71,7 @@
                     name: 'notes.txt',
                     language: 'Text',
                     content: [
-                        '=== HITBASIC EDITOR ===',
+                        '=== Myslyx Text Editor ===',
                         '',
                         'Features:',
                         '  - Multiple files in memory',
