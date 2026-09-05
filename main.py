@@ -55,4 +55,11 @@ def _get_server_options() -> tuple[str, int]:
 
 
 HOST, PORT = _get_server_options()
-ui.run(title='HITBASIC Editor', host=HOST, port=PORT, reload=False)
+# Auto-reload via uvicorn when code or static files change during development.
+ui.run(
+    title='HITBASIC Editor',
+    host=HOST,
+    port=PORT,
+    reload=True,
+    uvicorn_reload_includes='*.py, *.css, *.js',
+)
