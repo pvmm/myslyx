@@ -957,7 +957,7 @@ def editor_page() -> None:
                         const tab = document.createElement('div');
                         tab.className = 'wb-file-tab';
                         // icon
-                        const icon = document.createElement('div'); icon.className='file-icon'; icon.textContent = (f.language && f.language.toLowerCase().startsWith('python')) ? 'PY' : 'TX';
+                        const icon = document.createElement('div'); icon.className='file-icon'; icon.textContent = (f.language && /basic|vbscript/i.test(f.language)) ? 'BAS' : 'TXT';
                         const name = document.createElement('div'); name.className='file-name'; name.textContent = f.name + (f.readonly ? ' 🔒' : '');
                         const close = document.createElement('div'); close.className='file-close'; close.textContent='X';
                         close.addEventListener('click', function(ev){ ev.stopPropagation(); try{
