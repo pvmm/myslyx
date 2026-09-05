@@ -8,14 +8,12 @@ anyio==4.13.0
 argcomplete==3.6.3
 attrs==26.1.0
 bidict==0.24.1
-blivet @ file:///builddir/build/BUILD/python-blivet-3.14.1-build/blivet-3.14.1
 Brlapi==0.8.7
 Brotli==1.2.0
 certifi==2026.1.4
 cffi==2.0.0
 charset-normalizer==3.4.4
 click==8.5.0
-cockpit @ file:///builddir/build/BUILD/cockpit-365-build/cockpit-365/tmp/wheel/cockpit-365-py3-none-any.whl#sha256=cddf2ac7d5a15ca4dd8053463add9587cff7091922f40a3a7136fae5b865ca07
 crypt_r==3.13.1
 cupshelpers==1.0
 dasbus==1.7
@@ -79,7 +77,6 @@ pyenchant==3.3.0
 Pygments==2.21.0
 PyGObject==3.56.3
 pyinotify==0.9.6
-pykickstart @ file:///builddir/build/BUILD/pykickstart-3.69-build/pykickstart-3.69
 pyparted==3.13.0
 PySocks==1.7.1
 python-augeas==1.2.0
@@ -101,8 +98,6 @@ requests==2.33.1
 requests-file==3.0.0
 requests-ftp==0.3.1
 rpm==6.0.2
-selinux @ file:///builddir/build/BUILD/libselinux-3.11-build/libselinux-3.11/src/dist/selinux-3.11-cp314-cp314-linux_x86_64.whl#sha256=e028f96b8a57c596eb2e91c08d937d711954cb0882a6552bf28ddeab938028e3
-sepolicy @ file:///builddir/build/BUILD/policycoreutils-3.11-build/selinux-3.11/python/sepolicy/dist/sepolicy-3.11-py3-none-any.whl#sha256=4215ac0439a505cdb35970cf16a590b4592d8a21f2bc6612e7a216c4490da2a3
 setools==4.6.0
 simple-websocket==1.1.0
 simpleline==1.9.0
