@@ -499,6 +499,9 @@ html, body {
     line-height: 1.35;
     padding-top: 6px;
     padding-bottom: 6px;
+    /* Disable ligatures (e.g. the "fi" pair in Press Start 2P) */
+    font-feature-settings: "liga" 0, "clig" 0;
+    font-variant-ligatures: no-common-ligatures;
 }
 .cm-editor .cm-gutters {
     font-family: var(--wb-editor-font, 'Press Start 2P') !important;
