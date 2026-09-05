@@ -187,6 +187,10 @@ def editor_page() -> None:
                         'font-family:var(--wb-font);font-size:8px;'
                     )
 
+            # Resizable divider between editor and hints sidebar
+            with ui.element('div').props('id=wb-hints-resizer').classes('wb-hints-resizer'):
+                pass
+
             # Hints sidebar
             with ui.element('div').classes('wb-hints-sidebar'):
                 with ui.element('div').classes('hints-header'):

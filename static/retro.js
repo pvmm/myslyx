@@ -148,4 +148,59 @@
         } catch(e) {}
     };
 
+    // ===== Resizable hints sidebar =====
+
+    function setupHintsResizer() {
+        var resizer = document.getElementById('wb-hints-resizer');
+        var sidebar = document.querySelector('.wb-hints-sidebar');
+        var main = document.querySelector('.wb-main-area');
+        if (!resizer || !sidebar || !main) return false;
+
+        // Restore a previously saved width (the editor flexes to fill the rest).
+        var saved = parseInt(localStorage.getItem('wb_hints_width'), 10);
+        if (saved && saved >= 120) sidebar.style.width = saved + 'px';
+
+        var startX = 0;
+        var startW = 0;
+        resizer.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            startX = e.clientX;
+            startW = sidebar.getBoundingClientRect().width;
+            document.body.classList.add('wb-resizing');
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        });
+
+        function onMove(ev) {
+            var dw = startX - ev.clientX; // dragging left shrinks the sidebar
+            var rect = main.getBoundingClientRect();
+            var w = Math.max(120, Math.min(Math.round(rect.width * 0.75), Math.round(startW + dw)));
+            sidebar.style.width = w + 'px';
+        }
+
+        function onUp() {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            document.body.classList.remove('wb-resizing');
+            try {
+                localStorage.setItem('wb_hints_width', Math.round(sidebar.getBoundingClientRect().width));
+            } catch(e) {}
+        }
+
+        resizer._wbResizer = true;
+        return true;
+    }
+
+    function attachResizerWithRetry() {
+        var attempts = 0;
+        var iv = setInterval(function() {
+            if (setupHintsResizer() || ++attempts > 50) clearInterval(iv);
+        }, 200);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachResizerWithRetry);
+    } else {
+        attachResizerWithRetry();
+    }
+
 })();

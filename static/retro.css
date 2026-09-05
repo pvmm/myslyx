@@ -548,6 +548,26 @@ html, body {
     overflow: hidden;
 }
 
+/* Draggable divider between the editor and the hints sidebar */
+.wb-hints-resizer {
+    width: 8px;
+    cursor: col-resize;
+    background: var(--wb-bg-dark);
+    border-left: 2px solid var(--wb-black);
+    border-right: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 0 0 var(--wb-border-light);
+    flex: 0 0 auto;
+    touch-action: none;
+    user-select: none;
+}
+
+.wb-resizing,
+.wb-resizing * {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+
 .wb-hints-sidebar .hints-header {
     background: var(--wb-blue);
     color: var(--wb-title-text);
