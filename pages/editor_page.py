@@ -1,7 +1,10 @@
+import os
 import json
 from typing import Any
 from nicegui import ui
 
+
+undo_counter = 0
 
 # Language options - keys match CodeMirror language names
 LANGUAGES: dict[str, str] = {
@@ -454,13 +457,12 @@ def editor_page() -> None:
 
             file_name_label = (
                 ui.label('untitled')
+                .props('id=wb-file-name')
                 .style('font-family:var(--wb-font);font-size:9px;color:var(--wb-white);margin-left:12px;')
             )
 
             with ui.element('div').style('margin-left:auto;display:flex;gap:4px;'):
                 # Client-side immediate dispatch for snappy undo/redo (fallback to server handlers remain)
-                undo_js = "(function(){var el=document.querySelector('.cm-editor .cm-content'); if(!el){var v=window.__wbCM && window.__wbCM.getCmView && window.__wbCM.getCmView(); if(v && v.dom) el=v.dom.querySelector('.cm-content');} if(!el) return; el.dispatchEvent(new KeyboardEvent('keydown',{key:'z',ctrlKey:true,metaKey:true,bubbles:true,cancelable:true}));})()"
-                redo_js = "(function(){var el=document.querySelector('.cm-editor .cm-content'); if(!el){var v=window.__wbCM && window.__wbCM.getCmView && window.__wbCM.getCmView(); if(v && v.dom) el=v.dom.querySelector('.cm-content');} if(!el) return; el.dispatchEvent(new KeyboardEvent('keydown',{key:'y',ctrlKey:true,metaKey:true,bubbles:true,cancelable:true}));})()"
                 undo_btn = ui.button('UNDO').classes('wb-button')
                 undo_btn.props('id=wb-undo-btn')
                 redo_btn = ui.button('REDO').classes('wb-button')
@@ -474,8 +476,11 @@ def editor_page() -> None:
                 delete_btn = ui.button('DELETE', on_click=lambda: _open_delete_dialog(), color='red').classes('wb-button')
                 delete_btn.props('id=wb-delete-btn')
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
-                ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
                 ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button')
+                ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
+                # Debug-only reset button (visible when WB_DEBUG=1 or DEBUG=1)
+                if os.environ.get('WB_DEBUG', os.environ.get('DEBUG', '0')) in ('1', 'true', 'True'):
+                    ui.button('RESET ALL', on_click=lambda: _trigger_reset(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
 
         # === Main area: editor + hints sidebar ===
         with ui.element('div').classes('wb-main-area'):
@@ -490,6 +495,8 @@ def editor_page() -> None:
                     )
                     .style('flex:1;width:100%;')
                 )
+                undo_btn.on('click', lambda:_undo(code_editor.id))
+                redo_btn.on('click', lambda:_redo(code_editor.id))
 
                 # Status bar
                 with ui.element('div').classes('wb-status-bar'):
@@ -569,7 +576,8 @@ def editor_page() -> None:
                 )
                 with tab:
                     ui.label(_file_icon(f.get('language', 'Text'))).classes('file-icon')
-                    ui.label(f['name']).classes('file-name')
+                    # Append a padlock icon for read-only files
+                    ui.label(f.get('name', '') + (' 🔒' if f.get('readonly') else '')).classes('file-name')
                     close_btn = ui.element('div').classes('file-close')
                     with close_btn:
                         ui.label('X')
@@ -637,7 +645,8 @@ def editor_page() -> None:
         code_editor.set_value(f.get('content', ''))
         # Indicate read-only files in the UI and update toolbar state.
         readonly = bool(f.get('readonly', False))
-        file_name_label.set_text(f['name'] + (' (read-only)' if readonly else ''))
+        # Show a padlock icon for read-only files instead of text
+        file_name_label.set_text(f['name'] + (' 🔒' if readonly else ''))
         cm_lang = f.get('language', 'Text')
         code_editor.set_language(cm_lang)
         ui.run_javascript(f"window.__wbCurrentLang = '{cm_lang}';")
@@ -726,7 +735,10 @@ def editor_page() -> None:
         if client_state['active_id']:
             cur = next((f for f in client_state['files'] if f['id'] == client_state['active_id']), None)
             if cur and cur.get('readonly'):
+                ui.notify('Cannot save read-only file.')
                 return
+            else:
+                ui.notify('Current file saved.')
 
         if not client_state['active_id']:
             import random
@@ -808,36 +820,30 @@ def editor_page() -> None:
         )
 
     # ===== Editor actions: undo/redo, download, upload =====
-    def _undo() -> None:
-        # Use CodeMirror's native undo by dispatching a keyboard event to the editor
-        ui.run_javascript('''
-            (function() {
-                try {
-                    var v = window.__wbCM && window.__wbCM.getCmView && window.__wbCM.getCmView();
-                    var el = null;
-                    if (v && v.dom) el = v.dom.querySelector('.cm-content');
-                    if (!el) el = document.querySelector('.cm-editor .cm-content');
-                    if (!el) return;
-                    var ev = new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, metaKey: true, bubbles: true, cancelable: true});
-                    el.dispatchEvent(ev);
-                } catch(e) {}
-            })();
+    def _undo(id: int) -> None:
+        global undo_counter
+        undo_counter += 1
+        # ugly hack because _undo is called twice
+        if undo_counter % 2 == 0:
+            undo_counter = 0
+            return
+        ui.run_javascript(f'''
+            const p = await getElement({id}).editorPromise;
+            const CM = await import('nicegui-codemirror');
+            CM.undo(p);
         ''')
 
-    def _redo() -> None:
-        # Use CodeMirror's native redo by dispatching a keyboard event to the editor
-        ui.run_javascript('''
-            (function() {
-                try {
-                    var v = window.__wbCM && window.__wbCM.getCmView && window.__wbCM.getCmView();
-                    var el = null;
-                    if (v && v.dom) el = v.dom.querySelector('.cm-content');
-                    if (!el) el = document.querySelector('.cm-editor .cm-content');
-                    if (!el) return;
-                    var ev = new KeyboardEvent('keydown', {key: 'y', ctrlKey: true, metaKey: true, bubbles: true, cancelable: true});
-                    el.dispatchEvent(ev);
-                } catch(e) {}
-            })();
+    def _redo(id: int) -> None:
+        global undo_counter
+        undo_counter += 1
+        # ugly hack because _redo is called twice
+        if undo_counter % 2 == 0:
+            undo_counter = 0
+            return
+        ui.run_javascript(f'''
+            const p = await getElement({id}).editorPromise;
+            const CM = await import('nicegui-codemirror');
+            CM.redo(p);
         ''')
 
     def _download_current_file() -> None:
@@ -878,13 +884,35 @@ def editor_page() -> None:
                     if (!f) return;
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        var files = WBStorage.loadFiles() || [];
-                        var newid = WBStorage.generateId();
-                        var newfile = { id: newid, name: f.name, language: 'Text', content: e.target.result };
-                        files.push(newfile);
-                        WBStorage.saveFiles(files);
-                        WBStorage.saveActive(newid);
-                        location.reload();
+                        try {
+                            var files = WBStorage.loadFiles() || [];
+                            var newid = WBStorage.generateId();
+                            var newfile = { id: newid, name: f.name, language: 'Text', content: e.target.result };
+                            files.push(newfile);
+                            WBStorage.saveFiles(files);
+                            WBStorage.saveActive(newid);
+
+                            // Try to set the editor content in-place using CM view
+                            try {
+                                const wrap = document.querySelector('.cm-editor');
+                                const view = wrap && wrap.cmView && wrap.cmView.view ? wrap.cmView.view : null;
+                                if (view && view.dispatch) {
+                                    const docLen = view.state.doc.length || 0;
+                                    view.dispatch({changes: {from: 0, to: docLen, insert: e.target.result}});
+                                    if (typeof view.focus === 'function') view.focus();
+                                } else {
+                                    // Fallback: try to find the content element and set text
+                                    const el = document.querySelector('.cm-editor .cm-content');
+                                    if (el) {
+                                        // This won't update CM state perfectly but provides visible feedback
+                                        el.textContent = e.target.result;
+                                    }
+                                }
+                            } catch(err) { console.warn('apply upload to editor failed', err); }
+
+                            // Simple visual feedback
+                            try { alert('Imported: ' + f.name); } catch(_) { console.log('Imported', f.name); }
+                        } catch(err) { console.error(err); }
                     };
                     reader.readAsText(f);
                 };
@@ -893,6 +921,20 @@ def editor_page() -> None:
         ''')
 
     # ===== Initialize from localStorage =====
+    def _trigger_reset() -> None:
+        """Trigger a client-side storage reset and reload (debug use only)."""
+        ui.notify('Resetting editor storage and reloading...')
+        ui.run_javascript('''
+            (function(){
+                try{
+                    if (window.__wbPyBridge && window.__wbPyBridge.initDefaults) {
+                        window.__wbPyBridge.initDefaults();
+                    }
+                    localStorage.setItem('wb_editor_schema_v','2');
+                }catch(e){}
+                location.reload();
+            })();
+        ''')
     def _init() -> None:
         ui.run_javascript('''
             (function() {
@@ -934,6 +976,87 @@ def editor_page() -> None:
                 } catch(e) {}
                 // Do not rely on server-side callback here; storage will be read
                 // when the client interacts or on subsequent syncs.
+
+                // ===== Drag-and-drop import (client-side) =====
+                function loadFileIntoEditor(f) {
+                    try {
+                        // Update the editor content using CM view if possible
+                        const wrap = document.querySelector('.cm-editor');
+                        const view = wrap && wrap.cmView && wrap.cmView.view ? wrap.cmView.view : null;
+                        if (view && view.dispatch) {
+                            const docLen = view.state.doc.length || 0;
+                            view.dispatch({changes: {from: 0, to: docLen, insert: f.content}});
+                            if (typeof view.focus === 'function') view.focus();
+                        } else {
+                            const el = document.querySelector('.cm-editor .cm-content');
+                            if (el) el.textContent = f.content;
+                        }
+                        // Update file name label
+                        try { const lbl = document.getElementById('wb-file-name'); if (lbl) lbl.textContent = f.name + (f.readonly ? ' 🔒' : ''); } catch(e){}
+                        // set current language hint
+                        try { window.__wbCurrentLang = f.language || 'Text'; } catch(e){}
+                    } catch(e) { console.warn('loadFileIntoEditor error', e); }
+                }
+
+                function makeDockTabForFile(f) {
+                    try {
+                        const dock = document.querySelector('.wb-dock');
+                        if (!dock) return null;
+                        // create tab
+                        const tab = document.createElement('div');
+                        tab.className = 'wb-file-tab';
+                        // icon
+                        const icon = document.createElement('div'); icon.className='file-icon'; icon.textContent = (f.language && f.language.toLowerCase().startsWith('python')) ? 'PY' : 'TX';
+                        const name = document.createElement('div'); name.className='file-name'; name.textContent = f.name + (f.readonly ? ' 🔒' : '');
+                        const close = document.createElement('div'); close.className='file-close'; close.textContent='X';
+                        close.addEventListener('click', function(ev){ ev.stopPropagation(); try{
+                            var files = WBStorage.loadFiles() || [];
+                            var idx = files.findIndex(function(x){ return x.id===f.id; });
+                            if (idx>=0) { files.splice(idx,1); WBStorage.saveFiles(files); }
+                            if (WBStorage.loadActive()===f.id) {
+                                if (files.length) { WBStorage.saveActive(files[0].id); loadFileIntoEditor(files[0]); }
+                                else { WBStorage.saveActive(null); var lbl=document.getElementById('wb-file-name'); if(lbl) lbl.textContent='no files'; }
+                            }
+                        }catch(e){} tab.remove(); });
+                        tab.addEventListener('click', function(){ try{ document.querySelectorAll('.wb-file-tab').forEach(function(t){ t.classList.remove('active'); }); tab.classList.add('active'); WBStorage.saveActive(f.id); loadFileIntoEditor(f);}catch(e){} });
+                        tab.appendChild(icon); tab.appendChild(name); tab.appendChild(close);
+                        dock.appendChild(tab);
+                        return tab;
+                    } catch(e) { console.warn('makeDockTabForFile error', e); return null; }
+                }
+
+                document.addEventListener('dragover', function(e){ try{ e.preventDefault(); }catch(e){} }, false);
+                document.addEventListener('drop', function(e){
+                    try {
+                        e.preventDefault();
+                        const items = e.dataTransfer && e.dataTransfer.files ? e.dataTransfer.files : null;
+                        if (!items || items.length === 0) return;
+                        for (let i=0;i<items.length;i++) {
+                            const f = items[i];
+                            (function(file){
+                                const reader = new FileReader();
+                                reader.onload = function(ev) {
+                                    try {
+                                        var files = WBStorage.loadFiles() || [];
+                                        var newid = WBStorage.generateId();
+                                        var lang = 'Text';
+                                        if (file.name && file.name.endsWith('.py')) lang='Python';
+                                        if (file.name && (file.name.endsWith('.md')||file.name.endsWith('.markdown'))) lang='Markdown';
+                                        var newfile = { id: newid, name: file.name, language: lang, content: ev.target.result };
+                                        files.push(newfile);
+                                        WBStorage.saveFiles(files);
+                                        WBStorage.saveActive(newid);
+                                        // create dock tab and load into editor
+                                        try { document.querySelectorAll('.wb-file-tab').forEach(function(t){ t.classList.remove('active'); }); } catch(e){}
+                                        makeDockTabForFile(newfile);
+                                        loadFileIntoEditor(newfile);
+                                    } catch(e) { console.error(e); }
+                                };
+                                reader.readAsText(file);
+                            })(f);
+                        }
+                    } catch(e) { console.warn('drop handler error', e); }
+                }, false);
             })()
         ''')
         # Fallback: call storage loader without client result; client storage will
