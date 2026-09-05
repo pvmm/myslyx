@@ -248,6 +248,29 @@ html, body {
     cursor: pointer;
 }
 
+/* Compact the LANG/FONT combo boxes (Quasar q-select internals) */
+.wb-select.q-field {
+    min-height: 0;
+    height: auto;
+}
+
+.wb-select .q-field__control {
+    height: 22px;
+    min-height: 0;
+}
+
+.wb-select .q-field__native {
+    min-height: 0;
+    padding: 0 8px;
+    line-height: 22px;
+}
+
+.wb-select .q-select__dropdown-icon {
+    min-height: 0;
+    line-height: 22px;
+    font-size: 12px;
+}
+
 /* ===== File Pool (bottom dock) ===== */
 .wb-dock {
     background: var(--wb-bg-dark);

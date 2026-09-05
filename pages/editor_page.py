@@ -84,29 +84,33 @@ def editor_page() -> None:
 
         # === Toolbar ===
         with ui.element('div').classes('wb-toolbar'):
-            ui.label('LANG').classes('wb-select-label').style(
-                'font-family:var(--wb-font);font-size:8px;color:var(--wb-white);margin-right:4px;'
-            )
-            lang_select = (
-                ui.select(
-                    LANGUAGES,
-                    value='VBScript',
-                    on_change=lambda e: _on_language_change(e.value),
+            # LANG: label stacked above the combo box
+            with ui.element('div').style('display:flex;flex-direction:column;justify-content:center;gap:2px;'):
+                ui.label('LANG').classes('wb-select-label').style(
+                    'font-family:var(--wb-font);font-size:8px;color:var(--wb-white);'
                 )
-                .classes('wb-select')
-            )
+                lang_select = (
+                    ui.select(
+                        LANGUAGES,
+                        value='VBScript',
+                        on_change=lambda e: _on_language_change(e.value),
+                    )
+                    .classes('wb-select')
+                )
 
-            ui.label('FONT').classes('wb-select-label').style(
-                'font-family:var(--wb-font);font-size:8px;color:var(--wb-white);margin-left:8px;margin-right:4px;'
-            )
-            font_select = (
-                ui.select(
-                    FONTS,
-                    value=DEFAULT_FONT,
-                    on_change=lambda e: _on_font_change(e.value),
+            # FONT: label stacked above the combo box
+            with ui.element('div').style('display:flex;flex-direction:column;justify-content:center;gap:2px;margin-left:8px;'):
+                ui.label('FONT').classes('wb-select-label').style(
+                    'font-family:var(--wb-font);font-size:8px;color:var(--wb-white);'
                 )
-                .classes('wb-select')
-            )
+                font_select = (
+                    ui.select(
+                        FONTS,
+                        value=DEFAULT_FONT,
+                        on_change=lambda e: _on_font_change(e.value),
+                    )
+                    .classes('wb-select')
+                )
 
             font_size_label = (
                 ui.label(f'{DEFAULT_FONT_SIZE}px')
