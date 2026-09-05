@@ -655,36 +655,37 @@ def editor_page() -> None:
         # ensure undo/redo stacks exist for this file
         f.setdefault('undos', [])
         f.setdefault('redos', [])
-        ui.run_javascript('''
-            (function() {
-                try {
-                    function tryFocus() {
-                        // Prefer the CM6 view focus method if available
-                        try {
-                            if (window.__wbCM && window.__wbCM.getCmView) {
-                                const v = window.__wbCM.getCmView();
-                                if (v && typeof v.focus === 'function') { v.focus(); return true; }
-                            }
-                        } catch(e) {}
-                        // Fallback: look for the editor DOM and focus its content element
-                        const el = document.querySelector('.cm-editor .cm-content');
-                        if (el) { el.focus(); return true; }
-                        // Last resort: try to access cmView attached to .cm-editor
-                        const wrap = document.querySelector('.cm-editor');
-                        if (wrap && wrap.cmView && wrap.cmView.view && typeof wrap.cmView.view.focus === 'function') {
-                            wrap.cmView.view.focus(); return true;
-                        }
-                        return false;
-                    }
+        ui.run_javascript(f'''
+            (function() {{
+                var id = {code_editor.id};
+                var attempts = 0;
 
-                    if (!tryFocus()) {
-                        let retries = 0;
-                        const iv = setInterval(function() {
-                            if (tryFocus() || ++retries > 30) clearInterval(iv);
-                        }, 150);
-                    }
-                } catch(e) {}
-            })();
+                function wbFocus() {{
+                    try {{
+                        var el = getElement(id);
+                        if (el && el.editorPromise) {{
+                            el.editorPromise.then(function(v) {{ try {{ v.focus(); }} catch(e) {{}} }});
+                            return true;
+                        }}
+                    }} catch(e) {{}}
+                    return false;
+                }}
+
+                if (!wbFocus()) {{
+                    var iv = setInterval(function() {{
+                        if (wbFocus() || ++attempts > 60) clearInterval(iv);
+                    }}, 150);
+                }}
+
+                // Re-assert focus shortly after the page settles, unless the user
+                // has already moved focus somewhere else.
+                setTimeout(function() {{
+                    try {{
+                        var a = document.activeElement;
+                        if (!a || a === document.body) wbFocus();
+                    }} catch(e) {{}}
+                }}, 400);
+            }})();
         ''')
         # Prevent editing in the editor for read-only files by attaching
         # a short-circuiting input handler directly to the CM content element.
