@@ -391,19 +391,6 @@ def editor_page() -> None:
 
     hints_content_id = 'hints-content'
 
-    # ===== Delete dialog (defined early so toolbar handlers can reference it) =====
-    delete_dialog = ui.dialog()
-    with delete_dialog:
-        with ui.element('div').classes('wb-dialog'):
-            with ui.element('div').classes('wb-title-bar'):
-                ui.label('Delete current file?').classes('title-text')
-            with ui.element('div').classes('wb-dialog-body'):
-                ui.label('This will permanently remove the current file from the file pool.').style('white-space:pre-line;')
-            with ui.element('div').classes('wb-dialog-buttons'):
-                ui.button('Cancel', on_click=lambda: delete_dialog.close()).classes('wb-button')
-                ui.button('Delete', on_click=lambda: _confirm_delete()).classes('wb-button')
-
-
     with ui.element('div').classes('wb-root'):
         # === App Header ===
         with ui.element('div').classes('wb-app-header'):
@@ -565,7 +552,7 @@ def editor_page() -> None:
                     close_btn = ui.element('div').classes('file-close')
                     with close_btn:
                         ui.label('X')
-                    close_btn.on('click', lambda e, fid=f['id']: _close_file(fid))
+                    close_btn.on('click', lambda e, fid=f['id']: _request_close_file(fid))
                 tab.on('click', lambda e, fid=f['id']: _switch_to_file(fid))
                 file_tabs[f['id']] = tab
 
@@ -1191,27 +1178,47 @@ def editor_page() -> None:
         _save_to_storage()
         rename_dialog.close()
 
-    # ===== Delete dialog =====
+    # ===== Delete dialog (shared by the DELETE button and the dock X buttons) =====
+    _pending_delete_fid: str | None = None
     delete_dialog = ui.dialog()
     with delete_dialog:
         with ui.element('div').classes('wb-dialog'):
             with ui.element('div').classes('wb-title-bar'):
-                ui.label('Delete current file?').classes('title-text')
+                ui.label('Delete file?').classes('title-text')
             with ui.element('div').classes('wb-dialog-body'):
-                ui.label('This will permanently remove the current file from the file pool.').style('white-space:pre-line;')
+                delete_prompt = ui.label('This will permanently remove the file from the file pool.').style('white-space:pre-line;')
             with ui.element('div').classes('wb-dialog-buttons'):
-                ui.button('Cancel', on_click=lambda: delete_dialog.close()).classes('wb-button')
+                ui.button('Cancel', on_click=lambda: _cancel_delete()).classes('wb-button')
                 ui.button('Delete', on_click=lambda: _confirm_delete()).classes('wb-button')
 
     def _open_delete_dialog() -> None:
-        if not client_state['active_id']:
+        _request_close_file(client_state['active_id'])
+
+    def _request_close_file(fid: str | None) -> None:
+        nonlocal _pending_delete_fid
+        if not fid:
             return
+        target = next((f for f in client_state['files'] if f['id'] == fid), None)
+        if target and not (target.get('content') or '').strip():
+            # A blank, unedited file can be dropped without confirmation.
+            _close_file(fid)
+            return
+        _pending_delete_fid = fid
+        if target:
+            delete_prompt.set_text(f'Delete "{target["name"]}"?\n\nThis will permanently remove it from the file pool.')
+        else:
+            delete_prompt.set_text('This will permanently remove the file from the file pool.')
         delete_dialog.open()
 
-    def _confirm_delete() -> None:
-        if not client_state['active_id']:
-            delete_dialog.close()
-            return
-        fid = client_state['active_id']
-        _close_file(fid)
+    def _cancel_delete() -> None:
+        nonlocal _pending_delete_fid
         delete_dialog.close()
+        _pending_delete_fid = None
+
+    def _confirm_delete() -> None:
+        nonlocal _pending_delete_fid
+        fid = _pending_delete_fid
+        delete_dialog.close()
+        _pending_delete_fid = None
+        if fid:
+            _close_file(fid)
