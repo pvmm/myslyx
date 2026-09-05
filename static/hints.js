@@ -105,7 +105,7 @@
         var token = ++panelToken;
 
         if (!word) {
-            hintsEl.innerHTML = '<div class="hint-empty">Type code and move cursor to see hints.</div>';
+            // Keep the last hint visible instead of blanking the panel.
             return;
         }
 
@@ -180,7 +180,7 @@
             return;
         }
 
-        hintsEl.innerHTML = '<div class="hint-empty">No hint for "' + word + '".</div>';
+        // 5. No hint found — keep the last displayed hint unchanged.
     }
 
     // ===== Autocomplete popup =====
