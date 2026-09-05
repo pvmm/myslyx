@@ -112,20 +112,26 @@ def editor_page() -> None:
                     .classes('wb-select')
                 )
 
-            font_size_label = (
-                ui.label(f'{DEFAULT_FONT_SIZE}px')
-                .style('font-family:var(--wb-font);font-size:8px;color:var(--wb-white);margin-left:8px;width:28px;')
-            )
-            font_size_slider = (
-                ui.slider(
-                    min=MIN_FONT_SIZE,
-                    max=MAX_FONT_SIZE,
-                    step=1,
-                    value=DEFAULT_FONT_SIZE,
-                    on_change=lambda e: _on_font_size_change(e.value),
+            # Font size: label stacked above the slider
+            with ui.element('div').style('display:flex;flex-direction:column;justify-content:center;gap:2px;margin-left:8px;'):
+                ui.label('FONT SIZE').classes('wb-select-label').style(
+                    'font-family:var(--wb-font);font-size:8px;color:var(--wb-white);'
                 )
-                .style('width:90px;margin-left:6px;')
-            )
+                with ui.element('div').style('display:flex;align-items:center;'):
+                    font_size_label = (
+                        ui.label(f'{DEFAULT_FONT_SIZE}px')
+                        .style('font-family:var(--wb-font);font-size:8px;color:var(--wb-white);width:28px;')
+                    )
+                    font_size_slider = (
+                        ui.slider(
+                            min=MIN_FONT_SIZE,
+                            max=MAX_FONT_SIZE,
+                            step=1,
+                            value=DEFAULT_FONT_SIZE,
+                            on_change=lambda e: _on_font_size_change(e.value),
+                        )
+                        .style('width:90px;margin-left:6px;')
+                    )
 
             file_name_label = (
                 ui.label('untitled')
