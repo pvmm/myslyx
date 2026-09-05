@@ -7,16 +7,11 @@ from nicegui import ui
 
 FAVICON_PATH = str(Path(__file__).resolve().parents[1] / 'static' / 'favicon.svg')
 
-# Language options - keys match CodeMirror language names
+# Language options. Keys are the values stored with files (CodeMirror language
+# names), values are the labels shown in the dropdown.
 LANGUAGES: dict[str, str] = {
-    'Python': 'Python',
-    'JavaScript': 'JavaScript',
-    'TypeScript': 'TypeScript',
-    'HTML': 'HTML',
-    'CSS': 'CSS',
-    'JSON': 'JSON',
-    'Markdown': 'Markdown',
-    'Shell': 'Shell',
+    # HitBasic is a BASIC dialect, so use CodeMirror's BASIC (VBScript) highlighter.
+    'VBScript': 'HitBasic',
     'Text': 'Text',
 }
 
@@ -238,9 +233,7 @@ def _autocomplete_inject_js(hints_content_id: str) -> str:
             const lang = getLanguageFromView(cm);
             /* Map CodeMirror language names to hint keys */
             const langMap = {
-                'python': 'python', 'Python': 'python',
-                'javascript': 'javascript', 'JavaScript': 'javascript',
-                'typescript': 'typescript', 'TypeScript': 'typescript',
+                'vbscript': 'basic', 'VBScript': 'basic',
                 'plaintext': 'plaintext', 'Text': 'plaintext'
             };
             const hintLang = langMap[lang] || langMap[window.__wbCurrentLang] || 'plaintext';
@@ -301,9 +294,7 @@ def _autocomplete_inject_js(hints_content_id: str) -> str:
 
             const rawLang = getLanguageFromView(cm);
             const langMap = {
-                'python': 'python', 'Python': 'python',
-                'javascript': 'javascript', 'JavaScript': 'javascript',
-                'typescript': 'typescript', 'TypeScript': 'typescript',
+                'vbscript': 'basic', 'VBScript': 'basic',
                 'plaintext': 'plaintext', 'Text': 'plaintext'
             };
             const lang = langMap[rawLang] || langMap[window.__wbCurrentLang] || 'plaintext';
@@ -427,8 +418,8 @@ def editor_page() -> None:
             )
             lang_select = (
                 ui.select(
-                    {k: v for k, v in LANGUAGES.items()},
-                    value='Python',
+                    LANGUAGES,
+                    value='VBScript',
                     on_change=lambda e: _on_language_change(e.value),
                 )
                 .classes('wb-select')
@@ -495,7 +486,7 @@ def editor_page() -> None:
                 code_editor = (
                     ui.codemirror(
                         value='',
-                        language='Python',
+                        language='VBScript',
                         theme='basicDark',
                         on_change=lambda e: _on_editor_change(e.value),
                     )
@@ -506,7 +497,7 @@ def editor_page() -> None:
 
                 # Status bar
                 with ui.element('div').classes('wb-status-bar'):
-                    status_lang = ui.label('Python').style(
+                    status_lang = ui.label('HitBasic').style(
                         'font-family:var(--wb-font);font-size:8px;'
                     )
                     status_files = ui.label('0 files').style(
@@ -535,14 +526,7 @@ def editor_page() -> None:
 
     def _ext_for_lang(lang: str) -> str:
         return {
-            'python': 'py', 'Python': 'py',
-            'javascript': 'js', 'JavaScript': 'js',
-            'typescript': 'ts', 'TypeScript': 'ts',
-            'html': 'html', 'HTML': 'html',
-            'css': 'css', 'CSS': 'css',
-            'json': 'json', 'JSON': 'json',
-            'markdown': 'md', 'Markdown': 'md',
-            'shell': 'sh', 'Shell': 'sh',
+            'vbscript': 'bas', 'VBScript': 'bas',
             'plaintext': 'txt', 'Text': 'txt',
         }.get(lang, 'txt')
 
@@ -551,14 +535,7 @@ def editor_page() -> None:
 
     def _file_icon(language: str) -> str:
         return {
-            'python': 'PY', 'Python': 'PY',
-            'javascript': 'JS', 'JavaScript': 'JS',
-            'typescript': 'TS', 'TypeScript': 'TS',
-            'html': 'HT', 'HTML': 'HT',
-            'css': 'CS', 'CSS': 'CS',
-            'json': 'JN', 'JSON': 'JN',
-            'markdown': 'MD', 'Markdown': 'MD',
-            'shell': 'SH', 'Shell': 'SH',
+            'vbscript': 'HB', 'VBScript': 'HB',
             'plaintext': 'TX', 'Text': 'TX',
         }.get(language, '??')
 
@@ -654,6 +631,10 @@ def editor_page() -> None:
         # Show a padlock icon for read-only files instead of text
         file_name_label.set_text(f['name'] + (' 🔒' if readonly else ''))
         cm_lang = f.get('language', 'Text')
+        if cm_lang not in LANGUAGES:
+            # Migrate files saved with a language that no longer exists.
+            cm_lang = 'Text'
+            f['language'] = 'Text'
         code_editor.set_language(cm_lang)
         ui.run_javascript(f"window.__wbCurrentLang = '{cm_lang}';")
         ui.run_javascript(_autocomplete_inject_js(hints_content_id))
@@ -1062,8 +1043,7 @@ def editor_page() -> None:
                                         var files = WBStorage.loadFiles() || [];
                                         var newid = WBStorage.generateId();
                                         var lang = 'Text';
-                                        if (file.name && file.name.endsWith('.py')) lang='Python';
-                                        if (file.name && (file.name.endsWith('.md')||file.name.endsWith('.markdown'))) lang='Markdown';
+                                        if (file.name && file.name.endsWith('.bas')) lang='VBScript';
                                         var newfile = { id: newid, name: file.name, language: lang, content: ev.target.result };
                                         files.push(newfile);
                                         WBStorage.saveFiles(files);
@@ -1146,13 +1126,19 @@ def editor_page() -> None:
         client_state['files'] = data.get('files', [])
         client_state['active_id'] = data.get('active')
 
+        # Migrate files that carry a language no longer offered by the editor
+        # (e.g. saved as Python or Markdown) to plain text.
+        for f in client_state['files']:
+            if f.get('language') not in LANGUAGES:
+                f['language'] = 'Text'
+
         # If there are no files in storage, create a starter file so the UI
         # shows an initial file next to the '+ NEW' button and loads it into
         # the editor. Persist to client storage so page reloads keep it.
         if not client_state['files']:
             import random
-            # Read the project README so the initial file can be edited directly
-            # on disk (README.md in the repository root).
+            # Read the startup file so the initial file can be edited directly
+            # on disk (STARTUP.txt in the repository root).
             readme_path = Path(__file__).resolve().parents[1] / 'STARTUP.txt'
             try:
                 readme_content = readme_path.read_text(encoding='utf-8')
@@ -1160,14 +1146,14 @@ def editor_page() -> None:
                 readme_content = (
                     '# HITBASIC Editor\n\n'
                     'Welcome to HITBASIC Editor.\n'
-                    'Edit README.md in the project folder to customize this page.\n'
+                    'Edit STARTUP.txt in the project folder to customize this page.\n'
                 )
-            # Only create a single README starter file and make it active (read-only)
+            # Only create a single INITIAL starter file and make it active (read-only)
             fid_readme = f'file_{random.randint(100000, 999999)}'
             starter_readme = {
                 'id': fid_readme,
                 'name': 'STARTUP.txt',
-                'language': 'Markdown',
+                'language': 'Text',
                 'content': readme_content,
                 'undos': [],
                 'redos': [],

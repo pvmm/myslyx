@@ -51,20 +51,19 @@
             return [
                 {
                     id: WBStorage.generateId(),
-                    name: 'hello.py',
-                    language: 'Python',
+                    name: 'hello.bas',
+                    language: 'VBScript',
                     content: [
-                        '#!/usr/bin/env python3',
-                        '"""Welcome to HITBASIC Editor"""',
-                        '',
-                        'def greet(name):',
-                        '    """Print a friendly greeting."""',
-                        '    print(f"Hello, {name}!")',
-                        '    print("Welcome to HITBASIC.")',
-                        '',
-                        '',
-                        'if __name__ == "__main__":',
-                        '    greet("User")',
+                        '10 REM Welcome to HITBASIC Editor',
+                        '20 CLS',
+                        '30 INPUT "What is your name? "; N$',
+                        '40 PRINT "Hello, "; N$',
+                        '50 PRINT "Welcome to HITBASIC."',
+                        '60 FOR I = 1 TO 3',
+                        '70   SOUND 1, (9 - I) * 100 + 440',
+                        '80   FOR J = 1 TO 1000: NEXT J',
+                        '90 NEXT I',
+                        '100 END'
                     ].join('\n')
                 },
                 {
@@ -76,28 +75,12 @@
                         '',
                         'Features:',
                         '  - Multiple files in memory',
-                        '  - Syntax highlighting',
+                        '  - BASIC syntax highlighting',
                         '  - Autocomplete hints',
                         '  - Context tips panel',
                         '',
                         'Files persist in browser localStorage.',
                         'Switch files using the dock at the bottom.',
-                    ].join('\n')
-                },
-                {
-                    id: WBStorage.generateId(),
-                    name: 'script.js',
-                    language: 'JavaScript',
-                    content: [
-                        '// Sample JavaScript file',
-                        '',
-                        'function fibonacci(n) {',
-                        '    if (n <= 1) return n;',
-                        '    return fibonacci(n - 1) + fibonacci(n - 2);',
-                        '}',
-                        '',
-                        'const result = fibonacci(10);',
-                        'console.log(`Fibonacci(10) = ${result}`);',
                     ].join('\n')
                 }
             ];
@@ -191,6 +174,39 @@
                 { re: 'async', tip: 'async functions return a Promise. Use await inside.' },
                 { re: 'new\\s+Promise', tip: 'Promises: prefer async/await over .then() chains.' },
                 { re: 'document\\.', tip: 'DOM manipulation. Consider using querySelector().' },
+            ]
+        },
+        basic: {
+            keywords: ['PRINT', 'INPUT', 'LET', 'REM', 'GOTO', 'GOSUB', 'RETURN',
+                       'FOR', 'NEXT', 'STEP', 'IF', 'THEN', 'ELSE', 'END', 'DIM',
+                       'READ', 'DATA', 'RESTORE', 'ON', 'STOP', 'CLS', 'COLOR',
+                       'LOCATE', 'SOUND', 'PLAY', 'SCREEN', 'LINE', 'CIRCLE',
+                       'RANDOMIZE', 'DEF', 'FUNCTION', 'SUB', 'DO', 'LOOP',
+                       'WHILE', 'WEND', 'SELECT', 'CASE', 'OPEN', 'CLOSE',
+                       'BLOAD', 'BSAVE', 'SPRITE', 'AND', 'OR', 'NOT', 'MOD'],
+            builtins: ['SPRITE', 'JOYSTICK', 'TRIG', 'RND', 'INT', 'ABS', 'SGN',
+                      'SQR', 'SIN', 'COS', 'TAN', 'ATN', 'LEFT$', 'RIGHT$',
+                      'MID$', 'LEN', 'STR$', 'VAL', 'ASC', 'CHR$', 'INKEY$',
+                      'TIMER', 'VPEEK', 'VPOKE', 'PEEK', 'POKE', 'OUT', 'INP'],
+            tips: {
+                'PRINT': 'Output text: PRINT "HELLO"\nYou can use ; to keep the cursor on the same line.',
+                'INPUT': 'Read input: INPUT "NAME? "; A$\nStore numeric values in numeric variables.',
+                'LET': 'Assignment: LET A = 10\nLET is optional: A = 10',
+                'GOTO': 'Jump: GOTO 100\nAn old-school jump. Prefer structured control flow.',
+                'GOSUB': 'Call subroutine: GOSUB 1000\nReturn with RETURN.',
+                'RETURN': 'Return from a GOSUB subroutine.',
+                'FOR': 'Loop: FOR I = 1 TO 10\n    PRINT I\nNEXT I',
+                'IF': 'Conditional: IF A > 5 THEN PRINT "BIG"\nOne-line THEN branch.',
+                'THEN': 'Follows the IF condition: IF X THEN ...',
+                'REM': 'Comment: REM this line is ignored\nUse <rem> liberally.',
+                'DIM': 'Dimension an array: DIM A(10)\nIndexes from 1 unless OPTION BASE 0.',
+                'CSRLIN': 'Current cursor row. Use with LOCATE for cursor reading.',
+            },
+            patterns: [
+                { re: 'GOTO\\s+\\d+', tip: 'GOTO line numbers get hard to follow. Prefer loops/subroutines.' },
+                { re: 'GOSUB\\s+\\d+', tip: 'Make sure the subroutine ends with RETURN.' },
+                { re: 'FOR\\s+\\w+\\s*=', tip: 'Always close a FOR with NEXT.' },
+                { re: 'IF\\s+.*\\sTHEN', tip: 'One-line IF. Use IF...THEN...ELSE for both branches.' },
             ]
         },
         plaintext: {
