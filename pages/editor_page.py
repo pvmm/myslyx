@@ -468,8 +468,6 @@ def editor_page() -> None:
                 redo_btn.on('click', lambda: ui.run_javascript('if (window.__wbRedo) window.__wbRedo();'))
                 # separator between undo/redo and other actions
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
-                save_btn = ui.button('SAVE', on_click=lambda: _save_current_file()).classes('wb-button')
-                save_btn.props('id=wb-save-btn')
                 rename_btn = ui.button('RENAME', on_click=lambda: _open_rename_dialog()).classes('wb-button')
                 rename_btn.props('id=wb-rename-btn')
                 delete_btn = ui.button('DELETE', on_click=lambda: _open_delete_dialog(), color='red').classes('wb-button')
@@ -718,7 +716,7 @@ def editor_page() -> None:
             """
         ).replace("{{READONLY}}", readonly_js))
         # Disable/enable toolbar buttons for read-only files by ID
-        ui.run_javascript(f"(function(){{try{{var r={str(readonly).lower()}; var s=document.getElementById('wb-save-btn'); if(s) s.disabled = r; var rn=document.getElementById('wb-rename-btn'); if(rn) rn.disabled = r; var d=document.getElementById('wb-delete-btn'); if(d) d.disabled = r; var u=document.getElementById('wb-undo-btn'); if(u) u.disabled = r; var rr=document.getElementById('wb-redo-btn'); if(rr) rr.disabled = r; }}catch(e){{}}}})()")
+        ui.run_javascript(f"(function(){{try{{var r={str(readonly).lower()}; var rn=document.getElementById('wb-rename-btn'); if(rn) rn.disabled = r; var d=document.getElementById('wb-delete-btn'); if(d) d.disabled = r; var u=document.getElementById('wb-undo-btn'); if(u) u.disabled = r; var rr=document.getElementById('wb-redo-btn'); if(rr) rr.disabled = r; }}catch(e){{}}}})()")
 
     def _sync_editor_to_active() -> None:
         if not client_state['active_id']:
@@ -728,39 +726,9 @@ def editor_page() -> None:
                 f['content'] = code_editor.value
                 break
 
-    def _save_current_file() -> None:
-        # If there's no active file, create one from the current editor contents
-        # Prevent saving over read-only files
-        if client_state['active_id']:
-            cur = next((f for f in client_state['files'] if f['id'] == client_state['active_id']), None)
-            if cur and cur.get('readonly'):
-                ui.notify('Cannot save read-only file.')
-                return
-            else:
-                ui.notify('Current file saved.')
-
-        if not client_state['active_id']:
-            import random
-            fid = f'file_{random.randint(100000, 999999)}'
-            lang = lang_select.value or 'Text'
-            new = {
-                'id': fid,
-                'name': f'untitled_{len(client_state["files"]) + 1}.{_ext_for_lang(lang)}',
-                'language': lang,
-                'content': code_editor.value,
-                'undos': [],
-                'redos': [],
-            }
-            client_state['files'].append(new)
-            client_state['active_id'] = fid
-            _refresh_file_pool()
-            _load_file_into_editor(new)
-        else:
-            _sync_editor_to_active()
-        _save_to_storage()
-
     def _on_editor_change(value: str) -> None:
-        # Maintain simple per-file undo/redo stacks and persist
+        # Autosave: maintain per-file undo/redo stacks and persist content to
+        # storage on every edit of the opened file (unless read-only).
         if client_state['active_id']:
             # Ignore edits on read-only files
             cur = next((f for f in client_state['files'] if f['id'] == client_state['active_id']), None)
