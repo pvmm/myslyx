@@ -148,6 +148,27 @@
         } catch(e) {}
     };
 
+    // ===== Common configuration (UI preferences stored together) =====
+
+    var CONFIG_KEY = 'wb_editor_config';
+
+    window.WBStorage.loadConfig = function() {
+        try {
+            return JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
+        } catch(e) {
+            console.warn('WBStorage: failed to load config', e);
+            return {};
+        }
+    };
+
+    window.WBStorage.saveConfig = function(cfg) {
+        try {
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+        } catch(e) {
+            console.warn('WBStorage: failed to save config', e);
+        }
+    };
+
     // ===== Resizable hints sidebar =====
 
     function setupHintsResizer() {
@@ -157,7 +178,8 @@
         if (!resizer || !sidebar || !main) return false;
 
         // Restore a previously saved width (the editor flexes to fill the rest).
-        var saved = parseInt(localStorage.getItem('wb_hints_width'), 10);
+        var cfg = WBStorage.loadConfig();
+        var saved = parseInt(cfg.hints_width, 10);
         if (saved && saved >= 120) sidebar.style.width = saved + 'px';
 
         var startX = 0;
@@ -182,9 +204,9 @@
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
             document.body.classList.remove('wb-resizing');
-            try {
-                localStorage.setItem('wb_hints_width', Math.round(sidebar.getBoundingClientRect().width));
-            } catch(e) {}
+            var cfg = WBStorage.loadConfig();
+            cfg.hints_width = Math.round(sidebar.getBoundingClientRect().width);
+            WBStorage.saveConfig(cfg);
         }
 
         resizer._wbResizer = true;
