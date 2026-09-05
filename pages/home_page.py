@@ -48,6 +48,7 @@ def home_page() -> None:
                         ).classes('wb-button')
 
                     ui.element('br')
+                    ui.html('© 2026 Pedro "pvm" Medeiros')
                     ui.label(
                         'Your files are saved in the browser.\nNothing is sent to any server.'
                     ).style(

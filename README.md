@@ -1,3 +1,11 @@
+---
+title: Myslyx vintage text editor
+emoji: 📝
+colorFrom: blue
+colorTo: gray
+sdk: docker
+app_port: 7860
+---
 <p>
   <img src="/static/favicon.svg" alt="Project Icon" width="120" height="120">
 </p>
@@ -50,3 +58,5 @@ Developer notes
 
 Contributing
 - Make small, focused changes; run the app locally and test the editor UI after edits. Prefer client-side handlers in `pages/editor_page.py` for frontend behavior.
+
+© 2026 Pedro "pvm" Medeiros
