@@ -1,3 +1,7 @@
+<p>
+  <img src="/static/favicon.svg" alt="Project Icon" width="120" height="120">
+</p>
+
 # Myslyx Text Editor
 
 A small in-browser code editor built with NiceGUI and CodeMirror. Intended for lightweight editing, demos, and agent onboarding within this repository.
