@@ -36,7 +36,6 @@ Current status (summary)
 	- Drag-and-drop currently reloads the page after files are added; consider live insertion to avoid full reload.
 	- Repeated WatchFiles reload churn observed during edits — investigate to reduce spurious reloads.
 	- Intermittent ASGI/engineio error in logs: KeyError `'REQUEST_METHOD'` (needs investigation when certain requests arrive).
-	- Browser favicon requests produce 404s (non-critical).
+	- (Fixed) Browser favicon requests now resolve correctly; `static/favicon.svg` is served.
 	- Cross-browser acceptance testing (Firefox, Chrome) to confirm undo/redo button behavior and DnD UX.
-- Inline browsable documentation support.
 
