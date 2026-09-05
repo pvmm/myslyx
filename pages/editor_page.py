@@ -468,10 +468,12 @@ def editor_page() -> None:
                 redo_btn.on('click', lambda: ui.run_javascript('if (window.__wbRedo) window.__wbRedo();'))
                 # separator between undo/redo and other actions
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
-                rename_btn = ui.button('RENAME', on_click=lambda: _open_rename_dialog()).classes('wb-button')
-                rename_btn.props('id=wb-rename-btn')
-                delete_btn = ui.button('DELETE', on_click=lambda: _open_delete_dialog(), color='red').classes('wb-button')
-                delete_btn.props('id=wb-delete-btn')
+                # Rename/delete stacked in two rows
+                with ui.element('div').style('display:flex;flex-direction:column;gap:4px;'):
+                    rename_btn = ui.button('RENAME', on_click=lambda: _open_rename_dialog()).classes('wb-button')
+                    rename_btn.props('id=wb-rename-btn')
+                    delete_btn = ui.button('DELETE', on_click=lambda: _open_delete_dialog(), color='red').classes('wb-button')
+                    delete_btn.props('id=wb-delete-btn')
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 # Upload/download stacked in two rows
                 with ui.element('div').style('display:flex;flex-direction:column;gap:4px;'):
