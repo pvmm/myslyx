@@ -48,8 +48,5 @@ Developer notes
 
 - Logs and debugging: see `main.py` for middleware that logs HTTP requests and engineio/socketio logger settings.
 
-Known issues
-- Investigating occasional engineio KeyError 'REQUEST_METHOD' when using the reloader. Use `PORT`/`--port` and run without reload for stable testing.
-
 Contributing
 - Make small, focused changes; run the app locally and test the editor UI after edits. Prefer client-side handlers in `pages/editor_page.py` for frontend behavior.
