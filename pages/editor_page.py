@@ -422,6 +422,9 @@ def editor_page() -> None:
 
         # === Toolbar ===
         with ui.element('div').classes('wb-toolbar'):
+            ui.label('LANG').classes('wb-select-label').style(
+                'font-family:var(--wb-font);font-size:8px;color:var(--wb-white);margin-right:4px;'
+            )
             lang_select = (
                 ui.select(
                     {k: v for k, v in LANGUAGES.items()},
@@ -431,6 +434,9 @@ def editor_page() -> None:
                 .classes('wb-select')
             )
 
+            ui.label('FONT').classes('wb-select-label').style(
+                'font-family:var(--wb-font);font-size:8px;color:var(--wb-white);margin-left:8px;margin-right:4px;'
+            )
             font_select = (
                 ui.select(
                     FONTS,
@@ -438,7 +444,6 @@ def editor_page() -> None:
                     on_change=lambda e: _on_font_change(e.value),
                 )
                 .classes('wb-select')
-                .style('margin-left:8px;')
             )
 
             font_size_label = (
