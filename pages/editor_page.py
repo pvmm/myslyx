@@ -468,9 +468,22 @@ def editor_page() -> None:
         )
 
     def _apply_editor_font_size(font_size: float) -> None:
-        ui.run_javascript(
-            f"document.documentElement.style.setProperty('--wb-editor-font-size', '{int(font_size)}px');"
-        )
+        ui.run_javascript(f"""
+            (function() {{
+                // 1. Update the CSS variable for the font size
+                document.documentElement.style.setProperty('--wb-editor-font-size', '{int(font_size)}px');
+                // 2. Safely grab the NiceGUI element and resolve its CodeMirror EditorView instance
+                var el = getElement({code_editor.id});
+                if (el && el.editorPromise) {{
+                    el.editorPromise.then(function(view) {{
+                        if (view && typeof view.requestMeasure === 'function') {{
+                            // 3. Force CodeMirror to recalculate gutter sizing
+                            view.requestMeasure();
+                        }}
+                    }});
+                }}
+            }})()
+        """)
         font_size_label.set_text(f'{int(font_size)}px')
 
     def _on_font_size_change(font_size: float) -> None:
