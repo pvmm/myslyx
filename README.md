@@ -34,7 +34,7 @@ Running
   python main.py --host 127.0.0.1 --port 8081
   HOST=127.0.0.1 PORT=8081 python main.py
 
-- Open the editor in your browser at: http://localhost:8080/editor (adjust port as needed)
+- Open the editor in your browser at: http://localhost:8081/editor (adjust port as needed)
 
 Developer notes
 - Auto-reload is disabled by default to avoid multi-process engineio/socketio ASGI issues while debugging. Re-enable `reload=True` in `main.py` only when you understand the reloader behavior.
@@ -49,6 +49,3 @@ Known issues
 
 Contributing
 - Make small, focused changes; run the app locally and test the editor UI after edits. Prefer client-side handlers in `pages/editor_page.py` for frontend behavior.
-
-License
-- MIT-style (no license file included)
