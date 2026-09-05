@@ -1,7 +1,11 @@
+from pathlib import Path
+
 from nicegui import ui
 
+FAVICON_PATH = str(Path(__file__).resolve().parents[1] / 'static' / 'favicon.svg')
 
-@ui.page('/', favicon='/static/favicon.svg')
+
+@ui.page('/', favicon=FAVICON_PATH)
 def home_page() -> None:
     ui.add_head_html(
         '<link rel="stylesheet" href="/static/retro.css">'

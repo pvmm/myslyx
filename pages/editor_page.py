@@ -1,10 +1,13 @@
 import os
 import json
+from pathlib import Path
 from typing import Any
 from nicegui import ui
 
 
 undo_counter = 0
+
+FAVICON_PATH = str(Path(__file__).resolve().parents[1] / 'static' / 'favicon.svg')
 
 # Language options - keys match CodeMirror language names
 LANGUAGES: dict[str, str] = {
@@ -392,7 +395,7 @@ def _storage_io_js() -> str:
     '''
 
 
-@ui.page('/editor', favicon='/static/favicon.svg')
+@ui.page('/editor', favicon=FAVICON_PATH)
 def editor_page() -> None:
     ui.add_head_html('<link rel="stylesheet" href="/static/retro.css">')
     ui.add_head_html(_storage_io_js())
