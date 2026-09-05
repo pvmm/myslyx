@@ -703,6 +703,10 @@ def editor_page() -> None:
                     var r = {{READONLY}};
                     function makeHandler(){
                         return function(e){
+                            // Block undo/redo (Cmd/Ctrl+Z/Y, Cmd/Ctrl+Shift+Z) on read-only files
+                            if (e.ctrlKey || e.metaKey) {
+                                if (e.key === 'z' || e.key === 'y') { e.preventDefault(); e.stopPropagation(); return false; }
+                            }
                             // Allow navigation keys but block text input and commands
                             var blocked = !(e.key && (e.key.startsWith('Arrow') || e.key==='Tab' || e.key==='Escape' || e.ctrlKey || e.metaKey));
                             if (blocked) { e.preventDefault(); e.stopPropagation(); return false; }
@@ -726,7 +730,7 @@ def editor_page() -> None:
             """
         ).replace("{{READONLY}}", readonly_js))
         # Disable/enable toolbar buttons for read-only files by ID
-        ui.run_javascript(f"(function(){{try{{var r={str(readonly).lower()}; var s=document.getElementById('wb-save-btn'); if(s) s.disabled = r; var rn=document.getElementById('wb-rename-btn'); if(rn) rn.disabled = r; var d=document.getElementById('wb-delete-btn'); if(d) d.disabled = r; }}catch(e){{}}}})()")
+        ui.run_javascript(f"(function(){{try{{var r={str(readonly).lower()}; var s=document.getElementById('wb-save-btn'); if(s) s.disabled = r; var rn=document.getElementById('wb-rename-btn'); if(rn) rn.disabled = r; var d=document.getElementById('wb-delete-btn'); if(d) d.disabled = r; var u=document.getElementById('wb-undo-btn'); if(u) u.disabled = r; var rr=document.getElementById('wb-redo-btn'); if(rr) rr.disabled = r; }}catch(e){{}}}})()")
 
     def _sync_editor_to_active() -> None:
         if not client_state['active_id']:
@@ -1126,13 +1130,24 @@ def editor_page() -> None:
         # the editor. Persist to client storage so page reloads keep it.
         if not client_state['files']:
             import random
+            # Read the project README so the initial file can be edited directly
+            # on disk (README.md in the repository root).
+            readme_path = Path(__file__).resolve().parents[1] / 'README.md'
+            try:
+                readme_content = readme_path.read_text(encoding='utf-8')
+            except (OSError, UnicodeDecodeError):
+                readme_content = (
+                    '# HITBASIC Editor\n\n'
+                    'Welcome to HITBASIC Editor.\n'
+                    'Edit README.md in the project folder to customize this page.\n'
+                )
             # Only create a single README starter file and make it active (read-only)
             fid_readme = f'file_{random.randint(100000, 999999)}'
             starter_readme = {
                 'id': fid_readme,
                 'name': 'README.md',
                 'language': 'Markdown',
-                'content': '# HITBASIC Editor\n\n- Use the \'+ NEW\' button to create files.\n- Click a file in the dock to open it.\n- Use the toolbar for Save/Rename/Delete.\n- Drag-and-drop text files onto the editor page to import.\n',
+                'content': readme_content,
                 'undos': [],
                 'redos': [],
                 'readonly': True,
