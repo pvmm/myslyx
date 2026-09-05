@@ -1132,7 +1132,7 @@ def editor_page() -> None:
             import random
             # Read the project README so the initial file can be edited directly
             # on disk (README.md in the repository root).
-            readme_path = Path(__file__).resolve().parents[1] / 'README.md'
+            readme_path = Path(__file__).resolve().parents[1] / 'STARTUP.txt'
             try:
                 readme_content = readme_path.read_text(encoding='utf-8')
             except (OSError, UnicodeDecodeError):
@@ -1145,7 +1145,7 @@ def editor_page() -> None:
             fid_readme = f'file_{random.randint(100000, 999999)}'
             starter_readme = {
                 'id': fid_readme,
-                'name': 'README.md',
+                'name': 'STARTUP.txt',
                 'language': 'Markdown',
                 'content': readme_content,
                 'undos': [],
