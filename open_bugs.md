@@ -21,6 +21,11 @@ Remaining / follow-ups
 - Investigate ASGI/engineio KeyError `'REQUEST_METHOD'` seen in server logs under some requests.
 - Add browser acceptance tests and note any browser-specific quirks.
 
+Added by user:
+- Set short cuts for Ctrl-+/Ctrl-- to grow/shrink font size.
+- Add keyboards in shortcuts table
+- Add internationalization support?
+
 
 Testing tips
 - Hard-refresh browser after modifying `static/` files to avoid caching issues.
