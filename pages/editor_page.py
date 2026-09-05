@@ -923,19 +923,10 @@ def editor_page() -> None:
 
     # ===== Initialize from localStorage =====
     def _trigger_reset() -> None:
-        """Trigger a client-side storage reset and reload (debug use only)."""
-        ui.notify('Resetting editor storage and reloading...')
-        ui.run_javascript('''
-            (function(){
-                try{
-                    if (window.__wbPyBridge && window.__wbPyBridge.initDefaults) {
-                        window.__wbPyBridge.initDefaults();
-                    }
-                    localStorage.setItem('wb_editor_schema_v','2');
-                }catch(e){}
-                location.reload();
-            })();
-        ''')
+        """Trigger a full client-side reset (storage + caches) and reload."""
+        ui.notify('Resetting editor storage and clearing caches...')
+        ui.run_javascript('window.location.href = window.location.pathname + "?reset=1";')
+
     def _init() -> None:
         ui.run_javascript('''
             (function() {
@@ -943,22 +934,52 @@ def editor_page() -> None:
                     const SCHEMA_KEY = 'wb_editor_schema_v';
                     const SCHEMA_VERSION = '2';
 
-                    // If the URL contains ?reset=1 force reinitialization of client storage
+                    // If the URL contains ?reset=1, wipe storage and caches, then reload the whole app
                     try {
                         const params = new URLSearchParams(window.location.search || '');
                         if (params.get('reset') === '1') {
+                            try {
+                                ['wb_editor_files', 'wb_editor_active', 'wb_editor_schema_v',
+                                 'wb_editor_font', 'wb_editor_font_size']
+                                    .forEach(k => localStorage.removeItem(k));
+                            } catch(e) {}
                             if (window.__wbPyBridge && window.__wbPyBridge.initDefaults) {
                                 window.__wbPyBridge.initDefaults();
                             }
                             localStorage.setItem(SCHEMA_KEY, SCHEMA_VERSION);
-                            // Remove the query param from the URL to avoid repeated resets
+                            // Reload only after clearing CacheStorage (service workers, etc.),
+                            // with a cache-busting param so the whole app is re-fetched.
+                            var reloadNow = function() {
+                                try {
+                                    const url = new URL(window.location.href);
+                                    url.searchParams.delete('reset');
+                                    url.searchParams.set('r', String(Date.now()));
+                                    window.history.replaceState({}, '', url.toString());
+                                } catch(e) {}
+                                window.location.reload();
+                            };
                             try {
-                                const url = new URL(window.location.href);
-                                url.searchParams.delete('reset');
-                                window.history.replaceState({}, '', url.toString());
-                            } catch(e) {}
+                                if (window.caches && window.caches.keys) {
+                                    window.caches.keys().then(function(names) {
+                                        var deletes = names.map(function(n) {
+                                            return window.caches.delete(n).catch(function() {});
+                                        });
+                                        Promise.all(deletes).then(reloadNow).catch(reloadNow);
+                                    }).catch(reloadNow);
+                                } else {
+                                    reloadNow();
+                                }
+                            } catch(e) { reloadNow(); }
                             return;
                         }
+                        // Strip a leftover cache-buster param from a previous reset
+                        try {
+                            if (params.get('r')) {
+                                const url = new URL(window.location.href);
+                                url.searchParams.delete('r');
+                                window.history.replaceState({}, '', url.toString());
+                            }
+                        } catch(e) {}
                     } catch(e) {}
 
                     // If schema changed or missing, reinitialize client storage
