@@ -81,6 +81,14 @@ def editor_page() -> None:
         with ui.element('div').classes('wb-app-header'):
             ui.label('Myslyx Text').classes('app-title')
             ui.label('EDITOR v1.0').classes('app-version')
+            ui.button('?').classes('wb-button').style('margin-left:auto;').on_click(lambda: ui.notify('**Shortcuts**\n'
+                '- **Ctrl+C**: Copy\n'
+                '- **Ctrl+V**: Paste\n'
+                '- **Ctrl+Z**: Undo\n'
+                '- **Ctrl+Y**: Redo\n'
+                '- **Ctrl++**: Increase font size\n'
+                '- **Ctrl+-**: Decrease font size\n'
+                '- **F5**: Refresh editor', type='info'))
 
         # === Toolbar ===
         with ui.element('div').classes('wb-toolbar'):
