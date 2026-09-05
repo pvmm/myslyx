@@ -5,8 +5,6 @@ from typing import Any
 from nicegui import ui
 
 
-undo_counter = 0
-
 FAVICON_PATH = str(Path(__file__).resolve().parents[1] / 'static' / 'favicon.svg')
 
 # Language options - keys match CodeMirror language names
@@ -825,12 +823,6 @@ def editor_page() -> None:
 
     # ===== Editor actions: undo/redo, download, upload =====
     def _undo(id: int) -> None:
-        global undo_counter
-        undo_counter += 1
-        # ugly hack because _undo is called twice
-        if undo_counter % 2 == 0:
-            undo_counter = 0
-            return
         ui.run_javascript(f'''
             const p = await getElement({id}).editorPromise;
             const CM = await import('nicegui-codemirror');
@@ -839,12 +831,6 @@ def editor_page() -> None:
         ''')
 
     def _redo(id: int) -> None:
-        global undo_counter
-        undo_counter += 1
-        # ugly hack because _redo is called twice
-        if undo_counter % 2 == 0:
-            undo_counter = 0
-            return
         ui.run_javascript(f'''
             const p = await getElement({id}).editorPromise;
             const CM = await import('nicegui-codemirror');
@@ -1076,6 +1062,8 @@ def editor_page() -> None:
                 const fs = localStorage.getItem('wb_editor_font_size') || '13';
                 document.documentElement.style.setProperty('--wb-editor-font-size', fs + 'px');
                 // Global keybindings for undo/redo (Ctrl/Cmd+Z, Ctrl/Cmd+Y or Ctrl+Shift+Z)
+                // CodeMirror handles these natively when the editor is focused; this
+                // covers the case where focus is elsewhere, by routing to the buttons.
                 document.addEventListener('keydown', function(e) {
                     const mod = e.ctrlKey || e.metaKey;
                     if (!mod) return;
@@ -1087,25 +1075,6 @@ def editor_page() -> None:
                         const b = document.getElementById('wb-redo-btn'); if (b) b.click();
                     }
                 });
-                // Attach client-side click handlers that dispatch native editor undo/redo
-                setTimeout(function(){
-                    try {
-                        var undoBtn = document.getElementById('wb-undo-btn');
-                        var redoBtn = document.getElementById('wb-redo-btn');
-                        var attach = function(btn, key) {
-                            if (!btn) return;
-                            btn.addEventListener('click', function(ev){
-                                try {
-                                    var k = key === 'undo' ? 'z' : 'y';
-                                    // Dispatch on document so global key handler picks it up
-                                    document.dispatchEvent(new KeyboardEvent('keydown',{key:k,ctrlKey:true,metaKey:true,bubbles:true,cancelable:true}));
-                                } catch(e) {}
-                            });
-                        };
-                        attach(undoBtn, 'undo');
-                        attach(redoBtn, 'redo');
-                    } catch(e) {}
-                }, 100);
             })()
         ''')
         # Give focus back to the editor after toolbar button clicks so the user
