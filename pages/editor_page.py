@@ -1,4 +1,3 @@
-import os
 import json
 from pathlib import Path
 from typing import Any
@@ -458,12 +457,15 @@ def editor_page() -> None:
                 .style('font-family:var(--wb-font);font-size:9px;color:var(--wb-white);margin-left:12px;')
             )
 
-            with ui.element('div').style('margin-left:auto;display:flex;gap:4px;'):
-                # Client-side immediate dispatch for snappy undo/redo (fallback to server handlers remain)
-                undo_btn = ui.button('UNDO').classes('wb-button')
-                undo_btn.props('id=wb-undo-btn')
-                redo_btn = ui.button('REDO').classes('wb-button')
-                redo_btn.props('id=wb-redo-btn')
+            with ui.element('div').style('margin-left:auto;display:flex;align-items:stretch;gap:4px;'):
+                # Undo/redo stacked in two rows (operate directly on the editor view)
+                with ui.element('div').style('display:flex;flex-direction:column;gap:4px;'):
+                    undo_btn = ui.button('UNDO').classes('wb-button')
+                    undo_btn.props('id=wb-undo-btn')
+                    redo_btn = ui.button('REDO').classes('wb-button')
+                    redo_btn.props('id=wb-redo-btn')
+                undo_btn.on('click', lambda: ui.run_javascript('if (window.__wbUndo) window.__wbUndo();'))
+                redo_btn.on('click', lambda: ui.run_javascript('if (window.__wbRedo) window.__wbRedo();'))
                 # separator between undo/redo and other actions
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 save_btn = ui.button('SAVE', on_click=lambda: _save_current_file()).classes('wb-button')
@@ -473,11 +475,12 @@ def editor_page() -> None:
                 delete_btn = ui.button('DELETE', on_click=lambda: _open_delete_dialog(), color='red').classes('wb-button')
                 delete_btn.props('id=wb-delete-btn')
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
-                ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button')
-                ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
-                # Debug-only reset button (visible when WB_DEBUG=1 or DEBUG=1)
-                if os.environ.get('WB_DEBUG', os.environ.get('DEBUG', '0')) in ('1', 'true', 'True'):
-                    ui.button('RESET ALL', on_click=lambda: _trigger_reset(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
+                # Upload/download stacked in two rows
+                with ui.element('div').style('display:flex;flex-direction:column;gap:4px;'):
+                    ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button')
+                    ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
+                # RESET ALL unstacked
+                ui.button('RESET ALL', on_click=lambda: _trigger_reset(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
 
         # === Main area: editor + hints sidebar ===
         with ui.element('div').classes('wb-main-area'):
@@ -492,8 +495,6 @@ def editor_page() -> None:
                     )
                     .style('flex:1;width:100%;')
                 )
-                undo_btn.on('click', lambda:_undo(code_editor.id))
-                redo_btn.on('click', lambda:_redo(code_editor.id))
 
                 # Status bar
                 with ui.element('div').classes('wb-status-bar'):
@@ -687,6 +688,7 @@ def editor_page() -> None:
             (function(){
                 try{
                     var r = {{READONLY}};
+                    window.__wbActiveReadonly = r;
                     function makeHandler(){
                         return function(e){
                             // Block undo/redo (Cmd/Ctrl+Z/Y, Cmd/Ctrl+Shift+Z) on read-only files
@@ -817,22 +819,6 @@ def editor_page() -> None:
         )
 
     # ===== Editor actions: undo/redo, download, upload =====
-    def _undo(id: int) -> None:
-        ui.run_javascript(f'''
-            const p = await getElement({id}).editorPromise;
-            const CM = await import('nicegui-codemirror');
-            CM.undo(p);
-            p.focus();
-        ''')
-
-    def _redo(id: int) -> None:
-        ui.run_javascript(f'''
-            const p = await getElement({id}).editorPromise;
-            const CM = await import('nicegui-codemirror');
-            CM.redo(p);
-            p.focus();
-        ''')
-
     def _download_current_file() -> None:
         # Determine content and filename
         if client_state['active_id']:
@@ -1076,22 +1062,35 @@ def editor_page() -> None:
                 document.documentElement.style.setProperty('--wb-editor-font', "'" + f + "', monospace");
                 const fs = localStorage.getItem('wb_editor_font_size') || '13';
                 document.documentElement.style.setProperty('--wb-editor-font-size', fs + 'px');
-                // Global keybindings for undo/redo (Ctrl/Cmd+Z, Ctrl/Cmd+Y or Ctrl+Shift+Z)
-                // CodeMirror handles these natively when the editor is focused; this
-                // covers the case where focus is elsewhere, by routing to the buttons.
+                // Global undo/redo operating directly on the editor view.
+                // CodeMirror handles Ctrl/Cmd+Z and Ctrl/Cmd+Y natively while the
+                // editor is focused; these helpers cover focus elsewhere.
+                function wbCmDo(action) {
+                    if (window.__wbActiveReadonly) return;
+                    getElement(@CMID@).editorPromise.then(function(p) {
+                        import('nicegui-codemirror').then(function(CM) {
+                            try {
+                                if (action === 'undo') CM.undo(p); else CM.redo(p);
+                                try { p.focus(); } catch(e) {}
+                            } catch(e) {}
+                        });
+                    });
+                }
+                window.__wbUndo = function() { wbCmDo('undo'); };
+                window.__wbRedo = function() { wbCmDo('redo'); };
                 document.addEventListener('keydown', function(e) {
                     const mod = e.ctrlKey || e.metaKey;
                     if (!mod) return;
                     if (e.key === 'z' && !e.shiftKey) {
                         e.preventDefault();
-                        const b = document.getElementById('wb-undo-btn'); if (b) b.click();
+                        window.__wbUndo();
                     } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
                         e.preventDefault();
-                        const b = document.getElementById('wb-redo-btn'); if (b) b.click();
+                        window.__wbRedo();
                     }
                 });
             })()
-        ''')
+        '''.replace('@CMID@', str(code_editor.id)))
         # Give focus back to the editor after toolbar button clicks so the user
         # can keep typing. Rename/Delete open dialogs with their own focus, so
         # they are excluded.
