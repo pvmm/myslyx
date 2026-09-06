@@ -2,5 +2,5 @@ Welcome to Myslyx Text Editor.
 
 - Use the '+ NEW' button to create files.
 - Click a file in the dock to open it.
-- Use the toolbar for Save/Rename/Delete.
 - Drag-and-drop text files onto the editor page to import.
+- Use the toolbar for Rename/Delete.
