@@ -792,7 +792,7 @@ def editor_page() -> None:
                             if (eb) {
                                 const frac = f.export_symbols !== false;
                                 eb.classList.toggle('active', frac);
-                                eb.textContent = frac ? 'EXPORT\nSYMBOLS\nON' : 'EXPORT\nSYMBOLS\nOFF';
+                                eb.textContent = frac ? 'EXPORT\\nSYMBOLS\\nON' : 'EXPORT\\nSYMBOLS\\nOFF';
                             }
                         } catch(e){}
                     } catch(e) { console.warn('loadFileIntoEditor error', e); }
