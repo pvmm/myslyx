@@ -157,7 +157,7 @@ def editor_page() -> None:
                 # separator between undo/redo and other actions
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 # Toggle: globally export the current file's symbols or keep them local
-                export_btn = ui.button('EXPORT\nSYMBOLS').classes('wb-button').props('id=wb-export-btn')
+                export_btn = ui.button('EXPORT\nSYMBOLS\nON').classes('wb-button').props('id=wb-export-btn')
                 export_btn.on('click', lambda: _toggle_symbol_export())
                 export_btn.tooltip('When ON, this file\'s symbols (functions, subs) are available to every open file. Toggle OFF to keep them local to this file.')
                 wrap_btn = ui.button('WRAP\nOFF').classes('wb-button').props('id=wb-wrap-btn')
@@ -335,7 +335,7 @@ def editor_page() -> None:
             None,
         )
         exporting = bool(f.get('export_symbols', True)) if f else True
-        label = 'EXPORT\nSYMBOLS' if exporting else 'LOCAL\nSYMBOLS'
+        label = 'EXPORT\nSYMBOLS\nON' if exporting else 'EXPORT\nSYMBOLS\nOFF'
         export_btn.set_text(label)
         ui.run_javascript(f'''
             (function() {{
@@ -780,7 +780,7 @@ def editor_page() -> None:
                             if (eb) {
                                 const frac = f.export_symbols !== false;
                                 eb.classList.toggle('active', frac);
-                                eb.textContent = frac ? 'EXPORT\nSYMBOLS' : 'LOCAL\nSYMBOLS';
+                                eb.textContent = frac ? 'EXPORT\nSYMBOLS\nON' : 'EXPORT\nSYMBOLS\nOFF';
                             }
                         } catch(e){}
                     } catch(e) { console.warn('loadFileIntoEditor error', e); }
