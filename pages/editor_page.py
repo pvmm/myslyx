@@ -323,12 +323,12 @@ def editor_page() -> None:
         )
         exporting = bool(f.get('export_symbols', True)) if f else True
         label = 'EXPORT\nSYMBOLS' if exporting else 'LOCAL\nSYMBOLS'
+        export_btn.set_text(label)
         ui.run_javascript(f'''
             (function() {{
                 var b = document.getElementById('wb-export-btn');
                 if (!b) return;
                 b.classList.toggle('active', {str(exporting).lower()});
-                b.textContent = {json.dumps(label)};
             }})();
         ''')
 
