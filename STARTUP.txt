@@ -4,3 +4,4 @@ Welcome to Myslyx Text Editor.
 - Click a file in the dock to open it.
 - Drag-and-drop text files onto the editor page to import.
 - Use the toolbar for Rename/Delete.
+- Use the "EXPORT SYMBOLS" button to share through autocomplete the declared symbols.
