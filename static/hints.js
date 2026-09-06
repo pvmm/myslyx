@@ -73,12 +73,25 @@
         var symbols = WBStorage.loadSymbols() || {};
         var files = WBStorage.loadFiles() || [];
         var namesById = {};
-        files.forEach(function(f) { namesById[f.id] = f.name; });
+        var exportById = {};
+        files.forEach(function(f) {
+            namesById[f.id] = f.name;
+            exportById[f.id] = f.export_symbols !== false;
+        });
+        var activeFid = getActiveFid();
         var out = [];
         Object.keys(symbols).forEach(function(fid) {
-            (symbols[fid] || []).forEach(function(s) {
-                out.push({ name: s.name, kind: s.kind, line: s.line, file: namesById[fid] || fid });
-            });
+            // A file with global export disabled only makes its symbols
+            // available while that file is the one being edited.
+            if (exportById[fid] !== false) {
+                (symbols[fid] || []).forEach(function(s) {
+                    out.push({ name: s.name, kind: s.kind, line: s.line, file: namesById[fid] || fid });
+                });
+            } else if (fid === activeFid) {
+                (symbols[fid] || []).forEach(function(s) {
+                    out.push({ name: s.name, kind: s.kind, line: s.line, file: namesById[fid] || fid });
+                });
+            }
         });
         return out;
     }

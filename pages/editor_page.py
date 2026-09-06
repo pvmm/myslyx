@@ -155,6 +155,10 @@ def editor_page() -> None:
                     redo_btn.props('id=wb-redo-btn')
                 undo_btn.on('click', lambda: ui.run_javascript('if (window.__wbUndo) window.__wbUndo();'))
                 redo_btn.on('click', lambda: ui.run_javascript('if (window.__wbRedo) window.__wbRedo();'))
+                # Toggle: globally export the current file's symbols or keep them local
+                export_btn = ui.button('EXPORT').classes('wb-button').props('id=wb-export-btn')
+                export_btn.on('click', lambda: _toggle_symbol_export())
+                export_btn.tooltip('When ON, this file\'s symbols (functions, subs) are available to every open file. Toggle OFF to keep them local to this file.')
                 # separator between undo/redo and other actions
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 # Rename/delete stacked in two rows
@@ -283,12 +287,44 @@ def editor_page() -> None:
             'name': f'untitled_{len(client_state["files"]) + 1}.{_ext_for_lang(lang)}',
             'language': lang,
             'content': '',
+            'export_symbols': True,
         }
         client_state['files'].append(new)
         client_state['active_id'] = fid
         _refresh_file_pool()
         _save_to_storage()
         _load_file_into_editor(new)
+
+    def _toggle_symbol_export() -> None:
+        if not client_state['active_id']:
+            return
+        f = next(
+            (f for f in client_state['files'] if f['id'] == client_state['active_id']),
+            None,
+        )
+        if not f:
+            return
+        f['export_symbols'] = not bool(f.get('export_symbols', True))
+        _save_to_storage()
+        _update_export_button()
+
+    def _update_export_button() -> None:
+        if not client_state['active_id']:
+            return
+        f = next(
+            (f for f in client_state['files'] if f['id'] == client_state['active_id']),
+            None,
+        )
+        exporting = bool(f.get('export_symbols', True)) if f else True
+        label = 'EXPORT' if exporting else 'LOCAL'
+        ui.run_javascript(f'''
+            (function() {{
+                var b = document.getElementById('wb-export-btn');
+                if (!b) return;
+                b.classList.toggle('active', {str(exporting).lower()});
+                b.textContent = {json.dumps(label)};
+            }})();
+        ''')
 
     def _close_file(fid: str) -> None:
         # Drop any persisted user symbols for this file.
@@ -346,6 +382,7 @@ def editor_page() -> None:
         # ensure undo/redo stacks exist for this file
         f.setdefault('undos', [])
         f.setdefault('redos', [])
+        f.setdefault('export_symbols', True)
         ui.run_javascript(f'''
             (function() {{
                 var id = {code_editor.id};
@@ -417,6 +454,7 @@ def editor_page() -> None:
         ).replace("{{READONLY}}", readonly_js))
         # Disable/enable toolbar buttons for read-only files by ID
         ui.run_javascript(f"(function(){{try{{var r={str(readonly).lower()}; var rn=document.getElementById('wb-rename-btn'); if(rn) rn.disabled = r; var d=document.getElementById('wb-delete-btn'); if(d) d.disabled = r; var u=document.getElementById('wb-undo-btn'); if(u) u.disabled = r; var rr=document.getElementById('wb-redo-btn'); if(rr) rr.disabled = r; }}catch(e){{}}}})()")
+        _update_export_button()
 
     def _sync_editor_to_active() -> None:
         if not client_state['active_id']:
@@ -541,7 +579,7 @@ def editor_page() -> None:
                         try {
                             var files = WBStorage.loadFiles() || [];
                             var newid = WBStorage.generateId();
-                            var newfile = { id: newid, name: f.name, language: 'Text', content: e.target.result };
+                            var newfile = { id: newid, name: f.name, language: 'Text', content: e.target.result, export_symbols: true };
                             files.push(newfile);
                             WBStorage.saveFiles(files);
                             WBStorage.saveActive(newid);
@@ -670,6 +708,15 @@ def editor_page() -> None:
                         try { const lbl = document.getElementById('wb-file-name'); if (lbl) lbl.textContent = f.name + (f.readonly ? ' 🔒' : ''); } catch(e){}
                         // set current language hint
                         try { window.__wbCurrentLang = f.language || 'Text'; } catch(e){}
+                        try { window.__wbActiveFid = f.id || null; } catch(e){}
+                        try {
+                            const eb = document.getElementById('wb-export-btn');
+                            if (eb) {
+                                const frac = f.export_symbols !== false;
+                                eb.classList.toggle('active', frac);
+                                eb.textContent = frac ? 'EXPORT' : 'LOCAL';
+                            }
+                        } catch(e){}
                     } catch(e) { console.warn('loadFileIntoEditor error', e); }
                 }
 
@@ -717,7 +764,7 @@ def editor_page() -> None:
                                         var newid = WBStorage.generateId();
                                         var lang = 'Text';
                                         if (file.name && file.name.endsWith('.bas')) lang='VBScript';
-                                        var newfile = { id: newid, name: file.name, language: lang, content: ev.target.result };
+                                        var newfile = { id: newid, name: file.name, language: lang, content: ev.target.result, export_symbols: true };
                                         files.push(newfile);
                                         WBStorage.saveFiles(files);
                                         WBStorage.saveActive(newid);
@@ -846,6 +893,7 @@ def editor_page() -> None:
                 'undos': [],
                 'redos': [],
                 'readonly': True,
+                'export_symbols': True,
             }
             client_state['files'] = [starter_readme]
             client_state['active_id'] = starter_readme['id']
