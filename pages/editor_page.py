@@ -120,7 +120,7 @@ def editor_page() -> None:
 
             # Font size: label stacked above the slider
             with ui.element('div').style('display:flex;flex-direction:column;justify-content:center;gap:2px;margin-left:8px;'):
-                ui.label('FONT SIZE').classes('wb-select-label').style(
+                ui.label('BASE FONT SIZE').classes('wb-select-label').style(
                     'font-family:var(--wb-font);font-size:8px;color:var(--wb-white);'
                 )
                 with ui.element('div').style('display:flex;align-items:center;'):
