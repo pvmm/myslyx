@@ -155,10 +155,12 @@ def editor_page() -> None:
                 undo_btn.on('click', lambda: ui.run_javascript('if (window.__wbUndo) window.__wbUndo();'))
                 redo_btn.on('click', lambda: ui.run_javascript('if (window.__wbRedo) window.__wbRedo();'))
                 # Toggle: globally export the current file's symbols or keep them local
-                with ui.element('div').style('margin-left:auto;display:flex;align-items:stretch;gap:4px;'):
-                    export_btn = ui.button('EXPORT\nSYMBOLS').classes('wb-button').props('id=wb-export-btn')
-                    export_btn.on('click', lambda: _toggle_symbol_export())
-                    export_btn.tooltip('When ON, this file\'s symbols (functions, subs) are available to every open file. Toggle OFF to keep them local to this file.')
+                export_btn = ui.button('EXPORT\nSYMBOLS').classes('wb-button').props('id=wb-export-btn')
+                export_btn.on('click', lambda: _toggle_symbol_export())
+                export_btn.tooltip('When ON, this file\'s symbols (functions, subs) are available to every open file. Toggle OFF to keep them local to this file.')
+                wrap_btn = ui.button('WRAP\nOFF').classes('wb-button').props('id=wb-wrap-btn')
+                wrap_btn.on('click', lambda: _toggle_wrap())
+                wrap_btn.tooltip('Toggle word wrap in the editor.')
                 # separator between undo/redo and other actions
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 # Rename/delete stacked in two rows
@@ -174,6 +176,14 @@ def editor_page() -> None:
                     ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
                 # RESET ALL unstacked
                 ui.button('RESET\nALL', on_click=lambda: _trigger_reset(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
+
+        # Hidden bridge for client->server configuration restore
+        config_bridge = ui.element('div').props('id=wb-config-bridge').style('display:none;')
+        config_bridge.on(
+            'wb-restore-config',
+            lambda e: _on_config_loaded(e.args),
+            js_handler="() => { try { const c = window.WBStorage.loadConfig(); emit(Boolean(c && c.wrap)); } catch(e) { emit(false); } }",
+        )
 
         # === Main area: editor + hints sidebar ===
         with ui.element('div').classes('wb-main-area'):
@@ -219,6 +229,7 @@ def editor_page() -> None:
         'active_id': None,
     }
     file_tabs: dict[str, Any] = {}
+    wrap_enabled: bool = False
 
     # ===== Helper functions =====
 
@@ -330,6 +341,53 @@ def editor_page() -> None:
                 if (!b) return;
                 b.classList.toggle('active', {str(exporting).lower()});
             }})();
+        ''')
+
+    def _apply_wrap(wrap: bool) -> None:
+        ui.run_javascript(f'''
+            (function() {{
+                var el = getElement({code_editor.id});
+                if (el && typeof el.setLineWrapping === 'function') {{
+                    el.setLineWrapping({str(wrap).lower()});
+                }}
+            }})();
+        ''')
+
+    def _update_wrap_button() -> None:
+        label = 'WRAP\nON' if wrap_enabled else 'WRAP\nOFF'
+        wrap_btn.set_text(label)
+        ui.run_javascript(f'''
+            (function() {{
+                var b = document.getElementById('wb-wrap-btn');
+                if (!b) return;
+                b.classList.toggle('active', {str(wrap_enabled).lower()});
+            }})();
+        ''')
+
+    def _toggle_wrap() -> None:
+        nonlocal wrap_enabled
+        wrap_enabled = not wrap_enabled
+        _apply_wrap(wrap_enabled)
+        _update_wrap_button()
+        ui.run_javascript(
+            f"var cfg = WBStorage.loadConfig(); cfg.wrap = {str(wrap_enabled).lower()}; WBStorage.saveConfig(cfg);"
+        )
+
+    def _on_config_loaded(data: Any) -> None:
+        nonlocal wrap_enabled
+        wrap_enabled = bool(data[0]) if isinstance(data, list) and data else bool(data)
+        if wrap_enabled:
+            _apply_wrap(True)
+        _update_wrap_button()
+
+    def _restore_wrap_from_config() -> None:
+        ui.run_javascript('''
+            (function() {
+                try {
+                    var el = document.getElementById('wb-config-bridge');
+                    if (el) el.dispatchEvent(new CustomEvent('wb-restore-config', {detail: {}}));
+                } catch(e) {}
+            })()
         ''')
 
     def _close_file(fid: str) -> None:
@@ -924,6 +982,7 @@ def editor_page() -> None:
         _save_to_storage()
 
     ui.timer(0.8, _init, once=True)
+    ui.timer(1.2, _restore_wrap_from_config, once=True)
 
     # ===== Shortcuts dialog =====
     shortcut_dialog = ui.dialog()
