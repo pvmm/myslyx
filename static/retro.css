@@ -335,6 +335,22 @@ html, body {
     text-overflow: ellipsis;
 }
 
+/* Row that holds the (extension-less) name and the optional read-only padlock,
+   vertically centered so the lock glyph aligns with the text baseline. */
+.wb-file-tab .file-name-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    max-width: 84px;
+    line-height: 1;
+}
+
+.wb-file-tab .file-name-row .file-name {
+    max-width: 70px;
+}
+
 .wb-file-tab .file-close {
     position: absolute;
     top: 2px;
@@ -361,12 +377,13 @@ html, body {
     background: #cc0000;
 }
 
-/* Read-only padlock indicator inside file tabs */
+/* Read-only padlock indicator inside file tabs (inline next to the name,
+   aligned with the text baseline) */
 .wb-file-tab .file-lock {
-    position: absolute;
-    left: 6px;
-    bottom: 6px;
-    font-size: 10px;
+    font-size: 7px;
+    line-height: 1;
+    flex: 0 0 auto;
+    transform: translateY(-1px);
     opacity: 0.95;
 }
 

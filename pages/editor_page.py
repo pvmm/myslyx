@@ -276,8 +276,12 @@ def editor_page() -> None:
                 )
                 with tab:
                     ui.label(_file_icon(f.get('language', 'Text'))).classes('file-icon')
-                    # Append a padlock icon for read-only files
-                    ui.label(_base_name(f.get('name', '')) + (' 🔒' if f.get('readonly') else '')).classes('file-name')
+                    # Read-only files get a separate padlock element centered
+                    # vertically next to the (extension-less) name.
+                    with ui.element('div').classes('file-name-row'):
+                        ui.label(_base_name(f.get('name', ''))).classes('file-name')
+                        if f.get('readonly'):
+                            ui.label('🔒').classes('file-lock')
                     close_btn = ui.element('div').classes('file-close')
                     with close_btn:
                         ui.label('X')
@@ -795,7 +799,10 @@ def editor_page() -> None:
                         tab.className = 'wb-file-tab';
                         // icon
                         const icon = document.createElement('div'); icon.className='file-icon'; icon.textContent = (f.language && /basic|vbscript/i.test(f.language)) ? 'BAS' : ((f.language && /pascal/i.test(f.language)) ? 'PAS' : ((f.language && /^c$/i.test(f.language)) ? 'C' : ((f.language && /z80|asm/i.test(f.language)) ? 'ASM' : 'TXT')));
-                        const name = document.createElement('div'); name.className='file-name'; var dn = String(f.name||''); var di = dn.lastIndexOf('.'); if (di>0) dn = dn.slice(0,di); name.textContent = dn + (f.readonly ? ' 🔒' : '');
+                        const nameRow = document.createElement('div'); nameRow.className='file-name-row';
+                        const name = document.createElement('div'); name.className='file-name'; var dn = String(f.name||''); var di = dn.lastIndexOf('.'); if (di>0) dn = dn.slice(0,di); name.textContent = dn;
+                        nameRow.appendChild(name);
+                        if (f.readonly) { const lock = document.createElement('div'); lock.className='file-lock'; lock.textContent='🔒'; nameRow.appendChild(lock); }
                         const close = document.createElement('div'); close.className='file-close'; close.textContent='X';
                         close.addEventListener('click', function(ev){ ev.stopPropagation(); try{
                             window.__wbPruneSymbols && window.__wbPruneSymbols(f.id);
@@ -808,7 +815,7 @@ def editor_page() -> None:
                             }
                         }catch(e){} tab.remove(); });
                         tab.addEventListener('click', function(){ try{ document.querySelectorAll('.wb-file-tab').forEach(function(t){ t.classList.remove('active'); }); tab.classList.add('active'); WBStorage.saveActive(f.id); loadFileIntoEditor(f);}catch(e){} });
-                        tab.appendChild(icon); tab.appendChild(name); tab.appendChild(close);
+                        tab.appendChild(icon); tab.appendChild(nameRow); tab.appendChild(close);
                         dock.appendChild(tab);
                         return tab;
                     } catch(e) { console.warn('makeDockTabForFile error', e); return null; }
