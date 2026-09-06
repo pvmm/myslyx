@@ -164,6 +164,7 @@ html, body {
     padding: 6px 12px;
     cursor: pointer;
     user-select: none;
+    white-space: pre-line;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }

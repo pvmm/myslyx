@@ -172,7 +172,7 @@ def editor_page() -> None:
                     ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button')
                     ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
                 # RESET ALL unstacked
-                ui.button('RESET ALL', on_click=lambda: _trigger_reset(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
+                ui.button('RESET\nALL', on_click=lambda: _trigger_reset(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
 
         # === Main area: editor + hints sidebar ===
         with ui.element('div').classes('wb-main-area'):
