@@ -79,6 +79,8 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/retro.js"></script>')
     ui.add_head_html('<script src="/static/vendor/marked.min.js"></script>')
     ui.add_head_html('<script src="/static/hints.js"></script>')
+    ui.add_head_html('<script src="/static/plugins.js"></script>')
+    ui.add_head_html('<script src="/static/plugins/color-swatches.js"></script>')
 
     hints_content_id = 'hints-content'
 
