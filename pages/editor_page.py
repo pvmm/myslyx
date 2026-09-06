@@ -176,8 +176,8 @@ def editor_page() -> None:
                 with ui.element('div').style('display:flex;flex-direction:column;gap:4px;'):
                     ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button')
                     ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
-                # RESET ALL unstacked
-                ui.button('RESET\nALL', on_click=lambda: _trigger_reset(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
+                # RESET FILE POOL unstacked
+                ui.button('RESET\nFILE\nPOOL', on_click=lambda: _trigger_reset(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
 
         # Hidden bridge for client->server configuration restore
         config_bridge = ui.element('div').props('id=wb-config-bridge').style('display:none;')
