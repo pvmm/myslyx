@@ -934,7 +934,7 @@ def editor_page() -> None:
             with ui.element('div').classes('wb-dialog-body'):
                 ui.table(
                     columns=[
-                        {'name': 'keys', 'label': 'Key(s)', 'field': 'keys', 'align': 'left'},
+                        {'name': 'keys', 'label': 'Shortcut', 'field': 'keys', 'align': 'left'},
                         {'name': 'action', 'label': 'Action', 'field': 'action', 'align': 'left'},
                     ],
                     rows=[
