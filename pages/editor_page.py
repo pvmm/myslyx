@@ -263,7 +263,7 @@ def editor_page() -> None:
                 with tab:
                     ui.label(_file_icon(f.get('language', 'Text'))).classes('file-icon')
                     # Append a padlock icon for read-only files
-                    ui.label(f.get('name', '') + (' 🔒' if f.get('readonly') else '')).classes('file-name')
+                    ui.label(_base_name(f.get('name', '')) + (' 🔒' if f.get('readonly') else '')).classes('file-name')
                     close_btn = ui.element('div').classes('file-close')
                     with close_btn:
                         ui.label('X')
@@ -734,7 +734,7 @@ def editor_page() -> None:
                         tab.className = 'wb-file-tab';
                         // icon
                         const icon = document.createElement('div'); icon.className='file-icon'; icon.textContent = (f.language && /basic|vbscript/i.test(f.language)) ? 'BAS' : ((f.language && /pascal/i.test(f.language)) ? 'PAS' : ((f.language && /^c$/i.test(f.language)) ? 'C' : ((f.language && /z80|asm/i.test(f.language)) ? 'ASM' : 'TXT')));
-                        const name = document.createElement('div'); name.className='file-name'; name.textContent = f.name + (f.readonly ? ' 🔒' : '');
+                        const name = document.createElement('div'); name.className='file-name'; var dn = String(f.name||''); var di = dn.lastIndexOf('.'); if (di>0) dn = dn.slice(0,di); name.textContent = dn + (f.readonly ? ' 🔒' : '');
                         const close = document.createElement('div'); close.className='file-close'; close.textContent='X';
                         close.addEventListener('click', function(ev){ ev.stopPropagation(); try{
                             window.__wbPruneSymbols && window.__wbPruneSymbols(f.id);
