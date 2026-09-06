@@ -79,8 +79,7 @@ def editor_page() -> None:
     with ui.element('div').classes('wb-root'):
         # === App Header ===
         with ui.element('div').classes('wb-app-header'):
-            ui.label('Myslyx Text').classes('app-title')
-            ui.label('EDITOR v1.0').classes('app-version')
+            ui.label('Myslyx Text Editor v1.0').classes('app-title')
             ui.button('?').classes('wb-button').style('margin-left:auto;').on_click(lambda: ui.notify('**Shortcuts**\n'
                 '- **Ctrl+C**: Copy\n'
                 '- **Ctrl+V**: Paste\n'

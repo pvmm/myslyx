@@ -14,8 +14,7 @@ def home_page() -> None:
     with ui.element('div').classes('wb-root'):
         # App header bar
         with ui.element('div').classes('wb-app-header'):
-            ui.label('Myslyx Text').classes('app-title')
-            ui.label('EDITOR v1.0').classes('app-version')
+            ui.label('Myslyx Text Editor v1.0').classes('app-title')
 
         # Main content area
         with ui.element('div').style('flex:1;display:flex;align-items:center;justify-content:center;'):
