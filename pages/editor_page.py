@@ -154,6 +154,8 @@ def editor_page() -> None:
                     redo_btn.props('id=wb-redo-btn')
                 undo_btn.on('click', lambda: ui.run_javascript('if (window.__wbUndo) window.__wbUndo();'))
                 redo_btn.on('click', lambda: ui.run_javascript('if (window.__wbRedo) window.__wbRedo();'))
+                # separator between undo/redo and other actions
+                ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 # Toggle: globally export the current file's symbols or keep them local
                 export_btn = ui.button('EXPORT\nSYMBOLS').classes('wb-button').props('id=wb-export-btn')
                 export_btn.on('click', lambda: _toggle_symbol_export())
@@ -161,7 +163,7 @@ def editor_page() -> None:
                 wrap_btn = ui.button('WRAP\nOFF').classes('wb-button').props('id=wb-wrap-btn')
                 wrap_btn.on('click', lambda: _toggle_wrap())
                 wrap_btn.tooltip('Toggle word wrap in the editor.')
-                # separator between undo/redo and other actions
+                # separator between toggle buttons and other actions
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 # Rename/delete stacked in two rows
                 with ui.element('div').style('display:flex;flex-direction:column;gap:4px;'):
