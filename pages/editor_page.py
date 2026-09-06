@@ -161,10 +161,16 @@ def editor_page() -> None:
                 # Toggle: globally export the current file's symbols or keep them local
                 export_btn = ui.button('EXPORT\nSYMBOLS\nON').classes('wb-button').props('id=wb-export-btn')
                 export_btn.on('click', lambda: _toggle_symbol_export())
-                export_btn.tooltip('When ON, this file\'s symbols (functions, subs) are available to every open file. Toggle OFF to keep them local to this file.')
+                with export_btn:
+                    # Nest the tooltip (instead of export_btn.tooltip()) because the
+                    # shortcut sets target='#c<id>' while this button overrides its DOM
+                    # id via props('id=wb-export-btn'), leaving a dangling anchor that
+                    # makes Quasar log 'Anchor: target "#c…" not found'.
+                    ui.tooltip('When ON, this file\'s symbols (functions, subs) are available to every open file. Toggle OFF to keep them local to this file.')
                 wrap_btn = ui.button('WRAP\nOFF').classes('wb-button').props('id=wb-wrap-btn')
                 wrap_btn.on('click', lambda: _toggle_wrap())
-                wrap_btn.tooltip('Toggle word wrap in the editor.')
+                with wrap_btn:
+                    ui.tooltip('Toggle word wrap in the editor.')
                 # separator between toggle buttons and other actions
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 # Rename/delete stacked in two rows
