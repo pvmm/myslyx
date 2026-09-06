@@ -34,27 +34,44 @@
         el.title = '#' + this.hex.toUpperCase();
         return el;
     };
-    ColorSwatchWidget.prototype.eq = function(other) {
+    // This CodeMirror bundle compares widgets with compare(), not eq().
+    ColorSwatchWidget.prototype.compare = function(other) {
         return other instanceof ColorSwatchWidget && other.hex === this.hex;
     };
+    ColorSwatchWidget.prototype.eq = ColorSwatchWidget.prototype.compare;
+    // CodeMirror calls destroy() when an edit removes a widget from the view.
+    ColorSwatchWidget.prototype.destroy = function() {};
+
+    // Rebuilds the full swatch decoration set for the whole document.
+    // MatchDecorator cannot be used here: its updateDeco() rebuilds widget
+    // decorations spanning the matched text, and CodeMirror requires widgets to
+    // have zero-length ranges ("Widget decorations can only have zero-length
+    // ranges"). So this builds a zero-length widget range at the end of each
+    // token instead, which renders the swatch right after the hex text.
+    function buildSwatches(CM, view) {
+        var builder = new CM.RangeSetBuilder();
+        var re = new RegExp(SWATCH_RE.source, 'g');
+        var text = view.state.doc.toString();
+        var m;
+        while ((m = re.exec(text)) !== null) {
+            var end = m.index + m[0].length;
+            builder.add(end, end, CM.Decoration.widget({
+                widget: new ColorSwatchWidget(m[1]),
+                side: 1 // place the swatch after the token, not before it
+            }));
+        }
+        return builder.finish();
+    }
 
     // Builds the CodeMirror 6 view extension for one editor instance.
     function swatchExtension(CM) {
-        var matcher = new CM.MatchDecorator({
-            regexp: SWATCH_RE,
-            decoration: function(m) {
-                return CM.Decoration.widget({
-                    widget: new ColorSwatchWidget(m[1]),
-                    side: 1 // place the swatch after the token, not before it
-                });
-            }
-        });
-
         var SwatchViewPlugin = function(view) {
-            this.decorations = matcher.createDeco(view);
+            this.decorations = buildSwatches(CM, view);
         };
         SwatchViewPlugin.prototype.update = function(update) {
-            this.decorations = matcher.updateDeco(update, this.decorations);
+            if (update.docChanged) {
+                this.decorations = buildSwatches(CM, update.view);
+            }
         };
 
         return CM.ViewPlugin.fromClass(SwatchViewPlugin, {
