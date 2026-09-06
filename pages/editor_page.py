@@ -11,6 +11,9 @@ FAVICON_PATH = str(Path(__file__).resolve().parents[1] / 'static' / 'favicon.svg
 LANGUAGES: dict[str, str] = {
     # HitBasic is a BASIC dialect, so use CodeMirror's BASIC (VBScript) highlighter.
     'VBScript': 'HitBasic',
+    'Pascal': 'Pascal',
+    'C': 'C',
+    'Z80': 'Z80 Assembly',
     'Text': 'Text',
 }
 
@@ -18,6 +21,9 @@ LANGUAGES: dict[str, str] = {
 # static/hints/<key>.json). Unknown languages fall back to plain text.
 HINT_KEYS: dict[str, str] = {
     'VBScript': 'basic',
+    'Pascal': 'plaintext',
+    'C': 'plaintext',
+    'Z80': 'plaintext',
     'Text': 'plaintext',
 }
 
@@ -80,14 +86,7 @@ def editor_page() -> None:
         # === App Header ===
         with ui.element('div').classes('wb-app-header'):
             ui.label('Myslyx Text Editor v1.0').classes('app-title')
-            ui.button('?').classes('wb-button').style('margin-left:auto;').on_click(lambda: ui.notify('**Shortcuts**\n'
-                '- **Ctrl+C**: Copy\n'
-                '- **Ctrl+V**: Paste\n'
-                '- **Ctrl+Z**: Undo\n'
-                '- **Ctrl+Y**: Redo\n'
-                '- **Ctrl++**: Increase font size\n'
-                '- **Ctrl+-**: Decrease font size\n'
-                '- **F5**: Refresh editor', type='info'))
+            ui.button('?').classes('wb-button').style('margin-left:auto;').on_click(lambda: _open_shortcut_dialog())
 
         # === Toolbar ===
         with ui.element('div').classes('wb-toolbar'):
@@ -225,6 +224,9 @@ def editor_page() -> None:
     def _ext_for_lang(lang: str) -> str:
         return {
             'vbscript': 'bas', 'VBScript': 'bas',
+            'pascal': 'pas', 'Pascal': 'pas',
+            'c': 'c', 'C': 'c',
+            'z80': 'asm', 'Z80': 'asm',
             'plaintext': 'txt', 'Text': 'txt',
         }.get(lang, 'txt')
 
@@ -234,6 +236,9 @@ def editor_page() -> None:
     def _file_icon(language: str) -> str:
         return {
             'vbscript': 'BAS', 'VBScript': 'BAS',
+            'pascal': 'PAS', 'Pascal': 'PAS',
+            'c': 'C', 'C': 'C',
+            'z80': 'ASM', 'Z80': 'ASM',
             'plaintext': 'TXT', 'Text': 'TXT',
         }.get(language, '??')
 
@@ -728,7 +733,7 @@ def editor_page() -> None:
                         const tab = document.createElement('div');
                         tab.className = 'wb-file-tab';
                         // icon
-                        const icon = document.createElement('div'); icon.className='file-icon'; icon.textContent = (f.language && /basic|vbscript/i.test(f.language)) ? 'BAS' : 'TXT';
+                        const icon = document.createElement('div'); icon.className='file-icon'; icon.textContent = (f.language && /basic|vbscript/i.test(f.language)) ? 'BAS' : ((f.language && /pascal/i.test(f.language)) ? 'PAS' : ((f.language && /^c$/i.test(f.language)) ? 'C' : ((f.language && /z80|asm/i.test(f.language)) ? 'ASM' : 'TXT')));
                         const name = document.createElement('div'); name.className='file-name'; name.textContent = f.name + (f.readonly ? ' 🔒' : '');
                         const close = document.createElement('div'); close.className='file-close'; close.textContent='X';
                         close.addEventListener('click', function(ev){ ev.stopPropagation(); try{
@@ -763,7 +768,11 @@ def editor_page() -> None:
                                         var files = WBStorage.loadFiles() || [];
                                         var newid = WBStorage.generateId();
                                         var lang = 'Text';
-                                        if (file.name && file.name.endsWith('.bas')) lang='VBScript';
+                                        var n = (file.name || '').toLowerCase();
+                                        if (n.endsWith('.bas')) lang='VBScript';
+                                        else if (n.endsWith('.pas') || n.endsWith('.pp') || n.endsWith('.inc')) lang='Pascal';
+                                        else if (n.endsWith('.c') || n.endsWith('.h')) lang='C';
+                                        else if (n.endsWith('.asm') || n.endsWith('.s') || n.endsWith('.z80')) lang='Z80';
                                         var newfile = { id: newid, name: file.name, language: lang, content: ev.target.result, export_symbols: true };
                                         files.push(newfile);
                                         WBStorage.saveFiles(files);
@@ -914,6 +923,35 @@ def editor_page() -> None:
         _save_to_storage()
 
     ui.timer(0.8, _init, once=True)
+
+    # ===== Shortcuts dialog =====
+    shortcut_dialog = ui.dialog()
+    with shortcut_dialog:
+        with ui.element('div').classes('wb-dialog'):
+            with ui.element('div').classes('wb-title-bar'):
+                ui.label('Keyboard Shortcuts').classes('title-text')
+            with ui.element('div').classes('wb-dialog-body'):
+                ui.table(
+                    columns=[
+                        {'name': 'keys', 'label': 'Key(s)', 'field': 'keys', 'align': 'left'},
+                        {'name': 'action', 'label': 'Action', 'field': 'action', 'align': 'left'},
+                    ],
+                    rows=[
+                        {'keys': 'Ctrl+C', 'action': 'Copy'},
+                        {'keys': 'Ctrl+V', 'action': 'Paste'},
+                        {'keys': 'Ctrl+Z', 'action': 'Undo'},
+                        {'keys': 'Ctrl+Y', 'action': 'Redo'},
+                        {'keys': 'Ctrl++', 'action': 'Increase font size'},
+                        {'keys': 'Ctrl+-', 'action': 'Decrease font size'},
+                        {'keys': 'F5', 'action': 'Refresh editor'},
+                    ],
+                    row_key='keys',
+                ).style('width:100%;')
+            with ui.element('div').classes('wb-dialog-buttons'):
+                ui.button('Close', on_click=lambda: shortcut_dialog.close()).classes('wb-button')
+
+    def _open_shortcut_dialog() -> None:
+        shortcut_dialog.open()
 
     # ===== Rename dialog =====
     rename_dialog = ui.dialog()

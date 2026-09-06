@@ -36,6 +36,23 @@
         return window.__wbHintKey || 'plaintext';
     }
 
+    // ===== User symbol scanning (language-aware) =====
+
+    // Maps the CodeMirror language name to a scanner key.
+    function getScannerKey() {
+        var lang = (window.__wbCurrentLang || '').toUpperCase();
+        if (lang === 'PASCAL') return 'pascal';
+        if (lang === 'C') return 'c';
+        if (lang === 'Z80') return 'asm';
+        return 'basic';
+    }
+
+    function lineNumberAt(text, index) {
+        var line = 1;
+        for (var i = 0; i < index; i++) { if (text[i] === '\n') line++; }
+        return line;
+    }
+
     function getWord(state, pos) {
         var line = state.doc.lineAt(pos);
         var lineText = line.text;
@@ -47,22 +64,54 @@
         return { word: lineText.slice(start, end), start: start, line: line, lineText: lineText };
     }
 
-    // ===== User symbol scanning (FUNCTION / SUB / DEF FN) =====
+    // ===== User symbol scanning (FUNCTION / SUB / DEF FN / PROCEDURE / labels) =====
 
     function scanSymbols(viewImpl, fid) {
         if (!fid) return [];
         var text = viewImpl.state.doc.toString();
-        var re = /(?:FUNCTION|SUB|DEF\s+FN)\s+([A-Za-z][A-Za-z0-9_$%!&]*)/gi;
+        var key = getScannerKey();
         var found = [];
         var m;
-        while ((m = re.exec(text)) !== null) {
-            var line = 1;
-            for (var i = 0; i < m.index; i++) { if (text[i] === '\n') line++; }
-            var kw = m[0].toUpperCase();
-            var kind = kw.indexOf('FUNCTION') === 0 ? 'function'
-                    : (kw.indexOf('SUB') === 0 ? 'sub' : 'fn');
-            found.push({ name: m[1].toUpperCase(), kind: kind, line: line, file: fid });
+
+        function add(name, kind, index) {
+            found.push({ name: name.toUpperCase(), kind: kind, line: lineNumberAt(text, index), file: fid });
         }
+
+        if (key === 'pascal') {
+            // Pascal: FUNCTION name / PROCEDURE name
+            var reP = /(?:FUNCTION|PROCEDURE)\s+([A-Za-z_][A-Za-z0-9_]*)/gi;
+            while ((m = reP.exec(text)) !== null) {
+                var pw = m[0].toUpperCase();
+                add(m[1], pw.indexOf('FUNCTION') === 0 ? 'function' : 'procedure', m.index);
+            }
+        } else if (key === 'c') {
+            // C: type name(args) {  (function/definition, not prototype/control keywords)
+            var reC = /(?:^|[^A-Za-z0-9_])(?:(?:const|static|inline|extern|volatile|unsigned|signed|long|short|register)\s+)*(?:void|int|char|float|double|bool|size_t)\s+[*\s]*([A-Za-z_][A-Za-z0-9_]*)\s*\([^;{}]*\)\s*\{/g;
+            while ((m = reC.exec(text)) !== null) {
+                add(m[1], 'function', m.index + m[0].indexOf(m[1]));
+            }
+        } else if (key === 'asm') {
+            // Assembly labels: a name at the start of a line ending with ':'
+            var lines = text.split('\n');
+            var offset = 0;
+            for (var li = 0; li < lines.length; li++) {
+                var lm = lines[li].match(/^\s*([A-Za-z_@][A-Za-z0-9_@?]*)\s*:/);
+                if (lm && lm[1]) {
+                    add(lm[1], 'label', offset + lines[li].indexOf(lm[1]));
+                }
+                offset += lines[li].length + 1;
+            }
+        } else {
+            // Basic (HitBasic/VBScript): FUNCTION name / SUB name / DEF FN name
+            var reB = /(?:FUNCTION|SUB|DEF\s+FN)\s+([A-Za-z][A-Za-z0-9_$%!&]*)/gi;
+            while ((m = reB.exec(text)) !== null) {
+                var kw = m[0].toUpperCase();
+                var kind = kw.indexOf('FUNCTION') === 0 ? 'function'
+                        : (kw.indexOf('SUB') === 0 ? 'sub' : 'fn');
+                add(m[1], kind, m.index);
+            }
+        }
+
         var symbols = WBStorage.loadSymbols() || {};
         symbols[fid] = found;
         WBStorage.saveSymbols(symbols);
