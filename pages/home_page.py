@@ -23,7 +23,7 @@ def home_page() -> None:
                     ui.label('Welcome').classes('title-text')
                 with ui.element('div').style('padding:24px;text-align:center;'):
                     ui.html('<div style="text-align:center; margin: 24px 0;">'
-        '<img src="/static/favicon.svg" alt="Myslyx" style="width:128px; height:128px; display:block; margin:0 auto;">'
+        '<img src="/static/favicon-pixelated.png" alt="Myslyx" style="width:128px; height:96px; display:block; margin:0 auto;">'
         '</div>'
         '<div style="text-align:center; font-family:var(--wb-font); font-size:14px; color:var(--wb-blue);">Myslyx Text Editor</div>')
                     ui.label('A retro-styled code editor').style(
