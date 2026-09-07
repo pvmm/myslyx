@@ -41,12 +41,29 @@ Running
 - Open the editor in your browser at: http://localhost:8081/editor (adjust port as needed)
 
 Developer notes
-- Auto-reload is disabled by default to avoid multi-process engineio/socketio ASGI issues while debugging. Re-enable `reload=True` in `main.py` only when you understand the reloader behavior.
+- Auto-reload is on for development (uvicorn watches `*.py`, `*.css`, `*.js`). Disable it with `--no-reload` (or `WB_TESTING=1`) when you need a single quiet process.
 - To quickly check Python syntax for pages, run:
 
   python -m py_compile pages/editor_page.py
 
 - Logs and debugging: see `main.py` for middleware that logs HTTP requests and engineio/socketio logger settings.
+
+Tests
+- Browser acceptance tests live in `tests/`. They spawn their own app subprocess and run the same suites across Chromium and Firefox (WebKit is not a default: Playwright's prebuilt WebKit needs ICU 74 / libjpeg 8 / libbacktrace, which Fedora doesn't ship — run `-b webkit` only on a host that provides them).
+- Install the test dependencies and browsers once:
+
+  pip install -r dev-requirements.txt
+  playwright install chromium firefox webkit
+
+- Run the default browsers:
+
+  python -m tests.runner
+
+- Run specific browsers:
+
+  python -m tests.runner -b chromium firefox
+
+- Browsers that cannot launch (e.g. missing host libraries) are reported as SKIP rather than failing the run.
 
 Contributing
 - Make small, focused changes; run the app locally and test the editor UI after edits. Prefer client-side handlers in `pages/editor_page.py` for frontend behavior.

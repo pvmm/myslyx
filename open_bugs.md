@@ -16,10 +16,12 @@ Status updates
 - Drag-and-drop upload: implemented; dropped files are read as text and saved to `WBStorage` then the page reloads to show them.
 
 Remaining / follow-ups
-- Convert DnD flow to live-insert (avoid page reload after drop) for smoother UX.
-- Reduce WatchFiles reload churn when editing `pages/*.py` (investigate tooling or file-watching globs).
-- Investigate ASGI/engineio KeyError `'REQUEST_METHOD'` seen in server logs under some requests.
-- Add browser acceptance tests and note any browser-specific quirks.
+- Convert DnD flow to live-insert (avoid page reload after drop) for smoother UX. — Done: drag-and-drop imports go through the `wb-open-file` server bridge and insert a live editor; no reload.
+- Reduce WatchFiles reload churn when editing `pages/*.py` (investigate tooling or file-watching globs). — Open (dev-only; use `--no-reload` or `WB_TESTING=1` to bypass).
+- Investigate ASGI/engineio KeyError `'REQUEST_METHOD'` seen in server logs under some requests. — Open; not reproduced in the test harness so far.
+- Add browser acceptance tests and note any browser-specific quirks. — Done: `tests/` runner + suites, cross-browser. Quirks found so far:
+  - Fedora 44: Playwright's prebuilt WebKit links against ICU 74 / libjpeg 8 / libbacktrace 0, none of which Fedora ships (ICU 77, libjpeg-turbo 62, libbacktrace 1). WebKit cannot launch, so it is excluded from the default browsers (chromium + firefox) and reported as SKIP when requested.
+  - Chromium and Firefox both pass the full suite (multi-instance undo/redo, drag-drop, header favicon button).
 
 Added by user:
 - Set short cuts for Ctrl-+/Ctrl-- to grow/shrink font size.
