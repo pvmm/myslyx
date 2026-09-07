@@ -15,6 +15,14 @@
             registry.push(def);
         },
 
+        // List installed plugins as plain definitions, for UIs like the plugins
+        // menu. Read enabled state with _enabled().
+        list: function() {
+            return registry.map(function(d) {
+                return { name: d.name, enabledByDefault: d.enabledByDefault !== false };
+            });
+        },
+
         // A plugin is enabled unless the config explicitly disables it.
         _enabled: function(def) {
             var cfg = window.WBStorage ? window.WBStorage.loadConfig() : {};

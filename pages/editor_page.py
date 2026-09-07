@@ -89,6 +89,7 @@ def editor_page() -> None:
         with ui.element('div').classes('wb-app-header'):
             ui.label('Myslyx Text Editor v1.0').classes('app-title')
             ui.button('?').classes('wb-button').style('margin-left:auto;').on_click(lambda: _open_shortcut_dialog())
+            ui.button('PLUGINS').classes('wb-button').props('id=wb-plugins-btn')
 
         # === Toolbar ===
         with ui.element('div').classes('wb-toolbar'):
@@ -907,6 +908,106 @@ def editor_page() -> None:
                 });
             })()
         '''.replace('@CMID@', str(code_editor.id)))
+        # Plugins menu: enable/disable installed plugins individually.
+        ui.run_javascript('''
+            (function() {
+                function setupPluginsMenu() {
+                    var btn = document.getElementById('wb-plugins-btn');
+                    if (!btn || (window.WBPlugins && !window.WBPlugins.list)) return false;
+                    if (btn._wbPluginsMenu) return true;
+                    btn._wbPluginsMenu = true;
+
+                    var menu = document.createElement('div');
+                    menu.id = 'wb-plugins-menu';
+                    menu.className = 'wb-plugins-menu';
+                    menu.style.display = 'none';
+                    (btn.closest('.wb-app-header') || document.body).appendChild(menu);
+
+                    var title = document.createElement('div');
+                    title.className = 'wb-plugins-title';
+                    title.textContent = 'PLUGINS';
+                    menu.appendChild(title);
+                    var hint = document.createElement('div');
+                    hint.className = 'wb-plugins-hint';
+                    hint.textContent = 'changes reload the editor';
+                    menu.appendChild(hint);
+
+                    function rebuild() {
+                        menu.querySelectorAll('.wb-plugin-row').forEach(function(r) { r.remove(); });
+                        var defs = window.WBPlugins.list();
+                        if (!defs.length) {
+                            var empty = document.createElement('div');
+                            empty.className = 'wb-plugin-empty';
+                            empty.textContent = '(no plugins installed)';
+                            menu.appendChild(empty);
+                            return;
+                        }
+                        defs.forEach(function(def) {
+                            var row = document.createElement('label');
+                            row.className = 'wb-plugin-row';
+                            var name = document.createElement('span');
+                            name.className = 'wb-plugin-name';
+                            name.textContent = def.name;
+                            var cb = document.createElement('input');
+                            cb.type = 'checkbox';
+                            cb.className = 'wb-plugin-check';
+                            cb.checked = !!window.WBPlugins._enabled(def);
+                            cb.addEventListener('change', function() {
+                                try {
+                                    var cfg = window.WBStorage.loadConfig();
+                                    cfg.plugins = cfg.plugins || {};
+                                    cfg.plugins[def.name] = cb.checked;
+                                    window.WBStorage.saveConfig(cfg);
+                                    clearTimeout(menu._reloadT);
+                                    menu._reloadT = setTimeout(function() {
+                                        window.location.reload();
+                                    }, 300);
+                                } catch(e) { console.warn('plugins menu toggle failed', e); }
+                            });
+                            row.appendChild(name);
+                            row.appendChild(cb);
+                            menu.appendChild(row);
+                        });
+                    }
+
+                    function position() {
+                        var r = btn.getBoundingClientRect();
+                        menu.style.left = r.right + 'px';
+                        menu.style.top = (r.bottom + 6) + 'px';
+                        var w = menu.offsetWidth;
+                        if (r.right - w >= 0) menu.style.left = (r.right - w) + 'px';
+                    }
+
+                    function open() {
+                        rebuild();
+                        menu.style.display = 'block';
+                        position();
+                        btn.classList.add('active');
+                    }
+                    function close() {
+                        menu.style.display = 'none';
+                        btn.classList.remove('active');
+                    }
+
+                    btn.addEventListener('click', function(ev) {
+                        ev.stopPropagation();
+                        if (menu.style.display === 'block') close(); else open();
+                    });
+                    document.addEventListener('click', function(ev) {
+                        if (menu.style.display === 'block' && !menu.contains(ev.target)) close();
+                    });
+                    document.addEventListener('keydown', function(ev) {
+                        if (ev.key === 'Escape' && menu.style.display === 'block') close();
+                    });
+                    return true;
+                }
+
+                var _attempts = 0;
+                var _iv = setInterval(function() {
+                    if (setupPluginsMenu() || ++_attempts > 50) clearInterval(_iv);
+                }, 200);
+            })()
+        ''')
         # Give focus back to the editor after toolbar button clicks so the user
         # can keep typing. Rename/Delete open dialogs with their own focus, so
         # they are excluded.
