@@ -766,6 +766,11 @@ html, body {
     border-top: 2px solid var(--wb-black);
 }
 
+/* Shortcuts dialog table: blue header labels ("Shortcut" / "Action") */
+.wb-shortcuts-table thead th {
+    background-color: var(--wb-blue);
+}
+
 /* Favicon as text decoration – shows the favicon inside the element's text */
 .app-title {
     -webkit-background-clip: text;

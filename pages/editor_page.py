@@ -1126,7 +1126,7 @@ def editor_page() -> None:
                         {'keys': 'F5', 'action': 'Refresh editor'},
                     ],
                     row_key='keys',
-                ).style('width:100%;')
+                ).classes('wb-shortcuts-table').style('width:100%;')
             with ui.element('div').classes('wb-dialog-buttons'):
                 ui.button('Close', on_click=lambda: shortcut_dialog.close()).classes('wb-button')
 
