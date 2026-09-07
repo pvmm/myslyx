@@ -185,7 +185,7 @@ def editor_page() -> None:
                     ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button')
                     ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
                 # RESET FILE POOL unstacked
-                ui.button('RESET\nFILE\nPOOL', on_click=lambda: _trigger_reset(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
+                ui.button('RESET\nFILE\nPOOL', on_click=lambda: _open_reset_dialog(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
 
         # Hidden bridge for client->server configuration restore
         config_bridge = ui.element('div').props('id=wb-config-bridge').style('display:none;')
@@ -1112,3 +1112,28 @@ def editor_page() -> None:
         _pending_delete_fid = None
         if fid:
             _close_file(fid)
+
+    # ===== RESET FILE POOL dialog =====
+    reset_dialog = ui.dialog()
+    with reset_dialog:
+        with ui.element('div').classes('wb-dialog'):
+            with ui.element('div').classes('wb-title-bar'):
+                ui.label('Reset file pool?').classes('title-text')
+            with ui.element('div').classes('wb-dialog-body'):
+                reset_prompt = ui.label(
+                    'This will delete every file in the pool, clear the editor storage, '
+                    'and reload the whole app.\n\nThis cannot be undone.'
+                ).style('white-space:pre-line;')
+            with ui.element('div').classes('wb-dialog-buttons'):
+                ui.button('Cancel', on_click=lambda: _cancel_reset()).classes('wb-button')
+                ui.button('Reset', on_click=lambda: _confirm_reset()).classes('wb-button')
+
+    def _open_reset_dialog() -> None:
+        reset_dialog.open()
+
+    def _cancel_reset() -> None:
+        reset_dialog.close()
+
+    def _confirm_reset() -> None:
+        reset_dialog.close()
+        _trigger_reset()
