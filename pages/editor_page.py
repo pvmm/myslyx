@@ -89,7 +89,7 @@ def editor_page() -> None:
     with ui.element('div').classes('wb-root'):
         # === App Header ===
         with ui.element('div').classes('wb-app-header'):
-with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-btn'):
+            with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-btn'):
                 pass
             ui.label('Myslyx Text Editor v1.0').classes('app-title')
             ui.button('?').classes('wb-button').style('margin-left:auto;').on_click(lambda: _open_shortcut_dialog())
@@ -199,19 +199,20 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
             js_handler="() => { try { const c = window.WBStorage.loadConfig(); emit(Boolean(c && c.wrap)); } catch(e) { emit(false); } }",
         )
 
+        # Hidden bridge for client->server file open/import requests
+        open_bridge = ui.element('div').props('id=wb-open-bridge').style('display:none;')
+        open_bridge.on(
+            'wb-open-file',
+            lambda e: _open_file_request(e.args),
+            js_handler="() => { try { const f = window.__wbPendingFile || null; delete window.__wbPendingFile; emit(f); } catch(e) { emit(null); } }",
+        )
+
         # === Main area: editor + hints sidebar ===
         with ui.element('div').classes('wb-main-area'):
-            # Editor area
+            # Editor area: one CodeMirror instance per open file, hidden
+            # except the active one (built lazily via _ensure_editor).
             with ui.element('div').classes('wb-editor-area'):
-                code_editor = (
-                    ui.codemirror(
-                        value='',
-                        language='VBScript',
-                        theme='basicDark',
-                        on_change=lambda e: _on_editor_change(e.value),
-                    )
-                    .style('flex:1;width:100%;')
-                )
+                editor_host = ui.element('div').classes('wb-editor-host')
 
                 # Status bar
                 with ui.element('div').classes('wb-status-bar'):
@@ -243,6 +244,8 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
         'active_id': None,
     }
     file_tabs: dict[str, Any] = {}
+    editors: dict[str, Any] = {}
+    editor_slots: dict[str, Any] = {}
     wrap_enabled: bool = False
 
     # ===== Helper functions =====
@@ -258,6 +261,18 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
 
     def _base_name(name: str) -> str:
         return name.rsplit('.', 1)[0] if '.' in name else name
+
+    def _lang_for_name(name: str) -> str:
+        lowered = name.lower()
+        if lowered.endswith(('.bas', '.vb', '.vbs')):
+            return 'VBScript'
+        if lowered.endswith(('.pas', '.pp', '.inc')):
+            return 'Pascal'
+        if lowered.endswith(('.c', '.h')):
+            return 'C'
+        if lowered.endswith(('.asm', '.s', '.z80')):
+            return 'Z80'
+        return 'Text'
 
     def _file_icon(language: str) -> str:
         return {
@@ -364,10 +379,13 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
     def _apply_wrap(wrap: bool) -> None:
         ui.run_javascript(f'''
             (function() {{
-                var el = getElement({code_editor.id});
-                if (el && typeof el.setLineWrapping === 'function') {{
-                    el.setLineWrapping({str(wrap).lower()});
-                }}
+                var ids = window.__wbEditorIds || {{}};
+                Object.keys(ids).forEach(function(fid) {{
+                    var el = getElement(ids[fid]);
+                    if (el && typeof el.setLineWrapping === 'function') {{
+                        el.setLineWrapping({str(wrap).lower()});
+                    }}
+                }});
             }})();
         ''')
 
@@ -411,6 +429,15 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
     def _close_file(fid: str) -> None:
         # Drop any persisted user symbols for this file.
         ui.run_javascript(f'window.__wbPruneSymbols && window.__wbPruneSymbols("{fid}");')
+        ed = editors.pop(fid, None)
+        slot = editor_slots.pop(fid, None)
+        target_el = slot if slot is not None else ed
+        if target_el is not None:
+            ui.run_javascript(f'window.__wbEditorIds && delete window.__wbEditorIds["{fid}"];')
+            try:
+                target_el.delete()
+            except Exception:
+                pass
         client_state['files'] = [f for f in client_state['files'] if f['id'] != fid]
         if client_state['active_id'] == fid:
             if client_state['files']:
@@ -418,7 +445,7 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
                 _load_file_into_editor(client_state['files'][0])
             else:
                 client_state['active_id'] = None
-                code_editor.set_value('')
+                ui.run_javascript('window.__wbEditorId = null;')
                 file_name_label.set_text('no files')
         # Persist state before mutating UI elements. If we refresh (delete)
         # UI elements while this click handler's slot is still active, NiceGUI
@@ -426,10 +453,79 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
         _save_to_storage()
         _refresh_file_pool()
 
+    def _ensure_editor(f: dict[str, Any]) -> Any:
+        # Lazily create one CodeMirror instance per open file. Each view keeps
+        # its own native undo/redo history, so edits never leak across files.
+        # Returns the visible container slot (hidden until activated).
+        fid = f['id']
+        if fid in editor_slots:
+            return editor_slots[fid]
+        cm_lang = f.get('language', 'Text')
+        if cm_lang not in LANGUAGES:
+            cm_lang = 'Text'
+            f['language'] = 'Text'
+        with editor_host:
+            with ui.element('div').props(f'id=wb-edit-slot-{fid}').classes('wb-editor-slot wb-editor-hidden') as slot:
+                ed = (
+                    ui.codemirror(
+                        value=f.get('content', ''),
+                        language='VBScript',
+                        theme='basicDark',
+                        on_change=lambda e, fid=fid: _on_editor_change(fid, e.value),
+                    )
+                    .style('flex:1;width:100%;')
+                )
+        if cm_lang == 'Text':
+            ed.set_language(None)
+        else:
+            ed.set_language(cm_lang)
+        editors[fid] = ed
+        editor_slots[fid] = slot
+        ui.run_javascript(f'window.__wbEditorIds["{fid}"] = {ed.id};')
+        if wrap_enabled:
+            ui.run_javascript(f'''
+                (function() {{
+                    var el = getElement({ed.id});
+                    if (el && typeof el.setLineWrapping === 'function') el.setLineWrapping(true);
+                }})();
+            ''')
+        return slot
+
+    def _open_file_request(file: Any) -> None:
+        # Client-side imports (UPLOAD button, drag-and-drop) land here so the
+        # server owns file state, dock tabs and editor instances.
+        import random
+        if not isinstance(file, dict):
+            return
+        fid = str(file.get('id') or f'file_{random.randint(100000, 999999)}')
+        name = str(file.get('name') or 'untitled.txt')
+        lang = str(file.get('language') or _lang_for_name(name))
+        if lang not in LANGUAGES:
+            lang = 'Text'
+        content = file.get('content') if isinstance(file.get('content'), str) else ''
+        target = next((f for f in client_state['files'] if f['id'] == fid), None)
+        if target is None:
+            target = {
+                'id': fid,
+                'name': name,
+                'language': lang,
+                'content': content,
+                'export_symbols': True,
+            }
+            client_state['files'].append(target)
+        else:
+            target['name'] = name
+            target['language'] = lang
+            if content:
+                target['content'] = content
+        client_state['active_id'] = fid
+        _load_file_into_editor(target)
+        _refresh_file_pool()
+        _save_to_storage()
+
     def _switch_to_file(fid: str) -> None:
         if fid == client_state['active_id']:
             return
-        _sync_editor_to_active()
         target = next((f for f in client_state['files'] if f['id'] == fid), None)
         if not target:
             return
@@ -439,10 +535,23 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
         _save_to_storage()
 
     def _load_file_into_editor(f: dict[str, Any]) -> None:
-        code_editor.set_value(f.get('content', ''))
+        # Activate this file's own editor instance (creating it lazily) and
+        # make it the only visible one. Every other editor slot is hidden so
+        # callers do not need to order active_id updates around this call.
+        fid = f['id']
+        for other_fid, other_slot in editor_slots.items():
+            if other_fid != fid:
+                try:
+                    other_slot.classes(add='wb-editor-hidden')
+                except Exception:
+                    pass
+        slot = _ensure_editor(f)
+        slot.classes(remove='wb-editor-hidden')
+        ed = editors[fid]
+        client_state['active_id'] = fid
+
         # Indicate read-only files in the UI and update toolbar state.
         readonly = bool(f.get('readonly', False))
-        # Show a padlock icon for read-only files instead of text
         file_name_label.set_text(f['name'] + (' 🔒' if readonly else ''))
         cm_lang = f.get('language', 'Text')
         if cm_lang not in LANGUAGES:
@@ -452,22 +561,20 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
         if cm_lang == 'Text':
             # Plain text: clear the language extension instead of passing the
             # name 'Text' (which CodeMirror does not know) to set_language.
-            code_editor.set_language(None)
+            ed.set_language(None)
         else:
-            code_editor.set_language(cm_lang)
+            ed.set_language(cm_lang)
+        f.setdefault('export_symbols', True)
         ui.run_javascript(f"window.__wbCurrentLang = '{cm_lang}';")
         ui.run_javascript(
             f"window.__wbHintKey = '{HINT_KEYS.get(cm_lang, 'plaintext')}';"
-            f"window.__wbActiveFid = '{f['id']}';"
+            f"window.__wbActiveFid = '{fid}';"
+            f"window.__wbEditorId = {ed.id};"
         )
         status_lang.set_text(LANGUAGES.get(cm_lang, cm_lang))
-        # ensure undo/redo stacks exist for this file
-        f.setdefault('undos', [])
-        f.setdefault('redos', [])
-        f.setdefault('export_symbols', True)
         ui.run_javascript(f'''
             (function() {{
-                var id = {code_editor.id};
+                var id = {ed.id};
                 var attempts = 0;
 
                 function wbFocus() {{
@@ -498,88 +605,88 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
             }})();
         ''')
         # Prevent editing in the editor for read-only files by attaching
-        # a short-circuiting input handler directly to the CM content element.
-        readonly_js = str(readonly).lower()
-        ui.run_javascript((
-            """
-            (function(){
-                try{
-                    var r = {{READONLY}};
+        # a short-circuiting input handler directly to the CM content element
+        # of THIS file's editor only.
+        ui.run_javascript(f'''
+            (function() {{
+                try {{
+                    var r = {str(readonly).lower()};
                     window.__wbActiveReadonly = r;
-                    function makeHandler(){
-                        return function(e){
+                    function makeHandler(){{
+                        return function(e){{
                             // Block undo/redo (Cmd/Ctrl+Z/Y, Cmd/Ctrl+Shift+Z) on read-only files
-                            if (e.ctrlKey || e.metaKey) {
-                                if (e.key === 'z' || e.key === 'y') { e.preventDefault(); e.stopPropagation(); return false; }
-                            }
+                            if (e.ctrlKey || e.metaKey) {{
+                                if (e.key === 'z' || e.key === 'y') {{ e.preventDefault(); e.stopPropagation(); return false; }}
+                            }}
                             // Allow navigation keys but block text input and commands
                             var blocked = !(e.key && (e.key.startsWith('Arrow') || e.key==='Tab' || e.key==='Escape' || e.ctrlKey || e.metaKey));
-                            if (blocked) { e.preventDefault(); e.stopPropagation(); return false; }
-                        };
-                    }
-                    var wrap = document.querySelector('.cm-editor');
-                    if (wrap){
+                            if (blocked) {{ e.preventDefault(); e.stopPropagation(); return false; }}
+                        }};
+                    }}
+                    var slot = document.getElementById('wb-edit-slot-{fid}');
+                    var wrap = slot ? slot.querySelector('.cm-editor') : null;
+                    if (wrap){{
                         var el = wrap.querySelector('.cm-content');
-                        if (el){
+                        if (el){{
                             // Remove any previous handler
-                            if (el._wbReadOnlyHandler) { el.removeEventListener('keydown', el._wbReadOnlyHandler, true); el.removeEventListener('beforeinput', el._wbReadOnlyHandler, true); el._wbReadOnlyHandler = null; }
-                            if (r){
+                            if (el._wbReadOnlyHandler) {{ el.removeEventListener('keydown', el._wbReadOnlyHandler, true); el.removeEventListener('beforeinput', el._wbReadOnlyHandler, true); el._wbReadOnlyHandler = null; }}
+                            if (r){{
                                 el._wbReadOnlyHandler = makeHandler();
                                 el.addEventListener('keydown', el._wbReadOnlyHandler, true);
                                 el.addEventListener('beforeinput', el._wbReadOnlyHandler, true);
-                            }
-                        }
-                    }
-                }catch(e){}
-            })();
-            """
-        ).replace("{{READONLY}}", readonly_js))
+                            }}
+                        }}
+                    }}
+                }}catch(e){{}}
+            }})();
+        ''')
         # Disable/enable toolbar buttons for read-only files by ID
         ui.run_javascript(f"(function(){{try{{var r={str(readonly).lower()}; var rn=document.getElementById('wb-rename-btn'); if(rn) rn.disabled = r; var d=document.getElementById('wb-delete-btn'); if(d) d.disabled = r; var u=document.getElementById('wb-undo-btn'); if(u) u.disabled = r; var rr=document.getElementById('wb-redo-btn'); if(rr) rr.disabled = r; }}catch(e){{}}}})()")
         _update_export_button()
+        # Let static scripts (hints.js, plugins.js) bind to the now-active editor.
+        ui.run_javascript(f'''
+            (function() {{
+                try {{
+                    window.dispatchEvent(new CustomEvent('wb-active-editor', {{ detail: '{fid}' }}));
+                }} catch(e) {{}}
+            }})();
+        ''')
 
-    def _sync_editor_to_active() -> None:
-        if not client_state['active_id']:
-            return
-        for f in client_state['files']:
-            if f['id'] == client_state['active_id']:
-                f['content'] = code_editor.value
-                break
-
-    def _on_editor_change(value: str) -> None:
-        # Autosave: maintain per-file undo/redo stacks and persist content to
-        # storage on every edit of the opened file (unless read-only).
-        if client_state['active_id']:
-            # Ignore edits on read-only files
-            cur = next((f for f in client_state['files'] if f['id'] == client_state['active_id']), None)
-            if cur and cur.get('readonly'):
-                return
-            for f in client_state['files']:
-                if f['id'] == client_state['active_id']:
-                    undos = f.setdefault('undos', [])
-                    # push previous content to undos (avoid duplicates)
-                    prev = f.get('content', '')
-                    if not undos or undos[-1] != prev:
-                        undos.append(prev)
-                    # clear redo stack on new edit
-                    f['redos'] = []
-                    f['content'] = value
-                    break
+    def _on_editor_change(fid: str, value: str) -> None:
+        # Autosave: persist content to storage on every edit of a writable file.
+        cur = next((f for f in client_state['files'] if f['id'] == fid), None)
+        if cur is not None and not cur.get('readonly'):
+            cur['content'] = value
         _save_to_storage()
 
     def _on_language_change(language: str) -> None:
-        _sync_editor_to_active()
-        if client_state['active_id']:
-            for f in client_state['files']:
-                if f['id'] == client_state['active_id']:
-                    f['language'] = language
-                    f['name'] = _base_name(f['name']) + '.' + _ext_for_lang(language)
-                    break
-            _load_file_into_editor(
-                next(f for f in client_state['files'] if f['id'] == client_state['active_id'])
-            )
-            _refresh_file_pool()
-            _save_to_storage()
+        fid = client_state['active_id']
+        if not fid:
+            return
+        for f in client_state['files']:
+            if f['id'] == fid:
+                f['language'] = language
+                f['name'] = _base_name(f['name']) + '.' + _ext_for_lang(language)
+                file_name_label.set_text(f['name'] + (' 🔒' if f.get('readonly') else ''))
+                break
+        ed = editors.get(fid)
+        if ed is not None:
+            if language == 'Text':
+                ed.set_language(None)
+            else:
+                ed.set_language(language)
+        ui.run_javascript(f"window.__wbHintKey = '{HINT_KEYS.get(language, 'plaintext')}';")
+        ui.run_javascript(f"window.__wbCurrentLang = '{language}';")
+        status_lang.set_text(LANGUAGES.get(language, language))
+        ui.run_javascript(f'''
+            (function() {{
+                try {{
+                    window.dispatchEvent(new CustomEvent('wb-active-editor', {{ detail: '{fid}' }}));
+                }} catch(e) {{}}
+            }})();
+        ''')
+        _refresh_file_pool()
+        _save_to_storage()
 
     def _apply_editor_font(font: str) -> None:
         """Apply the chosen font to the CodeMirror editor via a CSS variable."""
@@ -599,8 +706,8 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
             (function() {{
                 // 1. Update the CSS variable for the font size
                 document.documentElement.style.setProperty('--wb-editor-font-size', '{int(font_size)}px');
-                // 2. Safely grab the NiceGUI element and resolve its CodeMirror EditorView instance
-                var el = getElement({code_editor.id});
+                // 2. Safely grab the active NiceGUI element and resolve its CodeMirror EditorView instance
+                var el = getElement(window.__wbEditorId);
                 if (el && el.editorPromise) {{
                     el.editorPromise.then(function(view) {{
                         if (view && typeof view.requestMeasure === 'function') {{
@@ -628,10 +735,10 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
                 content = target.get('content', '')
                 filename = target.get('name', 'untitled.txt')
             else:
-                content = code_editor.value
+                content = ''
                 filename = 'untitled.txt'
         else:
-            content = code_editor.value
+            content = ''
             filename = 'untitled.txt'
         # Trigger browser download
         ui.run_javascript(f"""
@@ -648,7 +755,8 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
         """)
 
     def _upload_file() -> None:
-        # Use client-side file picker, store into WBStorage and reload page
+        # Use client-side file picker and hand the parsed file to the server via
+        # the open bridge so it gets its own editor instance + dock tab.
         ui.run_javascript('''
             (function() {
                 const inp = document.createElement('input');
@@ -659,32 +767,15 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         try {
-                            var files = WBStorage.loadFiles() || [];
-                            var newid = WBStorage.generateId();
-                            var newfile = { id: newid, name: f.name, language: 'Text', content: e.target.result, export_symbols: true };
-                            files.push(newfile);
-                            WBStorage.saveFiles(files);
-                            WBStorage.saveActive(newid);
-
-                            // Try to set the editor content in-place using CM view
-                            try {
-                                const wrap = document.querySelector('.cm-editor');
-                                const view = wrap && wrap.cmView && wrap.cmView.view ? wrap.cmView.view : null;
-                                if (view && view.dispatch) {
-                                    const docLen = view.state.doc.length || 0;
-                                    view.dispatch({changes: {from: 0, to: docLen, insert: e.target.result}, addToHistory: false});
-                                    if (typeof view.focus === 'function') view.focus();
-                                } else {
-                                    // Fallback: try to find the content element and set text
-                                    const el = document.querySelector('.cm-editor .cm-content');
-                                    if (el) {
-                                        // This won't update CM state perfectly but provides visible feedback
-                                        el.textContent = e.target.result;
-                                    }
-                                }
-                            } catch(err) { console.warn('apply upload to editor failed', err); }
-
-                            // Simple visual feedback
+                            var lang = 'Text';
+                            var n = (f.name || '').toLowerCase();
+                            if (n.endsWith('.bas')) lang = 'VBScript';
+                            else if (n.endsWith('.pas') || n.endsWith('.pp') || n.endsWith('.inc')) lang = 'Pascal';
+                            else if (n.endsWith('.c') || n.endsWith('.h')) lang = 'C';
+                            else if (n.endsWith('.asm') || n.endsWith('.s') || n.endsWith('.z80')) lang = 'Z80';
+                            window.__wbPendingFile = { name: f.name, language: lang, content: e.target.result, export_symbols: true };
+                            const br = document.getElementById('wb-open-bridge');
+                            if (br) br.dispatchEvent(new CustomEvent('wb-open-file', { detail: {} }));
                             try { alert('Imported: ' + f.name); } catch(_) { console.log('Imported', f.name); }
                         } catch(err) { console.error(err); }
                     };
@@ -703,6 +794,9 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
     def _init() -> None:
         ui.run_javascript('''
             (function() {
+                // Shared map of file id -> CodeMirror element id, created before
+                // any editor is registered by the server.
+                window.__wbEditorIds = window.__wbEditorIds || {};
                 try {
                     const SCHEMA_KEY = 'wb_editor_schema_v';
                     const SCHEMA_VERSION = '2';
@@ -772,65 +866,15 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
                 // Do not rely on server-side callback here; storage will be read
                 // when the client interacts or on subsequent syncs.
 
-                // ===== Drag-and-drop import (client-side) =====
-                function loadFileIntoEditor(f) {
+                // ===== Drag-and-drop import =====
+                // Handed to the server via the open bridge; the server creates
+                // the file, a dock tab and its own editor instance.
+                function importFile(file, content, lang) {
                     try {
-                        // Update the editor content using CM view if possible
-                        const wrap = document.querySelector('.cm-editor');
-                        const view = wrap && wrap.cmView && wrap.cmView.view ? wrap.cmView.view : null;
-                        if (view && view.dispatch) {
-                            const docLen = view.state.doc.length || 0;
-                            view.dispatch({changes: {from: 0, to: docLen, insert: f.content}, addToHistory: false});
-                            if (typeof view.focus === 'function') view.focus();
-                        } else {
-                            const el = document.querySelector('.cm-editor .cm-content');
-                            if (el) el.textContent = f.content;
-                        }
-                        // Update file name label
-                        try { const lbl = document.getElementById('wb-file-name'); if (lbl) lbl.textContent = f.name + (f.readonly ? ' 🔒' : ''); } catch(e){}
-                        // set current language hint
-                        try { window.__wbCurrentLang = f.language || 'Text'; } catch(e){}
-                        try { window.__wbActiveFid = f.id || null; } catch(e){}
-                        try {
-                            const eb = document.getElementById('wb-export-btn');
-                            if (eb) {
-                                const frac = f.export_symbols !== false;
-                                eb.classList.toggle('active', frac);
-                                eb.textContent = frac ? 'EXPORT\\nSYMBOLS\\nON' : 'EXPORT\\nSYMBOLS\\nOFF';
-                            }
-                        } catch(e){}
-                    } catch(e) { console.warn('loadFileIntoEditor error', e); }
-                }
-
-                function makeDockTabForFile(f) {
-                    try {
-                        const dock = document.querySelector('.wb-dock');
-                        if (!dock) return null;
-                        // create tab
-                        const tab = document.createElement('div');
-                        tab.className = 'wb-file-tab';
-                        // icon
-                        const icon = document.createElement('div'); icon.className='file-icon'; icon.textContent = (f.language && /basic|vbscript/i.test(f.language)) ? 'BAS' : ((f.language && /pascal/i.test(f.language)) ? 'PAS' : ((f.language && /^c$/i.test(f.language)) ? 'C' : ((f.language && /z80|asm/i.test(f.language)) ? 'ASM' : 'TXT')));
-                        const nameRow = document.createElement('div'); nameRow.className='file-name-row';
-                        const name = document.createElement('div'); name.className='file-name'; var dn = String(f.name||''); var di = dn.lastIndexOf('.'); if (di>0) dn = dn.slice(0,di); name.textContent = dn;
-                        nameRow.appendChild(name);
-                        if (f.readonly) { const lock = document.createElement('div'); lock.className='file-lock'; lock.textContent='🔒'; nameRow.appendChild(lock); }
-                        const close = document.createElement('div'); close.className='file-close'; close.textContent='X';
-                        close.addEventListener('click', function(ev){ ev.stopPropagation(); try{
-                            window.__wbPruneSymbols && window.__wbPruneSymbols(f.id);
-                            var files = WBStorage.loadFiles() || [];
-                            var idx = files.findIndex(function(x){ return x.id===f.id; });
-                            if (idx>=0) { files.splice(idx,1); WBStorage.saveFiles(files); }
-                            if (WBStorage.loadActive()===f.id) {
-                                if (files.length) { WBStorage.saveActive(files[0].id); loadFileIntoEditor(files[0]); }
-                                else { WBStorage.saveActive(null); var lbl=document.getElementById('wb-file-name'); if(lbl) lbl.textContent='no files'; }
-                            }
-                        }catch(e){} tab.remove(); });
-                        tab.addEventListener('click', function(){ try{ document.querySelectorAll('.wb-file-tab').forEach(function(t){ t.classList.remove('active'); }); tab.classList.add('active'); WBStorage.saveActive(f.id); loadFileIntoEditor(f);}catch(e){} });
-                        tab.appendChild(icon); tab.appendChild(nameRow); tab.appendChild(close);
-                        dock.appendChild(tab);
-                        return tab;
-                    } catch(e) { console.warn('makeDockTabForFile error', e); return null; }
+                        window.__wbPendingFile = { name: file.name, language: lang, content: content, export_symbols: true };
+                        const br = document.getElementById('wb-open-bridge');
+                        if (br) br.dispatchEvent(new CustomEvent('wb-open-file', { detail: {} }));
+                    } catch(e) { console.warn('importFile error', e); }
                 }
 
                 document.addEventListener('dragover', function(e){ try{ e.preventDefault(); }catch(e){} }, false);
@@ -845,22 +889,13 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
                                 const reader = new FileReader();
                                 reader.onload = function(ev) {
                                     try {
-                                        var files = WBStorage.loadFiles() || [];
-                                        var newid = WBStorage.generateId();
                                         var lang = 'Text';
                                         var n = (file.name || '').toLowerCase();
                                         if (n.endsWith('.bas')) lang='VBScript';
                                         else if (n.endsWith('.pas') || n.endsWith('.pp') || n.endsWith('.inc')) lang='Pascal';
                                         else if (n.endsWith('.c') || n.endsWith('.h')) lang='C';
                                         else if (n.endsWith('.asm') || n.endsWith('.s') || n.endsWith('.z80')) lang='Z80';
-                                        var newfile = { id: newid, name: file.name, language: lang, content: ev.target.result, export_symbols: true };
-                                        files.push(newfile);
-                                        WBStorage.saveFiles(files);
-                                        WBStorage.saveActive(newid);
-                                        // create dock tab and load into editor
-                                        try { document.querySelectorAll('.wb-file-tab').forEach(function(t){ t.classList.remove('active'); }); } catch(e){}
-                                        makeDockTabForFile(newfile);
-                                        loadFileIntoEditor(newfile);
+                                        importFile(file, ev.target.result, lang);
                                     } catch(e) { console.error(e); }
                                 };
                                 reader.readAsText(file);
@@ -880,102 +915,47 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
                 document.documentElement.style.setProperty('--wb-editor-font', "'" + f + "', monospace");
                 const fs = localStorage.getItem('wb_editor_font_size') || '13';
                 document.documentElement.style.setProperty('--wb-editor-font-size', fs + 'px');
-                // Expose the CM element id for static hints.js to hook into.
-                window.__wbEditorId = @CMID@;
-                // Global undo/redo operating directly on the editor view.
-                // CodeMirror's native history is shared across files on this
-                // single view, so we keep our own per-file stacks: no undo/redo
-                // ever bleeds into (or from) another file.
-                window.__wbHist = {};
-                function wbFid() { return window.__wbActiveFid || null; }
-                function wbHistOf(fid) {
-                    if (!fid) return null;
-                    if (!window.__wbHist[fid]) window.__wbHist[fid] = { undos: [], redos: [] };
-                    return window.__wbHist[fid];
-                }
-                function wbDocText(view) { try { return view.state.doc.toString(); } catch(e) { return ''; } }
-                function wbApplyDoc(view, text) {
-                    try {
-                        const len = view.state.doc.length || 0;
-                        view.dispatch({changes: {from: 0, to: len, insert: text}, addToHistory: false});
-                    } catch(e) {}
-                }
-                function wbUndoPerFile(view) {
-                    const fid = wbFid();
-                    if (!fid) return;
-                    const h = wbHistOf(fid);
-                    if (!h.undos.length) return;
-                    const prev = h.undos.pop();
-                    h.redos.push(wbDocText(view));
-                    wbApplyDoc(view, prev);
-                }
-                function wbRedoPerFile(view) {
-                    const fid = wbFid();
-                    if (!fid) return;
-                    const h = wbHistOf(fid);
-                    if (!h.redos.length) return;
-                    const next = h.redos.pop();
-                    h.undos.push(wbDocText(view));
-                    wbApplyDoc(view, next);
-                }
+                // Map of file id -> NiceGUI element id, filled by the server as
+                // editors are created. __wbEditorId is the ACTIVE editor's id.
+                window.__wbEditorIds = window.__wbEditorIds || {};
+                // Global undo/redo operate on the ACTIVE editor view. CodeMirror
+                // keeps native per-view history, so each file (its own view)
+                // gets independent undo/redo without client-side stacks.
                 function wbCmDo(action) {
                     if (window.__wbActiveReadonly) return;
-                    getElement(@CMID@).editorPromise.then(function(p) {
+                    var elId = window.__wbEditorId;
+                    if (!elId) return;
+                    getElement(elId).editorPromise.then(function(p) {
                         try {
-                            if (action === 'undo') wbUndoPerFile(p); else wbRedoPerFile(p);
-                            try { p.focus(); } catch(e) {}
+                            import('nicegui-codemirror').then(function(CM) {
+                                try {
+                                    if (action === 'undo') CM.undo(p); else CM.redo(p);
+                                } catch(e) {}
+                                try { p.focus(); } catch(e) {}
+                            });
                         } catch(e) {}
                     });
                 }
                 window.__wbUndo = function() { wbCmDo('undo'); };
                 window.__wbRedo = function() { wbCmDo('redo'); };
-                // Record user edits into the active file's stack and override the
-                // native Mod-z/Mod-y/Mod-Shift-z binds so CodeMirror's own shared
-                // history never gets a chance to undo across files.
-                getElement(@CMID@).editorPromise.then(function(p) {
-                    import('nicegui-codemirror').then(function(CM) {
-                        try {
-                            const recorder = CM.ViewPlugin.fromClass(class {
-                                update(u) {
-                                    if (!u.docChanged) return;
-                                    const fid = wbFid();
-                                    if (!fid) return;
-                                    let fromUser = false;
-                                    for (const tr of u.transactions) {
-                                        const ev = tr.annotation(CM.Transaction.userEvent);
-                                        if (typeof ev === 'string' && ev.indexOf('input') === 0) fromUser = true;
-                                    }
-                                    if (!fromUser) return;
-                                    const h = wbHistOf(fid);
-                                    const prev = u.startState.doc.toString();
-                                    if (!h.undos.length || h.undos[h.undos.length - 1] !== prev) {
-                                        h.undos.push(prev);
-                                        h.redos = [];
-                                    }
-                                }
-                            });
-                            const undoKeys = CM.keymap.of([
-                                { key: 'Mod-z', run: function() { if (window.__wbActiveReadonly) return true; wbUndoPerFile(p); return true; } },
-                                { key: 'Mod-y', run: function() { if (window.__wbActiveReadonly) return true; wbRedoPerFile(p); return true; } },
-                                { key: 'Mod-Shift-z', run: function() { if (window.__wbActiveReadonly) return true; wbRedoPerFile(p); return true; } },
-                            ]);
-                            p.dispatch({ effects: CM.StateEffect.appendConfig.of([recorder, undoKeys]) });
-                        } catch(e) {}
-                    });
-                });
                 document.addEventListener('keydown', function(e) {
-                    const mod = e.ctrlKey || e.metaKey;
+                    var mod = e.ctrlKey || e.metaKey;
                     if (!mod) return;
                     if (e.key === 'z' && !e.shiftKey) {
+                        // When focus is inside an editor, Let CodeMirror's own
+                        // keymap handle undo natively (per-view history). The
+                        // global fallback only covers focus on toolbar controls.
+                        if (e.target && e.target.closest && e.target.closest('.cm-editor')) return;
                         e.preventDefault();
                         window.__wbUndo();
                     } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+                        if (e.target && e.target.closest && e.target.closest('.cm-editor')) return;
                         e.preventDefault();
                         window.__wbRedo();
                     }
                 });
             })()
-        '''.replace('@CMID@', str(code_editor.id)))
+        ''')
         # Plugins menu: enable/disable installed plugins individually.
         ui.run_javascript('''
             (function() {
@@ -1079,29 +1059,30 @@ with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-bt
         # Give focus back to the editor after toolbar button clicks so the user
         # can keep typing. Rename/Delete open dialogs with their own focus, so
         # they are excluded.
-        ui.run_javascript(f'''
-            (function() {{
-                var cmId = {code_editor.id};
-                window.wbRefocusEditor = function() {{
-                    try {{
-                        var el = getElement(cmId);
-                        if (el && el.editorPromise) {{
-                            el.editorPromise.then(function(v) {{ try {{ v.focus(); }} catch(e) {{}} }});
+        ui.run_javascript('''
+            (function() {
+                window.wbRefocusEditor = function() {
+                    try {
+                        var elId = window.__wbEditorId;
+                        if (!elId) return false;
+                        var el = getElement(elId);
+                        if (el && el.editorPromise) {
+                            el.editorPromise.then(function(v) { try { v.focus(); } catch(e) {} });
                             return true;
-                        }}
-                    }} catch(e) {{}}
+                        }
+                    } catch(e) {}
                     return false;
-                }};
-                document.addEventListener('click', function(e) {{
-                    try {{
+                };
+                document.addEventListener('click', function(e) {
+                    try {
                         var t = e.target && e.target.closest ? e.target.closest('button') : null;
                         if (!t) return;
                         var id = t.id || '';
                         if (id === 'wb-rename-btn' || id === 'wb-delete-btn') return;
                         window.wbRefocusEditor();
-                    }} catch(e) {{}}
-                }}, true);
-            }})();
+                    } catch(e) {}
+                }, true);
+            })();
         ''')
 
     def _on_storage_loaded(result: Any) -> None:

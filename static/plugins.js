@@ -84,4 +84,10 @@
     var iv = setInterval(function() {
         if (WBPlugins.tryHook() || ++attempts > 100) clearInterval(iv);
     }, 200);
+
+    // Re-bind whenever the server activates a (possibly new) editor. Installs
+    // are idempotent per view (view._wbPluginsApplied).
+    window.addEventListener('wb-active-editor', function() {
+        try { WBPlugins.tryHook(); } catch(e) {}
+    });
 })();
