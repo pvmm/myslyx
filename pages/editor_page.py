@@ -87,9 +87,9 @@ def editor_page() -> None:
     with ui.element('div').classes('wb-root'):
         # === App Header ===
         with ui.element('div').classes('wb-app-header'):
+            ui.button(icon='menu').classes('wb-button').props('id=wb-plugins-btn')
             ui.label('Myslyx Text Editor v1.0').classes('app-title')
             ui.button('?').classes('wb-button').style('margin-left:auto;').on_click(lambda: _open_shortcut_dialog())
-            ui.button('PLUGINS').classes('wb-button').props('id=wb-plugins-btn')
 
         # === Toolbar ===
         with ui.element('div').classes('wb-toolbar'):

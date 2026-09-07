@@ -640,6 +640,16 @@ html, body {
     color: var(--wb-orange);
 }
 
+/* Icon-only header buttons (e.g. the plugins menu) */
+.wb-icon-btn {
+    padding: 4px 6px;
+    line-height: 1;
+}
+
+.wb-icon-btn .q-icon {
+    font-size: 16px;
+}
+
 /* ===== Plugins menu (dropdown next to the '?' button) ===== */
 .wb-plugins-menu {
     position: fixed;
@@ -653,6 +663,7 @@ html, body {
         3px 3px 0 rgba(0,0,0,0.4);
     padding: 4px;
     font-family: var(--wb-font);
+    color: var(--wb-text);
 }
 
 .wb-plugins-title {
