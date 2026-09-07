@@ -672,7 +672,7 @@ def editor_page() -> None:
                                 const view = wrap && wrap.cmView && wrap.cmView.view ? wrap.cmView.view : null;
                                 if (view && view.dispatch) {
                                     const docLen = view.state.doc.length || 0;
-                                    view.dispatch({changes: {from: 0, to: docLen, insert: e.target.result}});
+                                    view.dispatch({changes: {from: 0, to: docLen, insert: e.target.result}, addToHistory: false});
                                     if (typeof view.focus === 'function') view.focus();
                                 } else {
                                     // Fallback: try to find the content element and set text
@@ -780,7 +780,7 @@ def editor_page() -> None:
                         const view = wrap && wrap.cmView && wrap.cmView.view ? wrap.cmView.view : null;
                         if (view && view.dispatch) {
                             const docLen = view.state.doc.length || 0;
-                            view.dispatch({changes: {from: 0, to: docLen, insert: f.content}});
+                            view.dispatch({changes: {from: 0, to: docLen, insert: f.content}, addToHistory: false});
                             if (typeof view.focus === 'function') view.focus();
                         } else {
                             const el = document.querySelector('.cm-editor .cm-content');
@@ -883,21 +883,86 @@ def editor_page() -> None:
                 // Expose the CM element id for static hints.js to hook into.
                 window.__wbEditorId = @CMID@;
                 // Global undo/redo operating directly on the editor view.
-                // CodeMirror handles Ctrl/Cmd+Z and Ctrl/Cmd+Y natively while the
-                // editor is focused; these helpers cover focus elsewhere.
+                // CodeMirror's native history is shared across files on this
+                // single view, so we keep our own per-file stacks: no undo/redo
+                // ever bleeds into (or from) another file.
+                window.__wbHist = {};
+                function wbFid() { return window.__wbActiveFid || null; }
+                function wbHistOf(fid) {
+                    if (!fid) return null;
+                    if (!window.__wbHist[fid]) window.__wbHist[fid] = { undos: [], redos: [] };
+                    return window.__wbHist[fid];
+                }
+                function wbDocText(view) { try { return view.state.doc.toString(); } catch(e) { return ''; } }
+                function wbApplyDoc(view, text) {
+                    try {
+                        const len = view.state.doc.length || 0;
+                        view.dispatch({changes: {from: 0, to: len, insert: text}, addToHistory: false});
+                    } catch(e) {}
+                }
+                function wbUndoPerFile(view) {
+                    const fid = wbFid();
+                    if (!fid) return;
+                    const h = wbHistOf(fid);
+                    if (!h.undos.length) return;
+                    const prev = h.undos.pop();
+                    h.redos.push(wbDocText(view));
+                    wbApplyDoc(view, prev);
+                }
+                function wbRedoPerFile(view) {
+                    const fid = wbFid();
+                    if (!fid) return;
+                    const h = wbHistOf(fid);
+                    if (!h.redos.length) return;
+                    const next = h.redos.pop();
+                    h.undos.push(wbDocText(view));
+                    wbApplyDoc(view, next);
+                }
                 function wbCmDo(action) {
                     if (window.__wbActiveReadonly) return;
                     getElement(@CMID@).editorPromise.then(function(p) {
-                        import('nicegui-codemirror').then(function(CM) {
-                            try {
-                                if (action === 'undo') CM.undo(p); else CM.redo(p);
-                                try { p.focus(); } catch(e) {}
-                            } catch(e) {}
-                        });
+                        try {
+                            if (action === 'undo') wbUndoPerFile(p); else wbRedoPerFile(p);
+                            try { p.focus(); } catch(e) {}
+                        } catch(e) {}
                     });
                 }
                 window.__wbUndo = function() { wbCmDo('undo'); };
                 window.__wbRedo = function() { wbCmDo('redo'); };
+                // Record user edits into the active file's stack and override the
+                // native Mod-z/Mod-y/Mod-Shift-z binds so CodeMirror's own shared
+                // history never gets a chance to undo across files.
+                getElement(@CMID@).editorPromise.then(function(p) {
+                    import('nicegui-codemirror').then(function(CM) {
+                        try {
+                            const recorder = CM.ViewPlugin.fromClass(class {
+                                update(u) {
+                                    if (!u.docChanged) return;
+                                    const fid = wbFid();
+                                    if (!fid) return;
+                                    let fromUser = false;
+                                    for (const tr of u.transactions) {
+                                        const ev = tr.annotation(CM.Transaction.userEvent);
+                                        if (typeof ev === 'string' && ev.indexOf('input') === 0) fromUser = true;
+                                    }
+                                    if (!fromUser) return;
+                                    const h = wbHistOf(fid);
+                                    const prev = u.startState.doc.toString();
+                                    if (!h.undos.length || h.undos[h.undos.length - 1] !== prev) {
+                                        h.undos.push(prev);
+                                        h.redos = [];
+                                    }
+                                }
+                            });
+                            const undoKeys = CM.keymap.of([
+                                { key: 'Mod-z', run: function() { if (window.__wbActiveReadonly) return true; wbUndoPerFile(p); return true; } },
+                                { key: 'Mod-y', run: function() { if (window.__wbActiveReadonly) return true; wbRedoPerFile(p); return true; } },
+                                { key: 'Mod-Shift-z', run: function() { if (window.__wbActiveReadonly) return true; wbRedoPerFile(p); return true; } },
+                            ]);
+                            p.dispatch({ effects: CM.StateEffect.appendConfig.of([recorder, undoKeys]) });
+                        } catch(e) {}
+                    });
+                });
                 document.addEventListener('keydown', function(e) {
                     const mod = e.ctrlKey || e.metaKey;
                     if (!mod) return;
