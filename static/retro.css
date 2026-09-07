@@ -169,6 +169,21 @@ html, body {
     letter-spacing: 0.5px;
 }
 
+/* Plugins menu button: favicon fills the whole button. The button uses
+   color='transparent' so Quasar's bg-primary !important never interferes. */
+#wb-plugins-btn {
+    background-color: var(--wb-gadget-bg);
+    background-image: url('/static/favicon.svg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    width: 22px;
+    height: 18px;
+    min-height: 18px;
+    padding: 0;
+    line-height: 18px;
+}
+
 .wb-button:hover {
     background: var(--wb-orange);
     color: var(--wb-white);
@@ -640,16 +655,6 @@ html, body {
     color: var(--wb-orange);
 }
 
-/* Icon-only header buttons (e.g. the plugins menu) */
-.wb-icon-btn {
-    padding: 4px 6px;
-    line-height: 1;
-}
-
-.wb-icon-btn .q-icon {
-    font-size: 16px;
-}
-
 /* ===== Plugins menu (dropdown next to the '?' button) ===== */
 .wb-plugins-menu {
     position: fixed;
@@ -775,7 +780,6 @@ html, body {
 .app-title {
     -webkit-background-clip: text;
     background-clip: text;
-    background-image: url('/static/favicon.svg');
     color: transparent;
     background-size: contain;
     background-repeat: no-repeat;
