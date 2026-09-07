@@ -386,44 +386,46 @@
         completeTimer = setTimeout(checkCompletions, 80);
     }
 
-    function hookView(v) {
-        view = v;
-        if (view._wbHintHooked) return;
-        view._wbHintHooked = true;
+    function activateView(v) {
+        var active = v;
+        view = active;
+        if (!active._wbHintHooked) {
+            active._wbHintHooked = true;
 
-        import('nicegui-codemirror').then(function(CM) {
-            if (!view) return;
-            view.dispatch({
-                effects: CM.StateEffect.appendConfig.of([
-                    CM.EditorView.updateListener.of(function(update) {
-                        if (update.docChanged) {
-                            scheduleScan();
-                            scheduleCompletions();
-                        }
-                        if (update.selectionSet) {
-                            updateHintsPanel(true);
-                        }
-                    })
-                ])
-            });
+            import('nicegui-codemirror').then(function(CM) {
+                if (!active) return;
+                active.dispatch({
+                    effects: CM.StateEffect.appendConfig.of([
+                        CM.EditorView.updateListener.of(function(update) {
+                            if (update.docChanged) {
+                                scheduleScan();
+                                scheduleCompletions();
+                            }
+                            if (update.selectionSet) {
+                                updateHintsPanel(true);
+                            }
+                        })
+                    ])
+                });
 
-            // Keyboard navigation for the popup, and close on blur.
-            view.contentDOM.addEventListener('keydown', function(e) {
-                if (!popup) return;
-                if (e.key === 'ArrowDown') { e.preventDefault(); movePopup(1); }
-                else if (e.key === 'ArrowUp') { e.preventDefault(); movePopup(-1); }
-                else if (e.key === 'Enter' || e.key === 'Tab') {
-                    if (popupItems.length > 0) { e.preventDefault(); insertCompletion(popupItems[popupIndex]); }
-                } else if (e.key === 'Escape') { removePopup(); }
+                // Keyboard navigation for the popup, and close on blur.
+                active.contentDOM.addEventListener('keydown', function(e) {
+                    if (!popup) return;
+                    if (e.key === 'ArrowDown') { e.preventDefault(); movePopup(1); }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); movePopup(-1); }
+                    else if (e.key === 'Enter' || e.key === 'Tab') {
+                        if (popupItems.length > 0) { e.preventDefault(); insertCompletion(popupItems[popupIndex]); }
+                    } else if (e.key === 'Escape') { removePopup(); }
+                });
+                active.contentDOM.addEventListener('blur', function() {
+                    setTimeout(removePopup, 150);
+                });
             });
-            view.contentDOM.addEventListener('blur', function() {
-                setTimeout(removePopup, 150);
-            });
-
-            // Initial scan + panel.
-            scanSymbols(view, getActiveFid());
-            updateHintsPanel(true);
-        });
+        }
+        // Re-scan + refresh the panel on every activation (the view's own
+        // updateListener covers edits and cursor moves afterwards).
+        scanSymbols(active, getActiveFid());
+        updateHintsPanel(true);
     }
 
     function tryHook() {
@@ -431,11 +433,19 @@
         if (!elId) return false;
         var el = window.getElement ? window.getElement(elId) : null;
         if (!el || !el.editorPromise) return false;
-        el.editorPromise.then(hookView);
+        el.editorPromise.then(activateView);
         return true;
     }
 
-    // Wait for the server to set the editor id and for the CM view to exist.
+    // Re-bind whenever the server activates a (possibly new) editor.
+    window.addEventListener('wb-active-editor', function() {
+        try {
+            removePopup();
+            tryHook();
+        } catch(e) {}
+    });
+
+    // Fallback poll for the very first editor at load time.
     var attempts = 0;
     var iv = setInterval(function() {
         if (tryHook() || ++attempts > 100) clearInterval(iv);
