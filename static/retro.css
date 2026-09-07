@@ -650,6 +650,12 @@ html, body {
     font-size: 16px;
 }
 
+.wb-icon-btn .wb-myslyx-icon {
+    width: 16px;
+    height: 12px;
+    display: block;
+}
+
 /* ===== Plugins menu (dropdown next to the '?' button) ===== */
 .wb-plugins-menu {
     position: fixed;
@@ -775,7 +781,6 @@ html, body {
 .app-title {
     -webkit-background-clip: text;
     background-clip: text;
-    background-image: url('/static/favicon.svg');
     color: transparent;
     background-size: contain;
     background-repeat: no-repeat;
