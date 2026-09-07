@@ -1,13 +1,5 @@
----
-title: Myslyx vintage text editor
-emoji: 📝
-colorFrom: blue
-colorTo: gray
-sdk: docker
-app_port: 7860
----
 <p>
-  <img src="/static/favicon.svg" alt="Project Icon" width="120" height="120">
+  <img src="/static/favicon-pixelated.png" alt="Project Icon" width="128" height="96">
 </p>
 
 # Myslyx Text Editor
