@@ -1,5 +1,5 @@
 <p>
-  <img src="/static/favicon-pixelated.png" alt="Project Icon" width="128" height="96">
+  <img src="static/favicon-pixelated.png" alt="Project Icon" width="128" height="96">
 </p>
 
 # Myslyx Text Editor
