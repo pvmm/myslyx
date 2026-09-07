@@ -80,7 +80,9 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/vendor/marked.min.js"></script>')
     ui.add_head_html('<script src="/static/hints.js"></script>')
     ui.add_head_html('<script src="/static/plugins.js"></script>')
-    ui.add_head_html('<script src="/static/plugins/color-swatches.js"></script>')
+    plugins_dir = Path(__file__).resolve().parents[1] / 'static' / 'plugins'
+    for plugin_js in sorted(plugins_dir.glob('*.js')):
+        ui.add_head_html(f'<script src="/static/plugins/{plugin_js.name}"></script>')
 
     hints_content_id = 'hints-content'
 
