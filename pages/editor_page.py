@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from typing import Any
 from nicegui import ui
@@ -72,6 +73,26 @@ def _storage_io_js() -> str:
     '''
 
 
+def _plugin_metadata(plugin_dir: Path) -> dict[str, Any] | None:
+    """Metadata for one plugin directory (static/plugins/<name>/)."""
+    name = plugin_dir.name
+    entry = f'{name}.js'
+    if not (plugin_dir / entry).is_file():
+        return None
+    meta: dict[str, Any] = {'name': name, 'dir': name, 'entry': entry}
+    meta_file = plugin_dir / 'plugin.json'
+    if meta_file.is_file():
+        try:
+            extra = json.loads(meta_file.read_text())
+            if isinstance(extra.get('languages'), list):
+                meta['languages'] = extra['languages']
+            if isinstance(extra.get('enabledByDefault'), bool):
+                meta['enabledByDefault'] = extra['enabledByDefault']
+        except (OSError, ValueError):
+            logging.warning('Invalid plugin.json in %s', plugin_dir)
+    return meta
+
+
 @ui.page('/editor', favicon=FAVICON_PATH)
 def editor_page() -> None:
     ui.add_head_html('<link rel="stylesheet" href="/static/retro.css">')
@@ -81,8 +102,14 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/hints.js"></script>')
     ui.add_head_html('<script src="/static/plugins.js"></script>')
     plugins_dir = Path(__file__).resolve().parents[1] / 'static' / 'plugins'
-    for plugin_js in sorted(plugins_dir.glob('*.js')):
-        ui.add_head_html(f'<script src="/static/plugins/{plugin_js.name}"></script>')
+    plugin_manifest = []
+    for plugin_dir in sorted(d for d in plugins_dir.iterdir() if d.is_dir()):
+        meta = _plugin_metadata(plugin_dir)
+        if meta:
+            plugin_manifest.append(meta)
+    if plugin_manifest:
+        ui.add_head_html(f'<script>window.WB_PLUGIN_MANIFEST = {json.dumps(plugin_manifest)};</script>')
+        ui.add_head_html('<script src="/static/plugins/lifecycle.js"></script>')
 
     hints_content_id = 'hints-content'
 

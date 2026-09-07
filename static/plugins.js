@@ -42,28 +42,37 @@
         },
 
         // Attach the enabled plugins' extensions to a CodeMirror view. Runs once
-        // per view; config changes take effect on the next page load.
+        // per view; config changes take effect on the next page load. Extension
+        // providers may be synchronous (an array) or asynchronous (a Promise,
+        // e.g. one that dynamic-imports the plugin module).
         install: function(view) {
             if (!view || view._wbPluginsApplied) return;
             view._wbPluginsApplied = true;
             import('nicegui-codemirror').then(function(CM) {
                 if (!view) return;
-                var exts = [];
-                registry.forEach(function(def) {
-                    try {
+                var providers = registry.map(function(def) {
+                    return Promise.resolve().then(function() {
                         if (WBPlugins._enabled(def) && WBPlugins._langOk(def)) {
-                            var got = def.extensions(view, CM, { config: (window.WBStorage.loadConfig().plugins || {})[def.name] || {} });
-                            if (got) exts = exts.concat(got);
+                            return def.extensions(view, CM, { config: (window.WBStorage.loadConfig().plugins || {})[def.name] || {} });
                         }
-                    } catch(e) {
+                        return [];
+                    }).catch(function(e) {
                         console.warn('WBPlugins: ' + def.name + ' failed to provide extensions', e);
+                        return [];
+                    });
+                });
+                Promise.all(providers).then(function(results) {
+                    if (!view) return;
+                    var exts = [];
+                    results.forEach(function(r) {
+                        if (r) exts = exts.concat(r);
+                    });
+                    if (exts.length) {
+                        view.dispatch({
+                            effects: CM.StateEffect.appendConfig.of(exts)
+                        });
                     }
                 });
-                if (exts.length) {
-                    view.dispatch({
-                        effects: CM.StateEffect.appendConfig.of(exts)
-                    });
-                }
             }).catch(function(e) {
                 console.warn('WBPlugins: failed to load CodeMirror namespace', e);
             });
