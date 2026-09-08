@@ -1012,7 +1012,9 @@ def editor_page() -> None:
                                 el.setLineWrapping(on);
                             }
                         });
-                        wrapRow.classList.toggle('active', on);
+                        // Do not use .active here: that is the orange hover /
+                        // open-flyout highlight. Wrap state shows in the value.
+                        wrapValue.classList.toggle('on', on);
                         wrapValue.textContent = on ? 'ON' : 'OFF';
                     }
                     wrapRow.addEventListener('click', function(ev) {

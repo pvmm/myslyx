@@ -746,6 +746,17 @@ html, body {
     font-weight: bold;
 }
 
+/* WRAP row: the ON state is shown by the value text, not the row highlight
+   (hover and the open PLUGINS flyout stay the orange .active highlight). */
+.wb-settings-value.on {
+    color: var(--wb-orange);
+}
+
+.wb-settings-row:hover .wb-settings-value.on,
+.wb-settings-row.active .wb-settings-value.on {
+    color: var(--wb-white);
+}
+
 .wb-settings-arrow {
     font-size: 8px;
     font-weight: bold;

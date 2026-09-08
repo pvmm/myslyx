@@ -10,10 +10,17 @@ async def wrap_toggle_preserves_content(page, msgs):
     before = await h.doc_text(page)
     assert before == 'PRINT 42'
     await h.open_settings(page)
+    wrap_row = page.locator('#wb-settings-wrap')
+    # The WRAP row must not use the orange .active highlight (reserved for
+    # hover/open flyout); its ON/OFF state shows as the value text instead.
+    assert await wrap_row.evaluate("el => !el.classList.contains('active')"), \
+        'WRAP row must not stay orange via .active'
     await page.click('#wb-settings-wrap')
     await page.wait_for_timeout(500)
     after = await h.doc_text(page)
     assert after == before, f'wrap toggle must not alter content: {after!r}'
+    assert await wrap_row.evaluate("el => !el.classList.contains('active')"), \
+        'WRAP row must stay unhighlighted after toggling'
     assert msgs == []
 
 
