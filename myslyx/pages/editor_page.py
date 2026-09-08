@@ -1289,8 +1289,6 @@ def editor_page() -> None:
                         {'keys': 'Ctrl++', 'action': 'Increase font size'},
                         {'keys': 'Ctrl+-', 'action': 'Decrease font size'},
                         {'keys': 'Ctrl+Space', 'action': 'Open SETTINGS menu'},
-                        {'keys': '↑ / ↓', 'action': 'Navigate SETTINGS menu / hints'},
-                        {'keys': '⇄', 'action': 'HINTS back/forward'},
                         {'keys': 'F1', 'action': 'Reload hints root page'},
                         {'keys': 'F5', 'action': 'Refresh editor'},
                     ],
