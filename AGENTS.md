@@ -7,6 +7,7 @@ Guidelines for agents
 - When editing UI code, prefer client-side handlers in `myslyx/pages/editor_page.py`'s `_init()` and use `ui.run_javascript()` rather than inline attributes.
 - For Python changes, run: `.venv/bin/python -m py_compile myslyx/pages/editor_page.py` before pushing.
 - When adding features that affect the frontend, include minimal manual test steps and a browser check (hard refresh).
+- Always clean up after yourself: every server (e.g. `python main.py`, test-run myslyx instances) started for a session must be killed before the task is finished — they accumulate and hog machine resources. Close stray Playwright/`firefox 127.0.0.1` tabs left pointing at dead test ports too.
 
 Project layout
 - Myslyx is an installable Python package (`pyproject.toml`). Install it for local use with `.venv/bin/pip install .` (or `-e .` for editable/development installs). It provides the `myslyx` console command and `python -m myslyx`.
