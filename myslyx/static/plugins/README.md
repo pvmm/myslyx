@@ -118,14 +118,20 @@ A plugin is enabled by default unless:
 Config changes apply on the next page load (hard refresh) — there is no
 runtime toggle yet.
 
-## Included example: `color-swatches`
+## Included examples
 
-Lives in `static/plugins/color-swatches/`. Scans the document for
-`#rrggbb`-style hex tokens and renders a small color box right after each one.
-It is the minimal proof-of-concept showing the full pipeline: manifest ->
-load module -> register -> hook view -> `Decoration.widget` on a `StateField`.
-It is a near-copy of the standalone version (see "Porting a standalone CM
-extension" above).
+- `static/plugins/color-swatches/` — scans the document for `#rrggbb`-style hex
+  tokens and renders a small color box right after each one. It is the minimal
+  proof-of-concept showing the full pipeline: manifest -> load module ->
+  register -> hook view -> `Decoration.widget` on a `StateField`. It is a
+  near-copy of the standalone version (see "Porting a standalone CM
+  extension" above).
+- `static/plugins/file-stats/` — shows live character / word / line counts for
+  the active file, stacked under its name in the top toolbar. It demonstrates
+  a plugin that reaches outside the editor view: it injects the display slot
+  as plain DOM around the existing `#wb-file-name` label and recomputes the
+  counts from the active view's document on every edit and on
+  `wb-active-editor` events.
 
 ## Validation
 

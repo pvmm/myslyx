@@ -1,4 +1,4 @@
-"""Smoke suite: wrap toggle, export-symbols and font controls."""
+"""Smoke suite: wrap toggle, export-symbols, font controls and file counts."""
 
 from tests import helpers as h
 
@@ -91,9 +91,33 @@ async def export_disabled_on_language_switch(page, msgs):
     assert msgs == []
 
 
+async def file_stats_counts(page, msgs):
+    # The bundled file-stats plugin injects a counts node under the active
+    # file name and fills it from the active editor's document.
+    counts = page.locator('#wb-file-counts')
+    await counts.wait_for(state='attached', timeout=10000)
+    await page.wait_for_function("""
+        () => /chars/.test((document.getElementById('wb-file-counts') || {}).textContent || '')
+    """)
+    # A fresh file is empty -> the counts line clears.
+    await h.new_file(page, 2)
+    await page.wait_for_function("""
+        () => (document.getElementById('wb-file-counts') || {}).textContent === ''
+    """)
+    # Typing updates counts live: "PRINT 42\nREM hi" -> 15 chars, 4 words, 2 lines.
+    await h.active_cm(page).click()
+    await page.keyboard.type('PRINT 42\nREM hi')
+    await page.wait_for_function("""
+        () => (document.getElementById('wb-file-counts') || {}).textContent
+                 === '15 chars \u00b7 4 words \u00b7 2 lines'
+    """)
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
     ('smoke/export-disabled-for-text', export_disabled_for_text),
     ('smoke/export-language-switch', export_disabled_on_language_switch),
+    ('smoke/file-stats-counts', file_stats_counts),
 ]
