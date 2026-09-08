@@ -1,4 +1,4 @@
-"""Smoke suite: wrap toggle, export-symbols, font controls and file counts."""
+"""Smoke suite: wrap toggle, export-symbols, hints browsing and counts."""
 
 from tests import helpers as h
 
@@ -121,10 +121,50 @@ async def file_stats_counts(page, msgs):
     assert msgs == []
 
 
+async def hints_page_title(page):
+    return await page.evaluate("""() => {
+        const t = document.querySelector('#hints-content .hint-title');
+        return t ? t.textContent : null;
+    }""")
+
+
+async def hints_nav_browse(page, msgs):
+    # The HINTS panel records every shown page; the ◀ ▶ buttons in the title
+    # bar move back and forward through the visited pages.
+    nav = page.locator('.wb-hints-nav-btn')
+    await nav.nth(0).wait_for(state='attached', timeout=10000)
+    await h.new_file(page, 2)
+    # Typing a word with a tip pushes a page; two words -> two history entries
+    # (the root page shown by "new file" is the first entry).
+    await h.active_cm(page).click()
+    await page.keyboard.type('PRINT 42\nINPUT')
+    await page.wait_for_function("""
+        () => (document.querySelector('#hints-content .hint-title') || {}).textContent === 'INPUT'
+    """)
+    title = await hints_page_title(page)
+    assert title == 'INPUT', f'expected INPUT hint, got {title!r}'
+    # End of history: back is enabled, forward is not.
+    assert not await nav.nth(0).is_disabled(), 'back must be enabled after a tip'
+    assert await nav.nth(1).is_disabled(), 'forward must be disabled at the newest page'
+    # One step back -> the earlier PRINT tip.
+    await nav.nth(0).click()
+    await page.wait_for_function("""
+        () => (document.querySelector('#hints-content .hint-title') || {}).textContent === 'PRINT'
+    """)
+    assert not await nav.nth(1).is_disabled(), 'forward must re-enable after going back'
+    # And forward again -> INPUT.
+    await nav.nth(1).click()
+    await page.wait_for_function("""
+        () => (document.querySelector('#hints-content .hint-title') || {}).textContent === 'INPUT'
+    """)
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
     ('smoke/export-disabled-for-text', export_disabled_for_text),
     ('smoke/export-language-switch', export_disabled_on_language_switch),
     ('smoke/file-stats-counts', file_stats_counts),
+    ('smoke/hints-nav-browse', hints_nav_browse),
 ]

@@ -1240,6 +1240,7 @@ def editor_page() -> None:
                         {'keys': 'Ctrl+Y', 'action': 'Redo'},
                         {'keys': 'Ctrl++', 'action': 'Increase font size'},
                         {'keys': 'Ctrl+-', 'action': 'Decrease font size'},
+                        {'keys': '⇄', 'action': 'HINTS back/forward'},
                         {'keys': 'F5', 'action': 'Refresh editor'},
                     ],
                     row_key='keys',

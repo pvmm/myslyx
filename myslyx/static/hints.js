@@ -28,6 +28,83 @@
     var completeTimer = null;
     var panelToken = 0;
 
+    // ===== Hints page history (back / forward browsing) =====
+    // Every hint the panel shows is recorded as a page; the ◀ ▶ buttons next
+    // to the "HINTS" title move through the pages visited so far.
+
+    var hintHistory = [];
+    var hintIndex = -1;
+    var navBack = null;
+    var navForward = null;
+
+    function ensureNavButtons() {
+        if (navBack) return true;
+        var header = document.querySelector('.wb-hints-sidebar .hints-header');
+        if (!header) return false;
+
+        var buttons = document.createElement('div');
+        buttons.className = 'wb-hints-nav';
+
+        navBack = document.createElement('button');
+        navBack.className = 'wb-hints-nav-btn';
+        navBack.textContent = '\u25c0';
+        navBack.title = 'Previous hint page';
+        navBack.addEventListener('click', function() { historyBack(); });
+
+        navForward = document.createElement('button');
+        navForward.className = 'wb-hints-nav-btn';
+        navForward.textContent = '\u25b6';
+        navForward.title = 'Next hint page';
+        navForward.addEventListener('click', function() { historyForward(); });
+
+        buttons.appendChild(navBack);
+        buttons.appendChild(navForward);
+        header.appendChild(buttons);
+        updateNavButtons();
+        return true;
+    }
+
+    function updateNavButtons() {
+        if (!navBack) return;
+        navBack.disabled = hintIndex <= 0;
+        navForward.disabled = hintIndex === -1 || hintIndex >= hintHistory.length - 1;
+        if (hintIndex < 0) {
+            navBack.disabled = true;
+            navForward.disabled = true;
+        }
+    }
+
+    function showHintPage(html) {
+        var hintsEl = document.getElementById(HINTS_CONTENT_ID);
+        if (!hintsEl) return;
+        ensureNavButtons();
+        // Repeated (identical) renders of the same hint do not create entries;
+        // a fresh page truncates any forward history and appends itself.
+        if (hintIndex < 0 || hintHistory[hintIndex] !== html) {
+            hintHistory = hintHistory.slice(0, hintIndex + 1);
+            hintHistory.push(html);
+            hintIndex = hintHistory.length - 1;
+        }
+        hintsEl.innerHTML = html;
+        updateNavButtons();
+    }
+
+    function historyBack() {
+        if (hintIndex <= 0) return;
+        hintIndex--;
+        var hintsEl = document.getElementById(HINTS_CONTENT_ID);
+        if (hintsEl) hintsEl.innerHTML = hintHistory[hintIndex];
+        updateNavButtons();
+    }
+
+    function historyForward() {
+        if (hintIndex === -1 || hintIndex >= hintHistory.length - 1) return;
+        hintIndex++;
+        var hintsEl = document.getElementById(HINTS_CONTENT_ID);
+        if (hintsEl) hintsEl.innerHTML = hintHistory[hintIndex];
+        updateNavButtons();
+    }
+
     function getActiveFid() {
         return window.__wbActiveFid || null;
     }
@@ -192,20 +269,20 @@
             }
         }
         if (tip) {
-            hintsEl.innerHTML =
+            showHintPage(
                 '<div class="hint-title">' + upper + '</div>' +
-                '<div class="hint-text">' + renderMarkdown(tip) + '</div>';
+                '<div class="hint-text">' + renderMarkdown(tip) + '</div>');
             return;
         }
 
         // 2. User-defined function/subroutine.
         var symbol = findSymbol(word, getAllSymbols());
         if (symbol) {
-            hintsEl.innerHTML =
+            showHintPage(
                 '<div class="hint-title">' + upper + '</div>' +
                 '<div class="hint-text">You defined this here:<br>' +
                 '&nbsp;&nbsp;<span class="hint-code">' + symbol.file + '</span> line ' + symbol.line +
-                ' (<span class="hint-code">' + symbol.kind + '</span>)</div>';
+                ' (<span class="hint-code">' + symbol.kind + '</span>)</div>');
             return;
         }
 
@@ -217,9 +294,9 @@
                 try {
                     var re = new RegExp(hints.patterns[p].re);
                     if (line.match(re)) {
-                        hintsEl.innerHTML =
+                        showHintPage(
                             '<div class="hint-title">' + upper + '</div>' +
-                            '<div class="hint-text">' + renderMarkdown(hints.patterns[p].tip) + '</div>';
+                            '<div class="hint-text">' + renderMarkdown(hints.patterns[p].tip) + '</div>');
                         return;
                     }
                 } catch(e) {}
@@ -229,16 +306,16 @@
         // 4. Known keyword / builtin.
         var known = (hints.keywords || []).some(function(k) { return k.toUpperCase() === upper; });
         if (known) {
-            hintsEl.innerHTML =
+            showHintPage(
                 '<div class="hint-title">' + upper + '</div>' +
-                '<div class="hint-text">' + upper + ' is a language keyword.</div>';
+                '<div class="hint-text">' + upper + ' is a language keyword.</div>');
             return;
         }
         var builtin = (hints.builtins || []).some(function(b) { return b.toUpperCase() === upper; });
         if (builtin) {
-            hintsEl.innerHTML =
+            showHintPage(
                 '<div class="hint-title">' + upper + '</div>' +
-                '<div class="hint-text">' + upper + ' is a builtin function/object.</div>';
+                '<div class="hint-text">' + upper + ' is a builtin function/object.</div>');
             return;
         }
 
@@ -441,6 +518,7 @@
     window.addEventListener('wb-active-editor', function() {
         try {
             removePopup();
+            ensureNavButtons();
             tryHook();
         } catch(e) {}
     });
@@ -450,4 +528,11 @@
     var iv = setInterval(function() {
         if (tryHook() || ++attempts > 100) clearInterval(iv);
     }, 200);
+
+    // Add the back/forward buttons to the HINTS title bar as soon as it exists.
+    (function() {
+        var navIv = setInterval(function() {
+            if (ensureNavButtons()) clearInterval(navIv);
+        }, 150);
+    })();
 })();

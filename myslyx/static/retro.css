@@ -645,6 +645,38 @@ html, body {
     padding: 4px 8px;
     border-bottom: 2px solid var(--wb-black);
     user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.wb-hints-nav {
+    display: flex;
+    gap: 4px;
+}
+
+.wb-hints-nav-btn {
+    font-family: var(--wb-font);
+    font-size: 10px;
+    line-height: 1;
+    color: var(--wb-white);
+    background: var(--wb-black);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark);
+    padding: 2px 6px;
+    cursor: pointer;
+}
+
+.wb-hints-nav-btn:hover:not(:disabled) {
+    background: var(--wb-orange);
+    color: var(--wb-white);
+}
+
+.wb-hints-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .wb-hints-sidebar .hints-content {
