@@ -23,7 +23,7 @@ packaged and loaded**, not about the CodeMirror API itself.
 | Where the API comes from | `import { ... } from '@codemirror/view'`, `'@codemirror/state'`, ... | A `CM` namespace passed to your module by the plugin runtime |
 | Module format | An ESM/CommonJS module in your own bundler | A single ES module in a self-contained directory |
 | Browser setup needed | An import map or a bundling step (browsers can't resolve `@codemirror/...`) | None — `nicegui-codemirror` is pre-bundled by the page |
-| Hosting | Whatever your app uses | Served as a static file under `/static/plugins/<name>/` |
+| Hosting | Whatever your app uses | Served as static files (bundled under `/static/plugins/<name>/` or installed under `/user-plugins/<name>/`) |
 | Adding it | Recompile / rebuild your frontend | Drop one directory in, hard-refresh the page |
 | Language awareness | None (global to the editor) | Can be scoped to specific languages |
 | Enable/disable | At editor construction | Per-user shared config (`localStorage['wb_editor_config']`) |
@@ -73,8 +73,10 @@ myslyx/static/plugins/<name>/
 ```
 
 `<name>` is a single URL-safe token (letters, digits, hyphens) and also
-determines the entry module file (`<name>.js`) and the served URL
-(`/static/plugins/<name>/<name>.js`).
+determines the entry module file (`<name>.js`) and the served URL. A bundled
+plugin is served at `/static/plugins/<name>/<name>.js`; a plugin installed in
+the user configuration directory (below) is served at
+`/user-plugins/<name>/<name>.js`.
 
 ### The factory
 
@@ -110,7 +112,8 @@ default) and can be used to read options that live in the shared client config.
 ## Creating a plugin step by step
 
 1. Create the directory `myslyx/static/plugins/<name>/` and the module
-   `<name>.js`.
+   `<name>.js` (or drop it straight into your user plugins directory — see
+   "Installing a plugin" below).
 2. Write your extension as a plain CodeMirror 6 extension, using only the `CM`
    namespace (see the porting notes above).
 3. Add a `plugin.json` only if you need language scoping or a non-default
@@ -132,8 +135,9 @@ Good practice:
   (`wb-autocomplete-popup`, `--wb-font`, `--wb-white`, hard borders) so the
   plugin looks native.
 - **Keep assets in the plugin directory.** Files under
-  `myslyx/static/plugins/<name>/` are served at `/static/plugins/<name>/...`
-  and stay isolated from other plugins.
+  `myslyx/static/plugins/<name>/` are served at `/static/plugins/<name>/...`,
+  and files under your user plugins directory at `/user-plugins/<name>/...` —
+  nothing leaks between plugins.
 - **Wrap failures.** The runtime catches load errors and factory throws, logs a
   warning, and skips the plugin without breaking the editor.
 
@@ -141,8 +145,10 @@ Good practice:
 
 ## Installing a plugin
 
-A plugin is installed the moment its directory exists on disk; the page
-discovers plugins at load time by scanning `myslyx/static/plugins/`.
+A plugin is installed the moment its directory exists on disk. At page load
+Myslyx scans two locations and merges the manifests: bundled plugins first,
+then plugins in the user configuration directory. A plugin installed by the
+user **shadows** a bundled plugin with the same name.
 
 ### From a source checkout or editable install
 
@@ -154,16 +160,38 @@ cp -r my-plugin myslyx/static/plugins/
 
 ### From an installed package
 
-With a regular (non-editable) `pip install`, the static files live in your
-Python's `site-packages/myslyx/static/plugins/`. Find the package with:
+Plugins can be installed in either of two places. Both are discovered
+automatically; neither requires editing the package or restarting the server.
+
+**Preferred — the user configuration directory.** This works for any install
+method (regular `pip install`, virtualenv, system install) and survives package
+upgrades. Myslyx creates it on first launch and serves it at
+`/user-plugins/`. The location depends on the operating system:
+
+| OS      | Plugins directory |
+|---------|-------------------|
+| Windows | `%APPDATA%\myslyx\plugins` |
+| macOS   | `~/Library/Application Support/myslyx/plugins` |
+| Linux   | `$XDG_CONFIG_HOME/myslyx/plugins` (default `~/.config/myslyx/plugins`) |
+
+```bash
+# example on Linux
+mkdir -p ~/.config/myslyx/plugins
+cp -r my-plugin ~/.config/myslyx/plugins/
+```
+
+**Alternative — inside the package.** With a regular (non-editable)
+`pip install`, the bundled static files live in your Python's
+`site-packages/myslyx/static/plugins/`. Find the path with:
 
 ```bash
 python -c "import myslyx; from pathlib import Path; print(Path(myslyx.__file__).parent / 'static' / 'plugins')"
 ```
 
-Then copy your plugin directory there (or — if you are distributing a plugin —
-add it to the source tree and rebuild the wheel; `MANIFEST.in` bundles
-`myslyx/static/**` automatically).
+Then copy your plugin directory there. This is only useful for development
+machines — package upgrades overwrite it. If you are *distributing* a plugin
+bundled with Myslyx, add it to the source tree and rebuild the wheel;
+`MANIFEST.in` bundles `myslyx/static/**` automatically.
 
 ### Enable / disable
 

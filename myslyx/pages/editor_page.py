@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any
 from nicegui import ui
 
+from myslyx.paths import user_plugins_dir
+
 
 FAVICON_PATH = str(Path(__file__).resolve().parents[1] / 'static' / 'favicon.svg')
 
@@ -101,12 +103,23 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/vendor/marked.min.js"></script>')
     ui.add_head_html('<script src="/static/hints.js"></script>')
     ui.add_head_html('<script src="/static/plugins.js"></script>')
-    plugins_dir = Path(__file__).resolve().parents[1] / 'static' / 'plugins'
-    plugin_manifest = []
-    for plugin_dir in sorted(d for d in plugins_dir.iterdir() if d.is_dir()):
-        meta = _plugin_metadata(plugin_dir)
-        if meta:
-            plugin_manifest.append(meta)
+    plugin_manifest_by_name: dict[str, Any] = {}
+
+    def collect(base_url: str, plugins_dir: Path) -> None:
+        for plugin_dir in sorted(d for d in plugins_dir.iterdir() if d.is_dir()):
+            meta = _plugin_metadata(plugin_dir)
+            if not meta:
+                continue
+            meta['base'] = base_url
+            plugin_manifest_by_name[meta['name']] = meta
+
+    # Bundled first, then user plugins: an installation in the user config
+    # directory shadows a bundled plugin with the same name.
+    collect('/static/plugins/', Path(__file__).resolve().parents[1] / 'static' / 'plugins')
+    user_plugins = user_plugins_dir()
+    if user_plugins.is_dir():
+        collect('/user-plugins/', user_plugins)
+    plugin_manifest = list(plugin_manifest_by_name.values())
     if plugin_manifest:
         ui.add_head_html(f'<script>window.WB_PLUGIN_MANIFEST = {json.dumps(plugin_manifest)};</script>')
         ui.add_head_html('<script src="/static/plugins/lifecycle.js"></script>')

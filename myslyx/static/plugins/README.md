@@ -47,6 +47,21 @@ directories and binds each module to the editor through the runtime in
 3. Hard-refresh the page. The plugin appears in the plugins menu and its
    extensions are appended the next time the editor view is created.
 
+### User plugins directory
+
+When Myslyx runs from an *installed* package, plugins can also be installed in
+a per-OS user configuration directory (created on first launch, served at
+`/user-plugins/`, and scanned at page load):
+
+- Windows: `%APPDATA%\myslyx\plugins`
+- macOS: `~/Library/Application Support/myslyx/plugins`
+- Linux: `$XDG_CONFIG_HOME/myslyx/plugins` (default `~/.config/myslyx/plugins`)
+
+The resolution lives in `myslyx/paths.py` (`user_plugins_dir()`). The manifest
+merges bundled plugins first and user plugins second, so a user plugin shadows
+a bundled one with the same name. User plugins carry `base: '/user-plugins/'`
+in the manifest, which `lifecycle.js` uses to pick the module URL.
+
 ## Contract
 
 - The module's default factory receives the `nicegui-codemirror` namespace

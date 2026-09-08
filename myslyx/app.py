@@ -6,12 +6,24 @@ from pathlib import Path
 
 from nicegui import app, ui
 
+from myslyx.paths import user_plugins_dir
+
 # Register pages (importing triggers @ui.page decorator registration)
 import myslyx.pages.home_page  # noqa: F401
 import myslyx.pages.editor_page  # noqa: F401
 
 # Serve the bundled static files (favicons, JS/CSS, hints, plugins).
 app.add_static_files('/static', str(Path(__file__).resolve().parent / 'static'))
+
+# Serve user-installed plugins from the per-OS configuration directory, so
+# plugins can be added without touching the installed package. Failures (e.g.
+# a read-only home) just disable the user-plugins feature.
+try:
+    _user_plugins = user_plugins_dir()
+    _user_plugins.mkdir(parents=True, exist_ok=True)
+    app.add_static_files('/user-plugins', str(_user_plugins))
+except OSError:
+    logging.warning('User plugin directory unavailable; user-installed plugins will be ignored: %s', user_plugins_dir())
 
 # Register a run config at import time so that uvicorn's auto-reload worker (a
 # spawned process that re-imports this module before serving) passes NiceGUI's

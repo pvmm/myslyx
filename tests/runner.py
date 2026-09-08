@@ -18,6 +18,7 @@ only on a host that provides those libraries.
 import argparse
 import asyncio
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -30,13 +31,14 @@ from playwright.async_api import async_playwright
 import tests.helpers  # noqa: F401  (keeps per-suite `from tests import ...` importable)
 from tests.test_header import HEADER_SUITES
 from tests.test_multiedit import MULTIEDIT_SUITES
+from tests.test_plugins import PLUGIN_SUITES, prepare_user_plugin_layout
 from tests.test_smoke import SMOKE_SUITES
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVER = ROOT / 'main.py'
 ARTIFACTS = ROOT / 'tests' / 'artifacts'
 DEFAULT_BROWSERS = ['chromium', 'firefox']
-ALL_SUITES = MULTIEDIT_SUITES + HEADER_SUITES + SMOKE_SUITES
+ALL_SUITES = MULTIEDIT_SUITES + HEADER_SUITES + SMOKE_SUITES + PLUGIN_SUITES
 
 
 def free_port() -> int:
@@ -61,6 +63,11 @@ async def wait_for_server(port: int, timeout: float = 45.0) -> None:
 def start_server(port: int) -> subprocess.Popen:
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, WB_TESTING='1')
+    cfg_dir = prepare_user_plugin_layout()
+    # Point the user plugins directory at the throwaway layout (Linux uses
+    # XDG_CONFIG_HOME, Windows APPDATA; macOS is HOME-based and not covered).
+    env['XDG_CONFIG_HOME'] = str(cfg_dir)
+    env['APPDATA'] = str(cfg_dir)
     log = open(ARTIFACTS / 'server.log', 'wb')
     proc = subprocess.Popen(
         [sys.executable, str(SERVER), '-p', str(port), '--no-reload'],
@@ -71,6 +78,7 @@ def start_server(port: int) -> subprocess.Popen:
     )
     # Keep the file handle alive so the child's output is not lost.
     proc._log = log  # type: ignore[attr-defined]
+    proc._cfg_dir = cfg_dir  # type: ignore[attr-defined]
     return proc
 
 
@@ -130,6 +138,7 @@ async def main() -> int:
             proc._log.close()  # type: ignore[attr-defined]
         except Exception:
             pass
+        shutil.rmtree(proc._cfg_dir, ignore_errors=True)  # type: ignore[attr-defined]
 
     width = max(len(name) for _, name, _, _ in all_results)
     for browser, name, status, detail in all_results:
