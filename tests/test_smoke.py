@@ -135,14 +135,15 @@ async def hints_nav_browse(page, msgs):
     await nav.nth(0).wait_for(state='attached', timeout=10000)
     await h.new_file(page, 2)
     # Typing a word with a tip pushes a page; two words -> two history entries
-    # (the root page shown by "new file" is the first entry).
+    # (the root page shown by "new file" is the first entry). GOTO's partial
+    # prefixes are not hints, so it adds exactly one page.
     await h.active_cm(page).click()
-    await page.keyboard.type('PRINT 42\nINPUT')
+    await page.keyboard.type('PRINT GOTO')
     await page.wait_for_function("""
-        () => (document.querySelector('#hints-content .hint-title') || {}).textContent === 'INPUT'
+        () => (document.querySelector('#hints-content .hint-title') || {}).textContent === 'GOTO'
     """)
     title = await hints_page_title(page)
-    assert title == 'INPUT', f'expected INPUT hint, got {title!r}'
+    assert title == 'GOTO', f'expected GOTO hint, got {title!r}'
     # End of history: back is enabled, forward is not.
     assert not await nav.nth(0).is_disabled(), 'back must be enabled after a tip'
     assert await nav.nth(1).is_disabled(), 'forward must be disabled at the newest page'
@@ -152,10 +153,10 @@ async def hints_nav_browse(page, msgs):
         () => (document.querySelector('#hints-content .hint-title') || {}).textContent === 'PRINT'
     """)
     assert not await nav.nth(1).is_disabled(), 'forward must re-enable after going back'
-    # And forward again -> INPUT.
+    # And forward again -> GOTO.
     await nav.nth(1).click()
     await page.wait_for_function("""
-        () => (document.querySelector('#hints-content .hint-title') || {}).textContent === 'INPUT'
+        () => (document.querySelector('#hints-content .hint-title') || {}).textContent === 'GOTO'
     """)
     assert msgs == []
 
@@ -163,10 +164,11 @@ async def hints_nav_browse(page, msgs):
 async def hints_root_page(page, msgs):
     # A new file opens its language's root page in the HINTS panel.
     await h.new_file(page, 2)
-    await page.wait_for_function("""
-        () => (document.querySelector('#hints-content .hint-text') || {}).textContent
-                 .indexOf('Commands, functions') !== -1
-    """)
+    root_on = """
+        () => { const t = document.querySelector('#hints-content .hint-text');
+                return !!t && t.textContent.indexOf('Commands, functions') !== -1; }
+    """
+    await page.wait_for_function(root_on)
     # Typing a tip replaces the root page...
     await h.active_cm(page).click()
     await page.keyboard.type('PRINT')
@@ -175,10 +177,7 @@ async def hints_root_page(page, msgs):
     """)
     # ...and F1 reloads the root page.
     await page.keyboard.press('F1')
-    await page.wait_for_function("""
-        () => (document.querySelector('#hints-content .hint-text') || {}).textContent
-                 .indexOf('Commands, functions') !== -1
-    """)
+    await page.wait_for_function(root_on)
     assert await hints_page_title(page) is None, 'F1 must show the root page, not a tip'
     assert msgs == []
 
