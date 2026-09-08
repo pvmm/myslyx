@@ -124,8 +124,8 @@ default) and can be used to read options that live in the shared client config.
    node --check myslyx/static/plugins/<name>/<name>.js
    ```
 
-5. Hard-refresh `/editor` and check the plugins menu — the plugin is picked up
-   automatically, with no Python edits and no server restart.
+5. Hard-refresh `/editor` and check **Settings > PLUGINS** — the plugin is
+   picked up automatically, with no Python edits and no server restart.
 
 Good practice:
 
@@ -210,7 +210,8 @@ the next page load — there is no runtime toggle yet.
 ## Validating end to end
 
 1. `node --check` the module (see "Creating a plugin step by step").
-2. Hard-refresh `/editor` and open the plugins menu — the plugin must appear.
+2. Hard-refresh `/editor` and open **Settings > PLUGINS** — the plugin must
+   appear.
 3. Exercise it on a real file. For the included `color-swatches` example, type
    a hex token such as `#ff00ff` and a small color box should render next to it
    on every edit.

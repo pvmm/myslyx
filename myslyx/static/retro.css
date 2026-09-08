@@ -169,9 +169,9 @@ html, body {
     letter-spacing: 0.5px;
 }
 
-/* Plugins menu button: favicon fills the whole button. The button uses
+/* Settings menu button: favicon fills the whole button. The button uses
    color='transparent' so Quasar's bg-primary !important never interferes. */
-#wb-plugins-btn {
+#wb-settings-btn {
     background-color: var(--wb-gadget-bg);
     background-image: url('/static/favicon.svg');
     background-size: cover;
@@ -201,6 +201,17 @@ html, body {
     box-shadow:
         inset -1px -1px 0 var(--wb-border-light),
         inset 1px 1px 0 var(--wb-border-dark);
+}
+
+.wb-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    color: var(--wb-text);
+    box-shadow: none;
+}
+.wb-button:disabled:hover {
+    background: var(--wb-gadget-bg);
+    color: var(--wb-text);
 }
 
 /* Delete button variant */
@@ -680,10 +691,74 @@ html, body {
     color: var(--wb-orange);
 }
 
-/* ===== Plugins menu (dropdown next to the '?' button) ===== */
-.wb-plugins-menu {
+/* ===== Settings menu (dropdown next to the '?' button) ===== */
+.wb-settings-menu {
     position: fixed;
     z-index: 9999;
+    min-width: 210px;
+    background: var(--wb-window-bg);
+    border: 2px solid var(--wb-black);
+    box-shadow:
+        inset 1px 1px 0 var(--wb-border-light),
+        inset -1px -1px 0 var(--wb-border-dark),
+        3px 3px 0 rgba(0,0,0,0.4);
+    padding: 4px;
+    font-family: var(--wb-font);
+    color: var(--wb-text);
+}
+
+.wb-settings-title {
+    background: var(--wb-blue);
+    color: var(--wb-title-text);
+    font-size: 9px;
+    padding: 4px 6px;
+    border: 2px solid var(--wb-black);
+    margin-bottom: 2px;
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+.wb-settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    background: var(--wb-white);
+    margin-bottom: 2px;
+}
+
+.wb-settings-row:hover,
+.wb-settings-row.active {
+    background: var(--wb-orange);
+    color: var(--wb-white);
+}
+
+.wb-settings-row-label {
+    font-size: 8px;
+    white-space: nowrap;
+}
+
+.wb-settings-value {
+    font-size: 8px;
+    font-weight: bold;
+}
+
+.wb-settings-arrow {
+    font-size: 8px;
+    font-weight: bold;
+}
+
+/* Plugins submenu inside the Settings menu (pops out to the right).
+   Shares the plugin-row styles below. */
+.wb-plugins-menu {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    margin-left: 2px;
+    z-index: 9998;
     min-width: 210px;
     background: var(--wb-window-bg);
     border: 2px solid var(--wb-black);

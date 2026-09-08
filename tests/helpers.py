@@ -15,6 +15,31 @@ async def visible_editors(page):
         "document.querySelectorAll('.wb-editor-slot:not(.wb-editor-hidden)').length")
 
 
+async def open_settings(page):
+    """Open the settings menu (favicon button) and wait for it to settle.
+
+    Clicking the button toggles the menu, so only click when it is closed.
+    """
+    for _ in range(3):
+        is_open = await page.evaluate("""() => {
+            const m = document.getElementById('wb-settings-menu');
+            return !!m && m.style.display !== 'none';
+        }""")
+        if is_open:
+            break
+        await page.click('#wb-settings-btn')
+        await page.wait_for_timeout(300)
+    await page.wait_for_timeout(300)
+
+
+async def set_language(page, label):
+    """Pick a language from the toolbar LANG dropdown by its shown label."""
+    await page.click('.wb-select')
+    await page.wait_for_timeout(500)
+    await page.click(f'.q-menu .q-item:has-text("{label}")')
+    await page.wait_for_timeout(600)
+
+
 def active_cm(page):
     """Locator for the currently visible editor's content area."""
     return page.locator('.wb-editor-slot:not(.wb-editor-hidden) .cm-content')

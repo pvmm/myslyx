@@ -44,7 +44,7 @@ directories and binds each module to the editor through the runtime in
    `name`, `dir` and `entry` (the module file) come from the directory name:
    `static/plugins/<name>/<name>.js`.
 
-3. Hard-refresh the page. The plugin appears in the plugins menu and its
+3. Hard-refresh the page. The plugin appears in Settings > PLUGINS and its
    extensions are appended the next time the editor view is created.
 
 ### User plugins directory

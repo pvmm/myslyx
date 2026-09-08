@@ -129,7 +129,7 @@ def editor_page() -> None:
     with ui.element('div').classes('wb-root'):
         # === App Header ===
         with ui.element('div').classes('wb-app-header'):
-            with ui.button(color='transparent').classes('wb-button').props('id=wb-plugins-btn'):
+            with ui.button(color='transparent').classes('wb-button').props('id=wb-settings-btn'):
                 pass
             ui.label('Myslyx Text Editor v1.0').classes('app-title')
             ui.button('?').classes('wb-button').style('margin-left:auto;').on_click(lambda: _open_shortcut_dialog())
@@ -211,10 +211,6 @@ def editor_page() -> None:
                     # id via props('id=wb-export-btn'), leaving a dangling anchor that
                     # makes Quasar log 'Anchor: target "#c…" not found'.
                     ui.tooltip('When ON, this file\'s symbols (functions, subs) are available to every open file. Toggle OFF to keep them local to this file.')
-                wrap_btn = ui.button('WRAP\nOFF').classes('wb-button').props('id=wb-wrap-btn')
-                wrap_btn.on('click', lambda: _toggle_wrap())
-                with wrap_btn:
-                    ui.tooltip('Toggle word wrap in the editor.')
                 # separator between toggle buttons and other actions
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 # Rename/delete stacked in two rows
@@ -230,14 +226,6 @@ def editor_page() -> None:
                     ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
                 # RESET FILE POOL unstacked
                 ui.button('RESET\nFILE\nPOOL', on_click=lambda: _open_reset_dialog(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
-
-        # Hidden bridge for client->server configuration restore
-        config_bridge = ui.element('div').props('id=wb-config-bridge').style('display:none;')
-        config_bridge.on(
-            'wb-restore-config',
-            lambda e: _on_config_loaded(e.args),
-            js_handler="() => { try { const c = window.WBStorage.loadConfig(); emit(Boolean(c && c.wrap)); } catch(e) { emit(false); } }",
-        )
 
         # Hidden bridge for client->server file open/import requests
         open_bridge = ui.element('div').props('id=wb-open-bridge').style('display:none;')
@@ -286,7 +274,6 @@ def editor_page() -> None:
     file_tabs: dict[str, Any] = {}
     editors: dict[str, Any] = {}
     editor_slots: dict[str, Any] = {}
-    wrap_enabled: bool = False
 
     # ===== Helper functions =====
 
@@ -394,6 +381,8 @@ def editor_page() -> None:
         )
         if not f:
             return
+        if f.get('language') == 'Text':
+            return  # symbol export is not meaningful for plain text
         f['export_symbols'] = not bool(f.get('export_symbols', True))
         _save_to_storage()
         _update_export_button()
@@ -406,64 +395,17 @@ def editor_page() -> None:
             None,
         )
         exporting = bool(f.get('export_symbols', True)) if f else True
-        label = 'EXPORT\nSYMBOLS\nON' if exporting else 'EXPORT\nSYMBOLS\nOFF'
+        disabled = bool(f and f.get('language') == 'Text')
+        label = ('EXPORT\nSYMBOLS\n---' if disabled
+                 else ('EXPORT\nSYMBOLS\nON' if exporting else 'EXPORT\nSYMBOLS\nOFF'))
         export_btn.set_text(label)
         ui.run_javascript(f'''
             (function() {{
                 var b = document.getElementById('wb-export-btn');
                 if (!b) return;
-                b.classList.toggle('active', {str(exporting).lower()});
+                b.disabled = {str(disabled).lower()};
+                b.classList.toggle('active', !b.disabled && {str(exporting).lower()});
             }})();
-        ''')
-
-    def _apply_wrap(wrap: bool) -> None:
-        ui.run_javascript(f'''
-            (function() {{
-                var ids = window.__wbEditorIds || {{}};
-                Object.keys(ids).forEach(function(fid) {{
-                    var el = getElement(ids[fid]);
-                    if (el && typeof el.setLineWrapping === 'function') {{
-                        el.setLineWrapping({str(wrap).lower()});
-                    }}
-                }});
-            }})();
-        ''')
-
-    def _update_wrap_button() -> None:
-        label = 'WRAP\nON' if wrap_enabled else 'WRAP\nOFF'
-        wrap_btn.set_text(label)
-        ui.run_javascript(f'''
-            (function() {{
-                var b = document.getElementById('wb-wrap-btn');
-                if (!b) return;
-                b.classList.toggle('active', {str(wrap_enabled).lower()});
-            }})();
-        ''')
-
-    def _toggle_wrap() -> None:
-        nonlocal wrap_enabled
-        wrap_enabled = not wrap_enabled
-        _apply_wrap(wrap_enabled)
-        _update_wrap_button()
-        ui.run_javascript(
-            f"var cfg = WBStorage.loadConfig(); cfg.wrap = {str(wrap_enabled).lower()}; WBStorage.saveConfig(cfg);"
-        )
-
-    def _on_config_loaded(data: Any) -> None:
-        nonlocal wrap_enabled
-        wrap_enabled = bool(data[0]) if isinstance(data, list) and data else bool(data)
-        if wrap_enabled:
-            _apply_wrap(True)
-        _update_wrap_button()
-
-    def _restore_wrap_from_config() -> None:
-        ui.run_javascript('''
-            (function() {
-                try {
-                    var el = document.getElementById('wb-config-bridge');
-                    if (el) el.dispatchEvent(new CustomEvent('wb-restore-config', {detail: {}}));
-                } catch(e) {}
-            })()
         ''')
 
     def _close_file(fid: str) -> None:
@@ -522,13 +464,6 @@ def editor_page() -> None:
         editors[fid] = ed
         editor_slots[fid] = slot
         ui.run_javascript(f'window.__wbEditorIds["{fid}"] = {ed.id};')
-        if wrap_enabled:
-            ui.run_javascript(f'''
-                (function() {{
-                    var el = getElement({ed.id});
-                    if (el && typeof el.setLineWrapping === 'function') el.setLineWrapping(true);
-                }})();
-            ''')
         return slot
 
     def _open_file_request(file: Any) -> None:
@@ -727,6 +662,7 @@ def editor_page() -> None:
         ''')
         _refresh_file_pool()
         _save_to_storage()
+        _update_export_button()
 
     def _apply_editor_font(font: str) -> None:
         """Apply the chosen font to the CodeMirror editor via a CSS variable."""
@@ -996,38 +932,130 @@ def editor_page() -> None:
                 });
             })()
         ''')
-        # Plugins menu: enable/disable installed plugins individually.
+        # Settings menu (favicon button): WRAP toggle plus a PLUGINS submenu
+        # that enables/disables the installed plugins individually.
         ui.run_javascript('''
             (function() {
-                function setupPluginsMenu() {
-                    var btn = document.getElementById('wb-plugins-btn');
+                function setupSettingsMenu() {
+                    var btn = document.getElementById('wb-settings-btn');
                     if (!btn || (window.WBPlugins && !window.WBPlugins.list)) return false;
-                    if (btn._wbPluginsMenu) return true;
-                    btn._wbPluginsMenu = true;
+                    if (btn._wbSettingsMenu) return true;
+                    btn._wbSettingsMenu = true;
 
                     var menu = document.createElement('div');
-                    menu.id = 'wb-plugins-menu';
-                    menu.className = 'wb-plugins-menu';
+                    menu.id = 'wb-settings-menu';
+                    menu.className = 'wb-settings-menu';
                     menu.style.display = 'none';
                     (btn.closest('.wb-app-header') || document.body).appendChild(menu);
 
                     var title = document.createElement('div');
-                    title.className = 'wb-plugins-title';
-                    title.textContent = 'PLUGINS';
+                    title.className = 'wb-settings-title';
+                    title.textContent = 'SETTINGS';
                     menu.appendChild(title);
+
+                    function closeSubmenu() {
+                        submenu.style.display = 'none';
+                        pluginsRow.classList.remove('active');
+                    }
+                    function toggleSubmenu() {
+                        if (submenu.style.display === 'block') closeSubmenu();
+                        else {
+                            rebuildPlugins();
+                            submenu.style.display = 'block';
+                            pluginsRow.classList.add('active');
+                        }
+                    }
+
+                    // "PLUGINS" row -> opens the plugins submenu.
+                    var pluginsRow = document.createElement('div');
+                    pluginsRow.id = 'wb-settings-plugins';
+                    pluginsRow.className = 'wb-settings-row';
+                    pluginsRow.tabIndex = 0;
+                    pluginsRow.setAttribute('role', 'button');
+                    var pluginsLabel = document.createElement('span');
+                    pluginsLabel.className = 'wb-settings-row-label';
+                    pluginsLabel.textContent = 'PLUGINS';
+                    var arrow = document.createElement('span');
+                    arrow.className = 'wb-settings-arrow';
+                    arrow.textContent = '>';
+                    pluginsRow.appendChild(pluginsLabel);
+                    pluginsRow.appendChild(arrow);
+                    pluginsRow.addEventListener('click', function(ev) {
+                        ev.stopPropagation();
+                        toggleSubmenu();
+                    });
+                    menu.appendChild(pluginsRow);
+
+                    // "WRAP" row -> toggles word wrap for every editor.
+                    var wrapRow = document.createElement('div');
+                    wrapRow.id = 'wb-settings-wrap';
+                    wrapRow.className = 'wb-settings-row';
+                    wrapRow.tabIndex = 0;
+                    wrapRow.setAttribute('role', 'button');
+                    var wrapLabel = document.createElement('span');
+                    wrapLabel.className = 'wb-settings-row-label';
+                    wrapLabel.textContent = 'WRAP';
+                    var wrapValue = document.createElement('span');
+                    wrapValue.className = 'wb-settings-value';
+                    wrapRow.appendChild(wrapLabel);
+                    wrapRow.appendChild(wrapValue);
+
+                    function wrapIsOn() {
+                        try { return !!window.WBStorage.loadConfig().wrap; } catch(e) { return false; }
+                    }
+                    function applyWrap() {
+                        var on = wrapIsOn();
+                        var ids = window.__wbEditorIds || {};
+                        Object.keys(ids).forEach(function(fid) {
+                            var el = getElement(ids[fid]);
+                            if (el && typeof el.setLineWrapping === 'function') {
+                                el.setLineWrapping(on);
+                            }
+                        });
+                        wrapRow.classList.toggle('active', on);
+                        wrapValue.textContent = on ? 'ON' : 'OFF';
+                    }
+                    wrapRow.addEventListener('click', function(ev) {
+                        ev.stopPropagation();
+                        try {
+                            var cfg = window.WBStorage.loadConfig();
+                            cfg.wrap = !cfg.wrap;
+                            window.WBStorage.saveConfig(cfg);
+                            applyWrap();
+                        } catch(e) { console.warn('settings wrap toggle failed', e); }
+                    });
+                    menu.appendChild(wrapRow);
+                    applyWrap();
+
+                    // Re-assert wrapping whenever the server activates an editor.
+                    window.addEventListener('wb-active-editor', function() {
+                        try { applyWrap(); } catch(e) {}
+                    });
+
+                    // Plugins submenu (a panel beside the settings menu).
+                    var submenu = document.createElement('div');
+                    submenu.id = 'wb-plugins-menu';
+                    submenu.className = 'wb-plugins-menu';
+                    submenu.style.display = 'none';
+                    menu.appendChild(submenu);
+
+                    var subTitle = document.createElement('div');
+                    subTitle.className = 'wb-plugins-title';
+                    subTitle.textContent = 'PLUGINS';
+                    submenu.appendChild(subTitle);
                     var hint = document.createElement('div');
                     hint.className = 'wb-plugins-hint';
                     hint.textContent = 'changes reload the editor';
-                    menu.appendChild(hint);
+                    submenu.appendChild(hint);
 
-                    function rebuild() {
-                        menu.querySelectorAll('.wb-plugin-row').forEach(function(r) { r.remove(); });
+                    function rebuildPlugins() {
+                        submenu.querySelectorAll('.wb-plugin-row').forEach(function(r) { r.remove(); });
                         var defs = window.WBPlugins.list();
                         if (!defs.length) {
                             var empty = document.createElement('div');
                             empty.className = 'wb-plugin-empty';
                             empty.textContent = '(no plugins installed)';
-                            menu.appendChild(empty);
+                            submenu.appendChild(empty);
                             return;
                         }
                         defs.forEach(function(def) {
@@ -1050,11 +1078,11 @@ def editor_page() -> None:
                                     menu._reloadT = setTimeout(function() {
                                         window.location.reload();
                                     }, 300);
-                                } catch(e) { console.warn('plugins menu toggle failed', e); }
+                                } catch(e) { console.warn('plugins toggle failed', e); }
                             });
                             row.appendChild(name);
                             row.appendChild(cb);
-                            menu.appendChild(row);
+                            submenu.appendChild(row);
                         });
                     }
 
@@ -1067,12 +1095,13 @@ def editor_page() -> None:
                     }
 
                     function open() {
-                        rebuild();
+                        applyWrap();
                         menu.style.display = 'block';
                         position();
                         btn.classList.add('active');
                     }
                     function close() {
+                        closeSubmenu();
                         menu.style.display = 'none';
                         btn.classList.remove('active');
                     }
@@ -1092,7 +1121,7 @@ def editor_page() -> None:
 
                 var _attempts = 0;
                 var _iv = setInterval(function() {
-                    if (setupPluginsMenu() || ++_attempts > 50) clearInterval(_iv);
+                    if (setupSettingsMenu() || ++_attempts > 50) clearInterval(_iv);
                 }, 200);
             })()
         ''')
@@ -1189,7 +1218,6 @@ def editor_page() -> None:
         _save_to_storage()
 
     ui.timer(0.8, _init, once=True)
-    ui.timer(1.2, _restore_wrap_from_config, once=True)
 
     # ===== Shortcuts dialog =====
     shortcut_dialog = ui.dialog()
