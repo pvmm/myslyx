@@ -1,4 +1,5 @@
 {
+  "root": "# HitBasic\n\nCommands, functions and tips are shown as you type.\n\n- `PRINT` output, `INPUT` reading\n- `IF`/`THEN`/`ELSE` branching\n- `FOR`/`NEXT` and `WHILE`/`WEND` loops\n- `FUNCTION`/`SUB` for reusable code\n\nPress **F1** to return here.",
   "keywords": [
     "PRINT", "INPUT", "LET", "REM", "GOTO", "GOSUB", "RETURN",
     "FOR", "NEXT", "STEP", "IF", "THEN", "ELSE", "END", "DIM",

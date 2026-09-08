@@ -160,6 +160,29 @@ async def hints_nav_browse(page, msgs):
     assert msgs == []
 
 
+async def hints_root_page(page, msgs):
+    # A new file opens its language's root page in the HINTS panel.
+    await h.new_file(page, 2)
+    await page.wait_for_function("""
+        () => (document.querySelector('#hints-content .hint-text') || {}).textContent
+                 .indexOf('Commands, functions') !== -1
+    """)
+    # Typing a tip replaces the root page...
+    await h.active_cm(page).click()
+    await page.keyboard.type('PRINT')
+    await page.wait_for_function("""
+        () => (document.querySelector('#hints-content .hint-title') || {}).textContent === 'PRINT'
+    """)
+    # ...and F1 reloads the root page.
+    await page.keyboard.press('F1')
+    await page.wait_for_function("""
+        () => (document.querySelector('#hints-content .hint-text') || {}).textContent
+                 .indexOf('Commands, functions') !== -1
+    """)
+    assert await hints_page_title(page) is None, 'F1 must show the root page, not a tip'
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -167,4 +190,5 @@ SMOKE_SUITES = [
     ('smoke/export-language-switch', export_disabled_on_language_switch),
     ('smoke/file-stats-counts', file_stats_counts),
     ('smoke/hints-nav-browse', hints_nav_browse),
+    ('smoke/hints-root-page', hints_root_page),
 ]

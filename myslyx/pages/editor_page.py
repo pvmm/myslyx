@@ -370,6 +370,9 @@ def editor_page() -> None:
         client_state['active_id'] = fid
         _refresh_file_pool()
         _save_to_storage()
+        # Ask the hints panel to open this language's root page after the
+        # new file's editor becomes active.
+        ui.run_javascript('window.__wbPendingRoot = true;')
         _load_file_into_editor(new)
 
     def _toggle_symbol_export() -> None:
@@ -1241,6 +1244,7 @@ def editor_page() -> None:
                         {'keys': 'Ctrl++', 'action': 'Increase font size'},
                         {'keys': 'Ctrl+-', 'action': 'Decrease font size'},
                         {'keys': '⇄', 'action': 'HINTS back/forward'},
+                        {'keys': 'F1', 'action': 'Reload hints root page'},
                         {'keys': 'F5', 'action': 'Refresh editor'},
                     ],
                     row_key='keys',

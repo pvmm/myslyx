@@ -89,6 +89,18 @@
         updateNavButtons();
     }
 
+    // ===== Root page per language (shown for new files, F1 reloads it) =====
+
+    function showRootPage() {
+        WBHints.get(getHintKey()).then(function(hints) {
+            var text = (hints && hints.root) || (hints && hints.tips && hints.tips['_ROOT_']) || '';
+            var html = text
+                ? '<div class="hint-text">' + renderMarkdown(text) + '</div>'
+                : '<div class="hint-empty">Select a language&#39;s &quot;root page&quot; is not yet defined.</div>';
+            showHintPage(html);
+        });
+    }
+
     function historyBack() {
         if (hintIndex <= 0) return;
         hintIndex--;
@@ -519,8 +531,20 @@
         try {
             removePopup();
             ensureNavButtons();
+            if (window.__wbPendingRoot) {
+                window.__wbPendingRoot = false;
+                showRootPage();
+            }
             tryHook();
         } catch(e) {}
+    });
+
+    // F1 reloads the current language's root page.
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'F1') {
+            e.preventDefault();
+            try { showRootPage(); } catch(_) {}
+        }
     });
 
     // Fallback poll for the very first editor at load time.
