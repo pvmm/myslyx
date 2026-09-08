@@ -1099,14 +1099,34 @@ def editor_page() -> None:
                         if (r.right - w >= 0) menu.style.left = (r.right - w) + 'px';
                     }
 
+                    function settingsRows() {
+                        return Array.prototype.slice.call(
+                            menu.querySelectorAll('.wb-settings-row'));
+                    }
+                    function clearRowFocus() {
+                        settingsRows().forEach(function(r) { r.classList.remove('keyboard'); });
+                    }
+                    function focusRow(delta) {
+                        var rows = settingsRows();
+                        if (!rows.length) return;
+                        clearRowFocus();
+                        var idx = rows.indexOf(menu.querySelector('.wb-settings-row.keyboard'));
+                        var next = idx < 0 ? 0 : idx + delta;
+                        if (next < 0) next = rows.length - 1;
+                        if (next >= rows.length) next = 0;
+                        rows[next].classList.add('keyboard');
+                    }
+
                     function open() {
                         applyWrap();
+                        clearRowFocus();
                         menu.style.display = 'block';
                         position();
                         btn.classList.add('active');
                     }
                     function close() {
                         closeSubmenu();
+                        clearRowFocus();
                         menu.style.display = 'none';
                         btn.classList.remove('active');
                     }
@@ -1119,7 +1139,22 @@ def editor_page() -> None:
                         if (menu.style.display === 'block' && !menu.contains(ev.target)) close();
                     });
                     document.addEventListener('keydown', function(ev) {
-                        if (ev.key === 'Escape' && menu.style.display === 'block') close();
+                        if (menu.style.display !== 'block') return;
+                        if (ev.key === 'Escape') { close(); return; }
+                        if (ev.key === 'ArrowDown') { ev.preventDefault(); focusRow(1); }
+                        else if (ev.key === 'ArrowUp') { ev.preventDefault(); focusRow(-1); }
+                        else if (ev.key === 'Enter' || ev.key === ' ') {
+                            var cur = menu.querySelector('.wb-settings-row.keyboard');
+                            if (cur) { ev.preventDefault(); cur.click(); }
+                        }
+                    });
+
+                    // Ctrl+Space opens/closes the SETTINGS menu from anywhere.
+                    document.addEventListener('keydown', function(ev) {
+                        if ((ev.ctrlKey || ev.metaKey) && (ev.key === ' ' || ev.code === 'Space')) {
+                            ev.preventDefault();
+                            if (menu.style.display === 'block') close(); else open();
+                        }
                     });
                     return true;
                 }
@@ -1243,6 +1278,8 @@ def editor_page() -> None:
                         {'keys': 'Ctrl+Y', 'action': 'Redo'},
                         {'keys': 'Ctrl++', 'action': 'Increase font size'},
                         {'keys': 'Ctrl+-', 'action': 'Decrease font size'},
+                        {'keys': 'Ctrl+Space', 'action': 'Open SETTINGS menu'},
+                        {'keys': '↑ / ↓', 'action': 'Navigate SETTINGS menu / hints'},
                         {'keys': '⇄', 'action': 'HINTS back/forward'},
                         {'keys': 'F1', 'action': 'Reload hints root page'},
                         {'keys': 'F5', 'action': 'Refresh editor'},

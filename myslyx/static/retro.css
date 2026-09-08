@@ -763,7 +763,8 @@ html, body {
 }
 
 .wb-settings-row:hover,
-.wb-settings-row.active {
+.wb-settings-row.active,
+.wb-settings-row.keyboard {
     background: var(--wb-orange);
     color: var(--wb-white);
 }
@@ -785,7 +786,8 @@ html, body {
 }
 
 .wb-settings-row:hover .wb-settings-value.on,
-.wb-settings-row.active .wb-settings-value.on {
+.wb-settings-row.active .wb-settings-value.on,
+.wb-settings-row.keyboard .wb-settings-value.on {
     color: var(--wb-white);
 }
 

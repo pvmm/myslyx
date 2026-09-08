@@ -183,6 +183,45 @@ async def hints_root_page(page, msgs):
     assert msgs == []
 
 
+async def settings_menu_keyboard(page, msgs):
+    # Ctrl+Space opens and closes the SETTINGS menu; arrows move the focus.
+    await page.locator('#wb-settings-btn').wait_for(state='visible', timeout=10000)
+    async def menu_open():
+        return await page.evaluate("""() => {
+            const m = document.getElementById('wb-settings-menu');
+            return !!m && m.style.display !== 'none';
+        }""")
+    assert not await menu_open(), 'menu starts closed'
+    await page.keyboard.press('Control+Space')
+    await page.wait_for_function("""
+        () => { const m = document.getElementById('wb-settings-menu');
+                return !!m && m.style.display !== 'none'; }
+    """)
+    # ArrowDown focuses the first row; ArrowUp cycles to the last.
+    await page.keyboard.press('ArrowDown')
+    focused = await page.evaluate("""() =>
+        document.querySelectorAll('#wb-settings-menu .wb-settings-row.keyboard').length""")
+    assert focused == 1, f'ArrowDown must focus one row, got {focused}'
+    await page.keyboard.press('ArrowUp')
+    moved = await page.evaluate("""() => {
+        const rows = document.querySelectorAll('#wb-settings-menu .wb-settings-row');
+        const k = document.querySelectorAll('#wb-settings-menu .wb-settings-row.keyboard');
+        return k.length === 1 && rows.length >= 2
+            ? rows.item(rows.length - 1).classList.contains('keyboard')
+            : false;
+    }""")
+    assert moved, 'ArrowUp must move focus to the last settings row'
+    # Escape closes; Ctrl+Space re-opens.
+    await page.keyboard.press('Escape')
+    assert not await menu_open(), 'Escape must close the menu'
+    await page.keyboard.press('Control+Space')
+    await page.wait_for_function("""
+        () => { const m = document.getElementById('wb-settings-menu');
+                return !!m && m.style.display !== 'none'; }
+    """)
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -191,4 +230,5 @@ SMOKE_SUITES = [
     ('smoke/file-stats-counts', file_stats_counts),
     ('smoke/hints-nav-browse', hints_nav_browse),
     ('smoke/hints-root-page', hints_root_page),
+    ('smoke/settings-menu-keyboard', settings_menu_keyboard),
 ]
