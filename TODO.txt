@@ -1,2 +1,3 @@
-- Add standalone desktop version.
-- Check if huggingface version works.
+Add capacity to browse markdown text in the HINTS panel. Add back and forward buttons to go backwards and forwards in the history of pages visited. Put these butons next to the "HINTS" text at the "HINTS" title bar.
+Add support for a root page in the HINTS window for new files created with each LANG. The F1 Shortcut reloads that root page.
+Ctrl-Space activates favicon menu and arrows can navigate through it. Add that to the shortcuts window. Add this to the test routines.

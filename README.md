@@ -4,13 +4,12 @@
 
 # Myslyx Text Editor
 
-A small in-browser code editor built with NiceGUI and CodeMirror. Intended for lightweight editing, demos, and agent onboarding within this repository.
+A in-browser code editor built with NiceGUI and CodeMirror. Intended for lightweight editing, demos, and agent onboarding within this repository.
 
 Features
 - Embedded CodeMirror editor with file dock
-- Starter `README.md` and sample Python file on first open
+- Wrap around, code completion and code folding
 - Undo/redo, rename, delete, save, download/upload, drag-and-drop import
-- Read-only support for selected files
 
 Requirements
 - Python 3.10+

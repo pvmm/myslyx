@@ -25,7 +25,7 @@ export default function fileStats(CM) {
         col.style.display = 'flex';
         col.style.flexDirection = 'column';
         col.style.justifyContent = 'center';
-        col.style.gap = '2px';
+        col.style.gap = '4px';
         col.style.marginLeft = '12px';
 
         // The label keeps its own margin otherwise, misaligning the counts.
@@ -34,7 +34,7 @@ export default function fileStats(CM) {
         const counts = document.createElement('div');
         counts.id = 'wb-file-counts';
         counts.style.fontFamily = 'var(--wb-font, monospace)';
-        counts.style.fontSize = '7px';
+        counts.style.fontSize = '12px';
         counts.style.color = 'var(--wb-text, #888)';
         counts.textContent = '';
 
