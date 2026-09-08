@@ -660,12 +660,12 @@ html, body {
     font-size: 8px;
     line-height: 1;
     color: var(--wb-white);
-    background: #5898d4;
+    background: var(--wb-gadget-bg);
     border: 2px solid var(--wb-black);
     box-shadow:
         inset 1px 1px 0 var(--wb-border-light),
         inset -1px -1px 0 var(--wb-border-dark);
-    padding: 4px 8px;
+    padding: 2px 6px 6px;
     cursor: pointer;
 }
 
