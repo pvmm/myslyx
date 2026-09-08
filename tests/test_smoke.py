@@ -191,12 +191,19 @@ async def settings_menu_keyboard(page, msgs):
             const m = document.getElementById('wb-settings-menu');
             return !!m && m.style.display !== 'none';
         }""")
+    async def in_editor():
+        return await page.evaluate("""() => {
+            const a = document.activeElement;
+            return !!a && a.classList && a.classList.contains('cm-content');
+        }""")
     assert not await menu_open(), 'menu starts closed'
     await page.keyboard.press('Control+Space')
     await page.wait_for_function("""
         () => { const m = document.getElementById('wb-settings-menu');
                 return !!m && m.style.display !== 'none'; }
     """)
+    # While the menu is open the editor must not hold keyboard focus.
+    assert not await in_editor(), 'menu must hold focus, not the editor'
     # ArrowDown focuses the first row; ArrowUp cycles to the last.
     await page.keyboard.press('ArrowDown')
     focused = await page.evaluate("""() =>
@@ -211,9 +218,13 @@ async def settings_menu_keyboard(page, msgs):
             : false;
     }""")
     assert moved, 'ArrowUp must move focus to the last settings row'
-    # Escape closes; Ctrl+Space re-opens.
+    # Escape closes and restores the editor focus; Ctrl+Space re-opens.
     await page.keyboard.press('Escape')
     assert not await menu_open(), 'Escape must close the menu'
+    await page.wait_for_function("""() => {
+        const a = document.activeElement;
+        return !!a && a.classList && a.classList.contains('cm-content');
+    }""")
     await page.keyboard.press('Control+Space')
     await page.wait_for_function("""
         () => { const m = document.getElementById('wb-settings-menu');

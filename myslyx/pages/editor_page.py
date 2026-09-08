@@ -949,6 +949,7 @@ def editor_page() -> None:
                     menu.id = 'wb-settings-menu';
                     menu.className = 'wb-settings-menu';
                     menu.style.display = 'none';
+                    menu.tabIndex = -1;
                     (btn.closest('.wb-app-header') || document.body).appendChild(menu);
 
                     var title = document.createElement('div');
@@ -1109,12 +1110,19 @@ def editor_page() -> None:
                     function focusRow(delta) {
                         var rows = settingsRows();
                         if (!rows.length) return;
-                        clearRowFocus();
                         var idx = rows.indexOf(menu.querySelector('.wb-settings-row.keyboard'));
-                        var next = idx < 0 ? 0 : idx + delta;
+                        var next = idx < 0 ? (delta > 0 ? 0 : rows.length - 1) : idx + delta;
                         if (next < 0) next = rows.length - 1;
                         if (next >= rows.length) next = 0;
+                        clearRowFocus();
                         rows[next].classList.add('keyboard');
+                    }
+                    function restoreEditorFocus() {
+                        try {
+                            var c = document.querySelector(
+                                '.wb-editor-slot:not(.wb-editor-hidden) .cm-content');
+                            if (c) c.focus();
+                        } catch(e) {}
                     }
 
                     function open() {
@@ -1123,12 +1131,14 @@ def editor_page() -> None:
                         menu.style.display = 'block';
                         position();
                         btn.classList.add('active');
+                        try { menu.focus({ preventScroll: true }); } catch(e) { menu.focus(); }
                     }
                     function close() {
                         closeSubmenu();
                         clearRowFocus();
                         menu.style.display = 'none';
                         btn.classList.remove('active');
+                        restoreEditorFocus();
                     }
 
                     btn.addEventListener('click', function(ev) {
