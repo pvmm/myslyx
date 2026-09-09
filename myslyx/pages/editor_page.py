@@ -68,32 +68,6 @@ MAX_FONT_SIZE = 28
 
 
 
-def _storage_io_js() -> str:
-    """Return JS that exposes file pool operations via window.__wbPyBridge."""
-    return '''
-    <script>
-    (function() {
-        window.__wbPyBridge = {
-            getFiles: function() { return WBStorage.loadFiles(); },
-            setFiles: function(files) { WBStorage.saveFiles(files); },
-            getActive: function() { return WBStorage.loadActive(); },
-            setActive: function(id) { WBStorage.saveActive(id); },
-            hasFiles: function() {
-                var f = WBStorage.loadFiles();
-                return f && f.length > 0;
-            },
-            initDefaults: function() {
-                var files = WBDefaults.createStarterFiles();
-                WBStorage.saveFiles(files);
-                WBStorage.saveActive(files[0].id);
-                return files;
-            }
-        };
-    })();
-    </script>
-    '''
-
-
 def _plugin_metadata(plugin_dir: Path) -> dict[str, Any] | None:
     """Metadata for one plugin directory (static/plugins/<name>/)."""
     name = plugin_dir.name
@@ -122,12 +96,16 @@ def _plugin_metadata(plugin_dir: Path) -> dict[str, Any] | None:
 @ui.page('/editor', favicon=FAVICON_PATH)
 def editor_page() -> None:
     ui.add_head_html('<link rel="stylesheet" href="/static/retro.css">')
-    ui.add_head_html(_storage_io_js())
+    ui.add_head_html('<script src="/static/storage-bridge.js"></script>')
     ui.add_head_html('<script src="/static/retro.js"></script>')
     ui.add_head_html('<script src="/static/vendor/marked.min.js"></script>')
     ui.add_head_html('<script src="/static/hints.js"></script>')
     ui.add_head_html('<script src="/static/plugins.js"></script>')
     ui.add_head_html('<script src="/static/folding.js"></script>')
+    ui.add_head_html('<script src="/static/editor-init.js"></script>')
+    ui.add_head_html('<script src="/static/editor-upload.js"></script>')
+    ui.add_head_html('<script src="/static/editor-keyboard.js"></script>')
+    ui.add_head_html('<script src="/static/settings-menu.js"></script>')
     plugin_manifest_by_name: dict[str, Any] = {}
 
     def collect(base_url: str, plugins_dir: Path) -> None:
@@ -649,7 +627,23 @@ def editor_page() -> None:
             }})();
         ''')
         # Disable/enable toolbar buttons for read-only files by ID
-        ui.run_javascript(f"(function(){{try{{var r={str(readonly).lower()}; var rn=document.getElementById('wb-rename-btn'); if(rn) rn.disabled = r; var d=document.getElementById('wb-delete-btn'); if(d) d.disabled = r; var u=document.getElementById('wb-undo-btn'); if(u) u.disabled = r; var rr=document.getElementById('wb-redo-btn'); if(rr) rr.disabled = r; }}catch(e){{}}}})()")
+        ui.run_javascript(
+            f"""
+            (function() {{
+                try {{
+                    var r = {str(readonly).lower()};
+                    var rn = document.getElementById('wb-rename-btn');
+                    if (rn) rn.disabled = r;
+                    var d = document.getElementById('wb-delete-btn');
+                    if (d) d.disabled = r;
+                    var u = document.getElementById('wb-undo-btn');
+                    if (u) u.disabled = r;
+                    var rr = document.getElementById('wb-redo-btn');
+                    if (rr) rr.disabled = r;
+                }} catch (e) {{}}
+            }})();
+            """
+        )
         _update_export_button()
         # Let static scripts (hints.js, plugins.js) bind to the now-active editor.
         ui.run_javascript(f'''
@@ -766,33 +760,7 @@ def editor_page() -> None:
     def _upload_file() -> None:
         # Use client-side file picker and hand the parsed file to the server via
         # the open bridge so it gets its own editor instance + dock tab.
-        ui.run_javascript('''
-            (function() {
-                const inp = document.createElement('input');
-                inp.type = 'file'; inp.accept = '*/*';
-                inp.onchange = function(ev) {
-                    const f = ev.target.files[0];
-                    if (!f) return;
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        try {
-                            var lang = 'Text';
-                            var n = (f.name || '').toLowerCase();
-                            if (n.endsWith('.bas')) lang = 'HitBasic';
-                            else if (n.endsWith('.pas') || n.endsWith('.pp') || n.endsWith('.inc')) lang = 'Pascal';
-                            else if (n.endsWith('.c') || n.endsWith('.h')) lang = 'C';
-                            else if (n.endsWith('.asm') || n.endsWith('.s') || n.endsWith('.z80')) lang = 'Z80';
-                            window.__wbPendingFile = { name: f.name, language: lang, content: e.target.result, export_symbols: true };
-                            const br = document.getElementById('wb-open-bridge');
-                            if (br) br.dispatchEvent(new CustomEvent('wb-open-file', { detail: {} }));
-                            try { alert('Imported: ' + f.name); } catch(_) { console.log('Imported', f.name); }
-                        } catch(err) { console.error(err); }
-                    };
-                    reader.readAsText(f);
-                };
-                inp.click();
-            })();
-        ''')
+        ui.run_javascript('window.WBFileImport.run();')
 
     # ===== Initialize from localStorage =====
     def _trigger_reset() -> None:
@@ -801,497 +769,12 @@ def editor_page() -> None:
         ui.run_javascript('window.location.href = window.location.pathname + "?reset=1";')
 
     def _init() -> None:
-        ui.run_javascript('''
-            (function() {
-                // Shared map of file id -> CodeMirror element id, created before
-                // any editor is registered by the server.
-                window.__wbEditorIds = window.__wbEditorIds || {};
-                try {
-                    const SCHEMA_KEY = 'wb_editor_schema_v';
-                    const SCHEMA_VERSION = '2';
-
-                    // If the URL contains ?reset=1, wipe storage and caches, then reload the whole app
-                    try {
-                        const params = new URLSearchParams(window.location.search || '');
-                        if (params.get('reset') === '1') {
-                            try {
-                                ['wb_editor_files', 'wb_editor_active', 'wb_editor_schema_v',
-                                 'wb_editor_font', 'wb_editor_font_size']
-                                    .forEach(k => localStorage.removeItem(k));
-                            } catch(e) {}
-                            if (window.__wbPyBridge && window.__wbPyBridge.initDefaults) {
-                                window.__wbPyBridge.initDefaults();
-                            }
-                            localStorage.setItem(SCHEMA_KEY, SCHEMA_VERSION);
-                            // Reload only after clearing CacheStorage (service workers, etc.),
-                            // with a cache-busting param so the whole app is re-fetched.
-                            var reloadNow = function() {
-                                try {
-                                    const url = new URL(window.location.href);
-                                    url.searchParams.delete('reset');
-                                    url.searchParams.set('r', String(Date.now()));
-                                    window.history.replaceState({}, '', url.toString());
-                                } catch(e) {}
-                                window.location.reload();
-                            };
-                            try {
-                                if (window.caches && window.caches.keys) {
-                                    window.caches.keys().then(function(names) {
-                                        var deletes = names.map(function(n) {
-                                            return window.caches.delete(n).catch(function() {});
-                                        });
-                                        Promise.all(deletes).then(reloadNow).catch(reloadNow);
-                                    }).catch(reloadNow);
-                                } else {
-                                    reloadNow();
-                                }
-                            } catch(e) { reloadNow(); }
-                            return;
-                        }
-                        // Strip a leftover cache-buster param from a previous reset
-                        try {
-                            if (params.get('r')) {
-                                const url = new URL(window.location.href);
-                                url.searchParams.delete('r');
-                                window.history.replaceState({}, '', url.toString());
-                            }
-                        } catch(e) {}
-                    } catch(e) {}
-
-                    // If schema changed or missing, reinitialize client storage
-                    if (localStorage.getItem(SCHEMA_KEY) !== SCHEMA_VERSION) {
-                        try {
-                            if (window.__wbPyBridge && window.__wbPyBridge.initDefaults) {
-                                window.__wbPyBridge.initDefaults();
-                            }
-                        } catch(e) {}
-                        localStorage.setItem(SCHEMA_KEY, SCHEMA_VERSION);
-                    } else {
-                        if (window.__wbPyBridge && !window.__wbPyBridge.hasFiles()) {
-                            window.__wbPyBridge.initDefaults();
-                        }
-                    }
-                } catch(e) {}
-                // Do not rely on server-side callback here; storage will be read
-                // when the client interacts or on subsequent syncs.
-
-                // ===== Drag-and-drop import =====
-                // Handed to the server via the open bridge; the server creates
-                // the file, a dock tab and its own editor instance.
-                function importFile(file, content, lang) {
-                    try {
-                        window.__wbPendingFile = { name: file.name, language: lang, content: content, export_symbols: true };
-                        const br = document.getElementById('wb-open-bridge');
-                        if (br) br.dispatchEvent(new CustomEvent('wb-open-file', { detail: {} }));
-                    } catch(e) { console.warn('importFile error', e); }
-                }
-
-                document.addEventListener('dragover', function(e){ try{ e.preventDefault(); }catch(e){} }, false);
-                document.addEventListener('drop', function(e){
-                    try {
-                        e.preventDefault();
-                        const items = e.dataTransfer && e.dataTransfer.files ? e.dataTransfer.files : null;
-                        if (!items || items.length === 0) return;
-                        for (let i=0;i<items.length;i++) {
-                            const f = items[i];
-                            (function(file){
-                                const reader = new FileReader();
-                                reader.onload = function(ev) {
-                                    try {
-                                        var lang = 'Text';
-                                        var n = (file.name || '').toLowerCase();
-                                        if (n.endsWith('.bas')) lang='HitBasic';
-                                        else if (n.endsWith('.pas') || n.endsWith('.pp') || n.endsWith('.inc')) lang='Pascal';
-                                        else if (n.endsWith('.c') || n.endsWith('.h')) lang='C';
-                                        else if (n.endsWith('.asm') || n.endsWith('.s') || n.endsWith('.z80')) lang='Z80';
-                                        importFile(file, ev.target.result, lang);
-                                    } catch(e) { console.error(e); }
-                                };
-                                reader.readAsText(file);
-                            })(f);
-                        }
-                    } catch(e) { console.warn('drop handler error', e); }
-                }, false);
-            })()
-        ''')
+        ui.run_javascript('window.WBEditorBoot.run();')
         # Fallback: call storage loader without client result; client storage will
         # be used by client-side code and saved back to server on changes.
         _on_storage_loaded(None)
-        # Restore the saved font preference
-        ui.run_javascript('''
-            (function() {
-                const f = localStorage.getItem('wb_editor_font') || 'Press Start 2P';
-                document.documentElement.style.setProperty('--wb-editor-font', "'" + f + "', monospace");
-                const fs = localStorage.getItem('wb_editor_font_size') || '13';
-                document.documentElement.style.setProperty('--wb-editor-font-size', fs + 'px');
-                // Map of file id -> NiceGUI element id, filled by the server as
-                // editors are created. __wbEditorId is the ACTIVE editor's id.
-                window.__wbEditorIds = window.__wbEditorIds || {};
-                // Global undo/redo operate on the ACTIVE editor view. CodeMirror
-                // keeps native per-view history, so each file (its own view)
-                // gets independent undo/redo without client-side stacks.
-                function wbCmDo(action) {
-                    if (window.__wbActiveReadonly) return;
-                    var elId = window.__wbEditorId;
-                    if (!elId) return;
-                    getElement(elId).editorPromise.then(function(p) {
-                        try {
-                            import('nicegui-codemirror').then(function(CM) {
-                                try {
-                                    if (action === 'undo') CM.undo(p); else CM.redo(p);
-                                } catch(e) {}
-                                try { p.focus(); } catch(e) {}
-                            });
-                        } catch(e) {}
-                    });
-                }
-                window.__wbUndo = function() { wbCmDo('undo'); };
-                window.__wbRedo = function() { wbCmDo('redo'); };
-                document.addEventListener('keydown', function(e) {
-                    var mod = e.ctrlKey || e.metaKey;
-                    if (!mod) return;
-                    if (e.key === 'z' && !e.shiftKey) {
-                        // When focus is inside an editor, Let CodeMirror's own
-                        // keymap handle undo natively (per-view history). The
-                        // global fallback only covers focus on toolbar controls.
-                        if (e.target && e.target.closest && e.target.closest('.cm-editor')) return;
-                        e.preventDefault();
-                        window.__wbUndo();
-                    } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
-                        if (e.target && e.target.closest && e.target.closest('.cm-editor')) return;
-                        e.preventDefault();
-                        window.__wbRedo();
-                    }
-                });
-            })()
-        ''')
-        # Settings menu (favicon button): WRAP toggle plus a PLUGINS submenu
-        # that enables/disables the installed plugins individually.
-        ui.run_javascript('''
-            (function() {
-                function setupSettingsMenu() {
-                    var btn = document.getElementById('wb-settings-btn');
-                    if (!btn || (window.WBPlugins && !window.WBPlugins.list)) return false;
-                    if (btn._wbSettingsMenu) return true;
-                    btn._wbSettingsMenu = true;
-
-                    var menu = document.createElement('div');
-                    menu.id = 'wb-settings-menu';
-                    menu.className = 'wb-settings-menu';
-                    menu.style.display = 'none';
-                    menu.tabIndex = -1;
-                    (btn.closest('.wb-app-header') || document.body).appendChild(menu);
-
-                    var title = document.createElement('div');
-                    title.className = 'wb-settings-title';
-                    title.textContent = 'SETTINGS';
-                    menu.appendChild(title);
-
-                    function closeSubmenu() {
-                        submenu.style.display = 'none';
-                        pluginsRow.classList.remove('active');
-                    }
-                    function toggleSubmenu() {
-                        if (submenu.style.display === 'block') closeSubmenu();
-                        else {
-                            rebuildPlugins();
-                            submenu.style.display = 'block';
-                            pluginsRow.classList.add('active');
-                        }
-                    }
-
-                    // "PLUGINS" row -> opens the plugins submenu.
-                    var pluginsRow = document.createElement('div');
-                    pluginsRow.id = 'wb-settings-plugins';
-                    pluginsRow.className = 'wb-settings-row';
-                    pluginsRow.tabIndex = 0;
-                    pluginsRow.setAttribute('role', 'button');
-                    var pluginsLabel = document.createElement('span');
-                    pluginsLabel.className = 'wb-settings-row-label';
-                    pluginsLabel.textContent = 'PLUGINS';
-                    var arrow = document.createElement('span');
-                    arrow.className = 'wb-settings-arrow';
-                    arrow.textContent = '>';
-                    pluginsRow.appendChild(pluginsLabel);
-                    pluginsRow.appendChild(arrow);
-                    pluginsRow.addEventListener('click', function(ev) {
-                        ev.stopPropagation();
-                        toggleSubmenu();
-                    });
-                    menu.appendChild(pluginsRow);
-
-                    // "WRAP" row -> toggles word wrap for every editor.
-                    var wrapRow = document.createElement('div');
-                    wrapRow.id = 'wb-settings-wrap';
-                    wrapRow.className = 'wb-settings-row';
-                    wrapRow.tabIndex = 0;
-                    wrapRow.setAttribute('role', 'button');
-                    var wrapLabel = document.createElement('span');
-                    wrapLabel.className = 'wb-settings-row-label';
-                    wrapLabel.textContent = 'WRAP';
-                    var wrapValue = document.createElement('span');
-                    wrapValue.className = 'wb-settings-value';
-                    wrapRow.appendChild(wrapLabel);
-                    wrapRow.appendChild(wrapValue);
-
-                    function wrapIsOn() {
-                        try { return !!window.WBStorage.loadConfig().wrap; } catch(e) { return false; }
-                    }
-                    function applyWrap() {
-                        var on = wrapIsOn();
-                        var ids = window.__wbEditorIds || {};
-                        Object.keys(ids).forEach(function(fid) {
-                            var el = getElement(ids[fid]);
-                            if (el && typeof el.setLineWrapping === 'function') {
-                                el.setLineWrapping(on);
-                            }
-                        });
-                        // Do not use .active here: that is the orange hover /
-                        // open-flyout highlight. Wrap state shows in the value.
-                        wrapValue.classList.toggle('on', on);
-                        wrapValue.textContent = on ? 'ON' : 'OFF';
-                    }
-                    wrapRow.addEventListener('click', function(ev) {
-                        ev.stopPropagation();
-                        try {
-                            var cfg = window.WBStorage.loadConfig();
-                            cfg.wrap = !cfg.wrap;
-                            window.WBStorage.saveConfig(cfg);
-                            applyWrap();
-                        } catch(e) { console.warn('settings wrap toggle failed', e); }
-                    });
-                    menu.appendChild(wrapRow);
-                    applyWrap();
-
-                    // Re-assert wrapping whenever the server activates an editor.
-                    window.addEventListener('wb-active-editor', function() {
-                        try { applyWrap(); } catch(e) {}
-                    });
-
-                    // "LIGATURES" row -> toggles font ligatures for every editor.
-                    // Off by default (retro fonts draw ugly "fi" pairs).
-                    var ligatureRow = document.createElement('div');
-                    ligatureRow.id = 'wb-settings-ligatures';
-                    ligatureRow.className = 'wb-settings-row';
-                    ligatureRow.tabIndex = 0;
-                    ligatureRow.setAttribute('role', 'button');
-                    var ligatureLabel = document.createElement('span');
-                    ligatureLabel.className = 'wb-settings-row-label';
-                    ligatureLabel.textContent = 'LIGATURES';
-                    var ligatureValue = document.createElement('span');
-                    ligatureValue.className = 'wb-settings-value';
-                    ligatureRow.appendChild(ligatureLabel);
-                    ligatureRow.appendChild(ligatureValue);
-
-                    function ligaturesOn() {
-                        try { return !!window.WBStorage.loadConfig().ligatures; } catch(e) { return false; }
-                    }
-                    function applyLigatures() {
-                        var on = ligaturesOn();
-                        document.querySelectorAll('.cm-editor .cm-content').forEach(function(el) {
-                            if (on) {
-                                el.style.fontVariantLigatures = 'common-ligatures';
-                                el.style.fontFeatureSettings = '"liga" 1, "clig" 1';
-                            } else {
-                                el.style.fontVariantLigatures = 'no-common-ligatures';
-                                el.style.fontFeatureSettings = '"liga" 0, "clig" 0';
-                            }
-                        });
-                        ligatureValue.classList.toggle('on', on);
-                        ligatureValue.textContent = on ? 'ON' : 'OFF';
-                    }
-                    ligatureRow.addEventListener('click', function(ev) {
-                        ev.stopPropagation();
-                        try {
-                            var cfg = window.WBStorage.loadConfig();
-                            cfg.ligatures = !cfg.ligatures;
-                            window.WBStorage.saveConfig(cfg);
-                            applyLigatures();
-                        } catch(e) { console.warn('settings ligatures toggle failed', e); }
-                    });
-                    menu.appendChild(ligatureRow);
-                    applyLigatures();
-
-                    // Re-assert ligatures whenever the server activates an editor.
-                    window.addEventListener('wb-active-editor', function() {
-                        try { applyLigatures(); } catch(e) {}
-                    });
-
-                    // Plugins submenu (a panel beside the settings menu).
-                    var submenu = document.createElement('div');
-                    submenu.id = 'wb-plugins-menu';
-                    submenu.className = 'wb-plugins-menu';
-                    submenu.style.display = 'none';
-                    menu.appendChild(submenu);
-
-                    var subTitle = document.createElement('div');
-                    subTitle.className = 'wb-plugins-title';
-                    subTitle.textContent = 'PLUGINS';
-                    submenu.appendChild(subTitle);
-                    var hint = document.createElement('div');
-                    hint.className = 'wb-plugins-hint';
-                    hint.textContent = 'changes reload the editor';
-                    submenu.appendChild(hint);
-
-                    function rebuildPlugins() {
-                        submenu.querySelectorAll('.wb-plugin-row').forEach(function(r) { r.remove(); });
-                        var defs = window.WBPlugins.list();
-                        if (!defs.length) {
-                            var empty = document.createElement('div');
-                            empty.className = 'wb-plugin-empty';
-                            empty.textContent = '(no plugins installed)';
-                            submenu.appendChild(empty);
-                            return;
-                        }
-                        defs.forEach(function(def) {
-                            var row = document.createElement('label');
-                            row.className = 'wb-plugin-row';
-                            var name = document.createElement('span');
-                            name.className = 'wb-plugin-name';
-                            name.textContent = def.name;
-                            var cb = document.createElement('input');
-                            cb.type = 'checkbox';
-                            cb.className = 'wb-plugin-check';
-                            cb.checked = !!window.WBPlugins._enabled(def);
-                            cb.addEventListener('change', function() {
-                                try {
-                                    var cfg = window.WBStorage.loadConfig();
-                                    cfg.plugins = cfg.plugins || {};
-                                    cfg.plugins[def.name] = cb.checked;
-                                    window.WBStorage.saveConfig(cfg);
-                                    clearTimeout(menu._reloadT);
-                                    menu._reloadT = setTimeout(function() {
-                                        window.location.reload();
-                                    }, 300);
-                                } catch(e) { console.warn('plugins toggle failed', e); }
-                            });
-                            row.appendChild(name);
-                            row.appendChild(cb);
-                            submenu.appendChild(row);
-                        });
-                    }
-
-                    function position() {
-                        var r = btn.getBoundingClientRect();
-                        menu.style.left = r.right + 'px';
-                        menu.style.top = (r.bottom + 6) + 'px';
-                        var w = menu.offsetWidth;
-                        if (r.right - w >= 0) menu.style.left = (r.right - w) + 'px';
-                    }
-
-                    function settingsRows() {
-                        return Array.prototype.slice.call(
-                            menu.querySelectorAll('.wb-settings-row'));
-                    }
-                    function clearRowFocus() {
-                        settingsRows().forEach(function(r) { r.classList.remove('keyboard'); });
-                    }
-                    function focusRow(delta) {
-                        var rows = settingsRows();
-                        if (!rows.length) return;
-                        var idx = rows.indexOf(menu.querySelector('.wb-settings-row.keyboard'));
-                        var next = idx < 0 ? (delta > 0 ? 0 : rows.length - 1) : idx + delta;
-                        if (next < 0) next = rows.length - 1;
-                        if (next >= rows.length) next = 0;
-                        clearRowFocus();
-                        rows[next].classList.add('keyboard');
-                    }
-                    function restoreEditorFocus() {
-                        try {
-                            var c = document.querySelector(
-                                '.wb-editor-slot:not(.wb-editor-hidden) .cm-content');
-                            if (c) c.focus();
-                        } catch(e) {}
-                    }
-
-                    function open() {
-                        applyWrap();
-                        clearRowFocus();
-                        menu.style.display = 'block';
-                        position();
-                        btn.classList.add('active');
-                        try { menu.focus({ preventScroll: true }); } catch(e) { menu.focus(); }
-                    }
-                    function close() {
-                        closeSubmenu();
-                        clearRowFocus();
-                        menu.style.display = 'none';
-                        btn.classList.remove('active');
-                        restoreEditorFocus();
-                    }
-
-                    btn.addEventListener('click', function(ev) {
-                        ev.stopPropagation();
-                        if (menu.style.display === 'block') close(); else open();
-                    });
-                    document.addEventListener('click', function(ev) {
-                        if (menu.style.display === 'block' && !menu.contains(ev.target)) close();
-                    });
-                    document.addEventListener('keydown', function(ev) {
-                        if (menu.style.display !== 'block') return;
-                        if (ev.key === 'Escape') { close(); return; }
-                        if (ev.key === 'ArrowDown') { ev.preventDefault(); focusRow(1); }
-                        else if (ev.key === 'ArrowUp') { ev.preventDefault(); focusRow(-1); }
-                        else if (ev.key === 'Enter' || ev.key === ' ') {
-                            var cur = menu.querySelector('.wb-settings-row.keyboard');
-                            if (cur) { ev.preventDefault(); cur.click(); }
-                        }
-                    });
-
-                    // Ctrl+Space opens/closes the SETTINGS menu from anywhere.
-                    document.addEventListener('keydown', function(ev) {
-                        if ((ev.ctrlKey || ev.metaKey) && (ev.key === ' ' || ev.code === 'Space')) {
-                            ev.preventDefault();
-                            if (menu.style.display === 'block') close(); else open();
-                        }
-                    });
-
-                    // F1 opens the Shortcut window from anywhere.
-                    document.addEventListener('keydown', function(ev) {
-                        if (ev.key === 'F1') {
-                            ev.preventDefault();
-                            var s = document.getElementById('wb-shortcut-btn');
-                            if (s && s.click) s.click();
-                        }
-                    });
-
-                    return true;
-                }
-
-                var _attempts = 0;
-                var _iv = setInterval(function() {
-                    if (setupSettingsMenu() || ++_attempts > 50) clearInterval(_iv);
-                }, 200);
-            })()
-        ''')
-        # Give focus back to the editor after toolbar button clicks so the user
-        # can keep typing. Rename/Delete open dialogs with their own focus, so
-        # they are excluded.
-        ui.run_javascript('''
-            (function() {
-                window.wbRefocusEditor = function() {
-                    try {
-                        var elId = window.__wbEditorId;
-                        if (!elId) return false;
-                        var el = getElement(elId);
-                        if (el && el.editorPromise) {
-                            el.editorPromise.then(function(v) { try { v.focus(); } catch(e) {} });
-                            return true;
-                        }
-                    } catch(e) {}
-                    return false;
-                };
-                document.addEventListener('click', function(e) {
-                    try {
-                        var t = e.target && e.target.closest ? e.target.closest('button') : null;
-                        if (!t) return;
-                        var id = t.id || '';
-                        if (id === 'wb-rename-btn' || id === 'wb-delete-btn') return;
-                        window.wbRefocusEditor();
-                    } catch(e) {}
-                }, true);
-            })();
-        ''')
+        ui.run_javascript('window.WBEditorKeyboard.install();')
+        ui.run_javascript('window.WBSettingsMenu.install();')
 
     def _on_storage_loaded(result: Any) -> None:
         try:
@@ -1413,7 +896,17 @@ def editor_page() -> None:
         rename_input.set_value(target.get('name', ''))
         rename_dialog.open()
         # focus the input inside the dialog after a short delay
-        ui.run_javascript("setTimeout(function(){const el=document.getElementById('wb-rename-input'); if (el) { const inp = el.querySelector('input'); if (inp) inp.focus(); } }, 50);")
+        ui.run_javascript(
+            """
+            setTimeout(function() {
+                const el = document.getElementById('wb-rename-input');
+                if (el) {
+                    const inp = el.querySelector('input');
+                    if (inp) inp.focus();
+                }
+            }, 50);
+            """
+        )
 
     def _confirm_rename() -> None:
         val = rename_input.value.strip() if hasattr(rename_input, 'value') else None
