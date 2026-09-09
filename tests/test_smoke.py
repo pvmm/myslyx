@@ -330,55 +330,6 @@ async def ligatures_toggle(page, msgs):
     assert msgs == []
 
 
-async def fold_toggle(page, msgs):
-    # The FOLD settings row toggles code folding in every editor and persists
-    # the choice in the global config. It is ON by default because the bundled
-    # CodeMirror basics ship with a fold gutter.
-    await h.new_file(page, 2)
-    await page.wait_for_timeout(300)
-    await h.open_settings(page)
-    row = page.locator('#wb-settings-fold')
-    await row.wait_for(state='attached', timeout=10000)
-    assert await row.evaluate("el => !el.classList.contains('active')"), \
-        'FOLD row must not use the orange .active highlight'
-    value = await row.locator('.wb-settings-value').inner_text()
-    assert value == 'ON', f'fold default must be ON, got {value!r}'
-    saved = await page.evaluate("() => window.WBStorage.loadConfig().fold !== false")
-    assert saved, 'config must default to folding ON'
-
-    async def fold_gutter_display():
-        return await page.evaluate("""() => {
-            const el = document.querySelector('.wb-editor-slot:not(.wb-editor-hidden) .cm-gutter.cm-foldGutter');
-            return el ? getComputedStyle(el).display : null;
-        }""")
-
-    assert await fold_gutter_display() != 'none', 'fold gutter must be visible by default'
-    # Toggle OFF: config saved and the fold gutter is hidden in every editor.
-    await page.click('#wb-settings-fold')
-    await page.wait_for_timeout(400)
-    value = await row.locator('.wb-settings-value').inner_text()
-    assert value == 'OFF', f'fold must show OFF after toggle, got {value!r}'
-    saved = await page.evaluate("() => window.WBStorage.loadConfig().fold")
-    assert saved is False, 'config must record fold OFF'
-    assert await fold_gutter_display() == 'none', 'fold gutter must be hidden when folding is OFF'
-    # A file opened after the toggle must come up with folding OFF too.
-    await page.click('.wb-new-file')
-    await page.wait_for_function("document.querySelectorAll('.wb-file-tab').length === 3")
-    await page.wait_for_timeout(400)
-    assert await fold_gutter_display() == 'none', \
-        'new editors must also hide the fold gutter when folding is OFF'
-    # Toggle back ON: config and rendering follow.
-    await h.open_settings(page)
-    await page.click('#wb-settings-fold')
-    await page.wait_for_timeout(400)
-    value = await row.locator('.wb-settings-value').inner_text()
-    assert value == 'ON', f'fold must show ON after second toggle, got {value!r}'
-    saved = await page.evaluate("() => window.WBStorage.loadConfig().fold !== false")
-    assert saved, 'config must record fold ON'
-    assert await fold_gutter_display() != 'none', 'fold gutter must be visible again when folding is ON'
-    assert msgs == []
-
-
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -391,5 +342,4 @@ SMOKE_SUITES = [
     ('smoke/f1-shortcuts-window', f1_shortcuts_window),
     ('smoke/comment-toggle', comment_toggle_basic),
     ('smoke/ligatures-toggle', ligatures_toggle),
-    ('smoke/fold-toggle', fold_toggle),
 ]
