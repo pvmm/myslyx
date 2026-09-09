@@ -1067,6 +1067,55 @@ def editor_page() -> None:
                         try { applyWrap(); } catch(e) {}
                     });
 
+                    // "LIGATURES" row -> toggles font ligatures for every editor.
+                    // Off by default (retro fonts draw ugly "fi" pairs).
+                    var ligatureRow = document.createElement('div');
+                    ligatureRow.id = 'wb-settings-ligatures';
+                    ligatureRow.className = 'wb-settings-row';
+                    ligatureRow.tabIndex = 0;
+                    ligatureRow.setAttribute('role', 'button');
+                    var ligatureLabel = document.createElement('span');
+                    ligatureLabel.className = 'wb-settings-row-label';
+                    ligatureLabel.textContent = 'LIGATURES';
+                    var ligatureValue = document.createElement('span');
+                    ligatureValue.className = 'wb-settings-value';
+                    ligatureRow.appendChild(ligatureLabel);
+                    ligatureRow.appendChild(ligatureValue);
+
+                    function ligaturesOn() {
+                        try { return !!window.WBStorage.loadConfig().ligatures; } catch(e) { return false; }
+                    }
+                    function applyLigatures() {
+                        var on = ligaturesOn();
+                        document.querySelectorAll('.cm-editor .cm-content').forEach(function(el) {
+                            if (on) {
+                                el.style.fontVariantLigatures = 'common-ligatures';
+                                el.style.fontFeatureSettings = '"liga" 1, "clig" 1';
+                            } else {
+                                el.style.fontVariantLigatures = 'no-common-ligatures';
+                                el.style.fontFeatureSettings = '"liga" 0, "clig" 0';
+                            }
+                        });
+                        ligatureValue.classList.toggle('on', on);
+                        ligatureValue.textContent = on ? 'ON' : 'OFF';
+                    }
+                    ligatureRow.addEventListener('click', function(ev) {
+                        ev.stopPropagation();
+                        try {
+                            var cfg = window.WBStorage.loadConfig();
+                            cfg.ligatures = !cfg.ligatures;
+                            window.WBStorage.saveConfig(cfg);
+                            applyLigatures();
+                        } catch(e) { console.warn('settings ligatures toggle failed', e); }
+                    });
+                    menu.appendChild(ligatureRow);
+                    applyLigatures();
+
+                    // Re-assert ligatures whenever the server activates an editor.
+                    window.addEventListener('wb-active-editor', function() {
+                        try { applyLigatures(); } catch(e) {}
+                    });
+
                     // Plugins submenu (a panel beside the settings menu).
                     var submenu = document.createElement('div');
                     submenu.id = 'wb-plugins-menu';
