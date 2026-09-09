@@ -33,7 +33,7 @@ Any unrecognized language falls back to `plaintext`.
 ```
 
 `root` is the language's **root page** (markdown). It is shown in the HINTS panel
-when a new file in that language is created, and **F1** reloads it at any time.
+when a new file in that language is created, and **F2** reloads it at any time.
 
 ## Writing a help text for a keyword or builtin
 

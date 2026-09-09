@@ -175,10 +175,10 @@ async def hints_root_page(page, msgs):
     await page.wait_for_function("""
         () => (document.querySelector('#hints-content .hint-title') || {}).textContent === 'PRINT'
     """)
-    # ...and F1 reloads the root page.
-    await page.keyboard.press('F1')
+    # ...and F2 reloads the root page.
+    await page.keyboard.press('F2')
     await page.wait_for_function(root_on)
-    assert await hints_page_title(page) is None, 'F1 must show the root page, not a tip'
+    assert await hints_page_title(page) is None, 'F2 must show the root page, not a tip'
     assert msgs == []
 
 

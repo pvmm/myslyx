@@ -132,7 +132,7 @@ def editor_page() -> None:
             with ui.button(color='transparent').classes('wb-button').props('id=wb-settings-btn'):
                 pass
             ui.label('Myslyx Text Editor v1.0').classes('app-title')
-            ui.button('?').classes('wb-button').style('margin-left:auto;').on_click(lambda: _open_shortcut_dialog())
+            ui.button('?').classes('wb-button').style('margin-left:auto;').props('id=wb-shortcut-btn').on_click(lambda: _open_shortcut_dialog())
 
         # === Toolbar ===
         with ui.element('div').classes('wb-toolbar'):
@@ -1166,6 +1166,16 @@ def editor_page() -> None:
                             if (menu.style.display === 'block') close(); else open();
                         }
                     });
+
+                    // F1 opens the Shortcut window from anywhere.
+                    document.addEventListener('keydown', function(ev) {
+                        if (ev.key === 'F1') {
+                            ev.preventDefault();
+                            var s = document.getElementById('wb-shortcut-btn');
+                            if (s && s.click) s.click();
+                        }
+                    });
+
                     return true;
                 }
 
@@ -1289,7 +1299,8 @@ def editor_page() -> None:
                         {'keys': 'Ctrl++', 'action': 'Increase font size'},
                         {'keys': 'Ctrl+-', 'action': 'Decrease font size'},
                         {'keys': 'Ctrl+Space', 'action': 'Open SETTINGS menu'},
-                        {'keys': 'F1', 'action': 'Reload hints root page'},
+                        {'keys': 'F1', 'action': 'Open shortcuts window'},
+                        {'keys': 'F2', 'action': 'Reload hints root page'},
                         {'keys': 'F5', 'action': 'Refresh editor'},
                     ],
                     row_key='keys',

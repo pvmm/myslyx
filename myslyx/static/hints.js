@@ -89,7 +89,7 @@
         updateNavButtons();
     }
 
-    // ===== Root page per language (shown for new files, F1 reloads it) =====
+    // ===== Root page per language (shown for new files, F2 reloads it) =====
 
     function showRootPage() {
         WBHints.get(getHintKey()).then(function(hints) {
@@ -539,9 +539,9 @@
         } catch(e) {}
     });
 
-    // F1 reloads the current language's root page.
+    // F2 reloads the current language's root page.
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'F1') {
+        if (e.key === 'F2') {
             e.preventDefault();
             try { showRootPage(); } catch(_) {}
         }
