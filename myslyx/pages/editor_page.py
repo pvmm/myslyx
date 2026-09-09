@@ -596,8 +596,10 @@ def editor_page() -> None:
                             if (e.ctrlKey || e.metaKey) {{
                                 if (e.key === 'z' || e.key === 'y') {{ e.preventDefault(); e.stopPropagation(); return false; }}
                             }}
-                            // Allow navigation keys but block text input and commands
-                            var blocked = !(e.key && (e.key.startsWith('Arrow') || e.key==='Tab' || e.key==='Escape' || e.ctrlKey || e.metaKey));
+                            // Allow navigation keys but block text input and commands.
+                            // F1/F2 are app shortcuts (shortcuts window / hints root)
+                            // handled at the document level, so let them through.
+                            var blocked = !(e.key && (e.key.startsWith('Arrow') || e.key==='Tab' || e.key==='Escape' || e.key==='F1' || e.key==='F2' || e.ctrlKey || e.metaKey));
                             if (blocked) {{ e.preventDefault(); e.stopPropagation(); return false; }}
                         }};
                     }}

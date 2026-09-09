@@ -232,6 +232,35 @@ async def settings_menu_keyboard(page, msgs):
     assert msgs == []
 
 
+async def f1_shortcuts_window(page, msgs):
+    # F1 must open the shortcuts window even when the (read-only) editor holds
+    # keyboard focus: the read-only input handler must not swallow F1/F2.
+    async def shortcut_open():
+        return await page.evaluate("""() => {
+            const t = document.querySelector('.wb-dialog .title-text');
+            return !!t && t.textContent === 'Keyboard Shortcuts';
+        }""")
+    assert await h.active_tab_name(page) == 'STARTUP'
+    await h.active_cm(page).click()
+    focused = await page.evaluate("""() => {
+        const a = document.activeElement;
+        return !!a && a.classList && a.classList.contains('cm-content');
+    }""")
+    assert focused, 'editor must hold focus while pressing F1'
+    assert not await shortcut_open(), 'shortcuts window starts closed'
+    await page.keyboard.press('F1')
+    await page.wait_for_function("""
+        () => { const t = document.querySelector('.wb-dialog .title-text');
+                return !!t && t.textContent === 'Keyboard Shortcuts'; }
+    """)
+    await page.keyboard.press('Escape')
+    await page.wait_for_function("""() => {
+        const t = document.querySelector('.wb-dialog .title-text');
+        return !t || t.textContent !== 'Keyboard Shortcuts';
+    }""")
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -241,4 +270,5 @@ SMOKE_SUITES = [
     ('smoke/hints-nav-browse', hints_nav_browse),
     ('smoke/hints-root-page', hints_root_page),
     ('smoke/settings-menu-keyboard', settings_menu_keyboard),
+    ('smoke/f1-shortcuts-window', f1_shortcuts_window),
 ]
