@@ -1116,6 +1116,90 @@ def editor_page() -> None:
                         try { applyLigatures(); } catch(e) {}
                     });
 
+                    // "FOLD" row -> toggles code folding for every editor.
+                    // On by default: the bundled CodeMirror basics already ship
+                    // a fold gutter and Ctrl-Shift-[ / Ctrl-Shift-] fold keys.
+                    var foldRow = document.createElement('div');
+                    foldRow.id = 'wb-settings-fold';
+                    foldRow.className = 'wb-settings-row';
+                    foldRow.tabIndex = 0;
+                    foldRow.setAttribute('role', 'button');
+                    var foldLabel = document.createElement('span');
+                    foldLabel.className = 'wb-settings-row-label';
+                    foldLabel.textContent = 'FOLD';
+                    var foldValue = document.createElement('span');
+                    foldValue.className = 'wb-settings-value';
+                    foldRow.appendChild(foldLabel);
+                    foldRow.appendChild(foldValue);
+
+                    // Keybindings the foldKeymap ships with in this bundle.
+                    var FOLD_KEYS = [
+                        'Ctrl-Shift-[', 'Ctrl-Shift-]', 'Ctrl-Alt-[', 'Ctrl-Alt-]'
+                    ];
+                    function foldIsOn() {
+                        // Folding ships enabled; only an explicit 'false' turns it off.
+                        try { return window.WBStorage.loadConfig().fold !== false; } catch(e) { return true; }
+                    }
+                    function foldBlockers(CM) {
+                        return [
+                            CM.EditorView.theme({
+                                '.cm-gutter.cm-foldGutter, .cm-foldPlaceholder': { display: 'none !important' }
+                            }),
+                            CM.Prec.high(CM.keymap.of(FOLD_KEYS.map(function(key) {
+                                return { key: key, run: function() { return true; } };
+                            })))
+                        ];
+                    }
+                    function applyFold() {
+                        var on = foldIsOn();
+                        foldValue.classList.toggle('on', on);
+                        foldValue.textContent = on ? 'ON' : 'OFF';
+                        var ids = window.__wbEditorIds || {};
+                        Object.keys(ids).forEach(function(fid) {
+                            var el = getElement(ids[fid]);
+                            if (!el || !el.editorPromise) return;
+                            el.editorPromise.then(function(view) {
+                                return import('nicegui-codemirror').then(function(CM) {
+                                    var effects = [];
+                                    if (on) {
+                                        if (view._wbFoldCompartment) {
+                                            effects.push(view._wbFoldCompartment.reconfigure([]));
+                                        }
+                                    } else {
+                                        try { CM.unfoldAll(view.state, view.dispatch); } catch(e) {}
+                                        if (!view._wbFoldCompartment) {
+                                            view._wbFoldCompartment = new CM.Compartment();
+                                            effects.push(CM.StateEffect.appendConfig.of([
+                                                view._wbFoldCompartment.of(foldBlockers(CM))
+                                            ]));
+                                        } else {
+                                            effects.push(view._wbFoldCompartment.reconfigure(foldBlockers(CM)));
+                                        }
+                                    }
+                                    if (effects.length) view.dispatch({ effects: effects });
+                                });
+                            }).catch(function(e) {
+                                console.warn('settings fold toggle failed', e);
+                            });
+                        });
+                    }
+                    foldRow.addEventListener('click', function(ev) {
+                        ev.stopPropagation();
+                        try {
+                            var cfg = window.WBStorage.loadConfig();
+                            cfg.fold = !foldIsOn();
+                            window.WBStorage.saveConfig(cfg);
+                            applyFold();
+                        } catch(e) { console.warn('settings fold toggle failed', e); }
+                    });
+                    menu.appendChild(foldRow);
+                    applyFold();
+
+                    // Re-assert folding whenever the server activates an editor.
+                    window.addEventListener('wb-active-editor', function() {
+                        try { applyFold(); } catch(e) {}
+                    });
+
                     // Plugins submenu (a panel beside the settings menu).
                     var submenu = document.createElement('div');
                     submenu.id = 'wb-plugins-menu';
