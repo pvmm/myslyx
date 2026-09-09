@@ -12,15 +12,16 @@
     'use strict';
 
     var manifest = window.WB_PLUGIN_MANIFEST || [];
+    var boot = [];
 
     manifest.forEach(function(def) {
         if (!def || !def.name || !def.dir || !def.entry) return;
-        WBPlugins.register({
+        var url = (def.base || '/static/plugins/') + def.dir + '/' + def.entry;
+        var plugin = {
             name: def.name,
             languages: def.languages || ['*'],
             enabledByDefault: def.enabledByDefault !== false,
             extensions: function(view, CM, ctx) {
-                var url = (def.base || '/static/plugins/') + def.dir + '/' + def.entry;
                 return import(url).then(function(mod) {
                     if (typeof mod.default !== 'function') {
                         throw new Error(def.name + ': module does not export a default factory');
@@ -29,6 +30,29 @@
                     return Array.isArray(got) ? got : [got];
                 });
             }
-        });
+        };
+        WBPlugins.register(plugin);
+        if (def.boot === true) boot.push(plugin);
     });
+
+    // Plugins marked "boot" load their module and run their factory once at
+    // page startup, before any editor exists. They use this for global side
+    // effects — e.g. hitbasic registers its language in the CodeMirror catalog
+    // so a server-driven set_language() never finds "Language not found: ..."
+    // for the very first editor it activates. Per-view install() re-runs the
+    // same (idempotent) factory to obtain the view extensions.
+    if (boot.length) {
+        import('nicegui-codemirror').then(function(CM) {
+            boot.forEach(function(plugin) {
+                if (!WBPlugins._enabled(plugin)) return;
+                plugin.extensions(null, CM, {
+                    config: (window.WBStorage.loadConfig().plugins || {})[plugin.name] || {}
+                }).catch(function(e) {
+                    console.warn('WBPlugins: ' + plugin.name + ' failed to boot', e);
+                });
+            });
+        }).catch(function(e) {
+            console.warn('WBPlugins: failed to load CodeMirror namespace at boot', e);
+        });
+    }
 })();

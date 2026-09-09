@@ -11,7 +11,7 @@ in `static/retro.js` and rendered by `static/hints.js` (markdown via
 
 | Language          | Hint file             |
 |-------------------|-----------------------|
-| `VBScript` (HitBasic) | `basic.json`      |
+| `HitBasic` (BASIC) | `basic.json`          |
 | `Text`            | `plaintext.json`      |
 
 Any unrecognized language falls back to `plaintext`.

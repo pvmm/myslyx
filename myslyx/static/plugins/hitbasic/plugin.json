@@ -1,0 +1,5 @@
+{
+  "languages": ["HitBasic", "VBScript"],
+  "enabledByDefault": true,
+  "boot": true
+}

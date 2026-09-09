@@ -191,7 +191,7 @@
                 offset += lines[li].length + 1;
             }
         } else {
-            // Basic (HitBasic/VBScript): FUNCTION name / SUB name / DEF FN name
+            // Basic (HitBasic): FUNCTION name / SUB name / DEF FN name
             var reB = /(?:FUNCTION|SUB|DEF\s+FN)\s+([A-Za-z][A-Za-z0-9_$%!&]*)/gi;
             while ((m = reB.exec(text)) !== null) {
                 var kw = m[0].toUpperCase();

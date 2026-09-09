@@ -38,7 +38,10 @@
             var langs = def.languages;
             if (!langs || langs.indexOf('*') >= 0) return true;
             var cur = window.__wbCurrentLang || 'Text';
-            return langs.indexOf(cur) >= 0;
+            if (langs.indexOf(cur) >= 0) return true;
+            // "HitBasic" superseded the "VBScript" stored id; keep plugin
+            // manifests written for the old id matching HitBasic files too.
+            return cur === 'HitBasic' && langs.indexOf('VBScript') >= 0;
         },
 
         // Attach the enabled plugins' extensions to a CodeMirror view. Runs once

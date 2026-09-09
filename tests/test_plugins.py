@@ -200,12 +200,12 @@ async def plugin_language_filter(page, msgs):
     }""")
     await page.reload(wait_until='load')
     await page.wait_for_timeout(2500)
-    # New files default to VBScript -> the C-only plugin must not render.
+    # New files default to HitBasic -> the C-only plugin must not render.
     await h.new_file(page, 2)
     await page.keyboard.type('#00ffff')
     await page.wait_for_timeout(900)
     colors = await _render_state(page)
-    assert colors['cyan'] == 0, f'c-swatches must not render in VBScript file: {colors}'
+    assert colors['cyan'] == 0, f'c-swatches must not render in HitBasic file: {colors}'
 
     # Import a C source file -> the C-only plugin must now render.
     before = await page.evaluate("document.querySelectorAll('.wb-file-tab').length")

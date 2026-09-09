@@ -37,15 +37,26 @@ directories and binds each module to the editor through the runtime in
 2. (Optional) Add `static/plugins/<name>/plugin.json` to override defaults:
 
    ```json
-   { "languages": ["VBScript"], "enabledByDefault": false }
+   { "languages": ["HitBasic"], "enabledByDefault": false }
    ```
 
    Defaults: `languages: ["*"]` (all languages), `enabledByDefault: true`.
    `name`, `dir` and `entry` (the module file) come from the directory name:
    `static/plugins/<name>/<name>.js`.
 
+   Set `"boot": true` when the plugin has global side effects that must be
+   in place before any editor exists — the canonical example is registering a
+   language in the CodeMirror catalog (see `hitbasic`). A boot plugin's module
+   is loaded and its factory run once at page startup; per-view `install()`
+   re-runs the same idempotent factory for the actual extensions:
+
 3. Hard-refresh the page. The plugin appears in Settings > PLUGINS and its
    extensions are appended the next time the editor view is created.
+
+> Language ids: a file's stored language is one of the `LANGUAGES` keys in
+> `pages/editor_page.py` (`HitBasic`, `Pascal`, `C`, `Z80`, `Text`). For
+> compatibility, a plugin whose `languages` says `"VBScript"` (the pre-rename
+> id for BASIC) also runs on `HitBasic` files.
 
 ### User plugins directory
 
@@ -132,6 +143,16 @@ runtime toggle yet.
   as plain DOM around the existing `#wb-file-name` label and recomputes the
   counts from the active view's document on every edit and on
   `wb-active-editor` events.
+- `static/plugins/hitbasic/` — publishes the *HitBasic* language to the
+  CodeMirror catalog (the "nicegui-codemirror" `CM.languages` list used by
+  `ui.codemirror`'s `setLanguage()`). Its factory returns no per-view
+  extensions; instead it registers a language entry built from the VBScript
+  highlighter plus `languageData.commentTokens` (`"'"`), which makes the
+  built-in **Ctrl-/** comment toggle work in BASIC. Because the editor that
+  triggers the module's first install may have mounted before the entry
+  existed, the factory also re-applies the language to the active editor.
+  Disabling this plugin removes HitBasic from the catalog (no highlighting,
+  no Ctrl-/ toggle).
 
 ## Validation
 

@@ -52,7 +52,7 @@
                 {
                     id: WBStorage.generateId(),
                     name: 'hello.bas',
-                    language: 'VBScript',
+                    language: 'HitBasic',
                     content: [
                         '10 REM Welcome to Myslyx Text Editor',
                         '20 CLS',

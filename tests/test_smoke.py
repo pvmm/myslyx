@@ -45,7 +45,7 @@ async def export_disabled_for_text(page, msgs):
     assert await export.is_disabled(), 'export toggle must be disabled for Text language'
     label = (await export.inner_text()).replace('\n', ' ')
     assert '---' in label, f'unexpected label for disabled export: {label!r}'
-    # Import a .bas file (VBScript) -> the toggle must re-enable.
+    # Import a .bas file (HitBasic) -> the toggle must re-enable.
     before = await page.evaluate("document.querySelectorAll('.wb-file-tab').length")
     await page.evaluate("""() => {
         const dt = new DataTransfer();
@@ -64,7 +64,7 @@ async def export_disabled_for_text(page, msgs):
 
 
 async def export_disabled_on_language_switch(page, msgs):
-    # New files default to VBScript -> the export toggle is usable.
+    # New files default to HitBasic -> the export toggle is usable.
     await h.new_file(page, 2)
     export = page.locator('#wb-export-btn')
     await export.wait_for(state='visible', timeout=10000)
@@ -261,6 +261,31 @@ async def f1_shortcuts_window(page, msgs):
     assert msgs == []
 
 
+async def comment_toggle_basic(page, msgs):
+    # Ctrl+/ toggles comments natively in HitBasic via the pluggable language
+    # whose commentTokens declare "'". Select-all + toggle must produce a
+    # leading "' " on every non-blank line, and a second press must undo it.
+    await h.new_file(page, 2)
+    await h.active_cm(page).click()
+    await page.keyboard.type('PRINT 42\nGOTO 10')
+    await page.wait_for_timeout(300)
+    expected = "' PRINT 42\n' GOTO 10"
+    toggled = False
+    for _ in range(6):
+        await page.keyboard.press('Control+a')
+        await page.keyboard.press('Control+/')
+        await page.wait_for_timeout(150)
+        if await h.doc_text(page) == expected:
+            toggled = True
+            break
+    assert toggled, 'Ctrl+/ must comment HitBasic lines with a leading apostrophe'
+    await page.keyboard.press('Control+a')
+    await page.keyboard.press('Control+/')
+    await page.wait_for_timeout(150)
+    assert await h.doc_text(page) == 'PRINT 42\nGOTO 10', 'Ctrl+/ second press must uncomment'
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -271,4 +296,5 @@ SMOKE_SUITES = [
     ('smoke/hints-root-page', hints_root_page),
     ('smoke/settings-menu-keyboard', settings_menu_keyboard),
     ('smoke/f1-shortcuts-window', f1_shortcuts_window),
+    ('smoke/comment-toggle', comment_toggle_basic),
 ]

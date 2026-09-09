@@ -9,21 +9,40 @@ from myslyx.paths import user_plugins_dir
 
 FAVICON_PATH = str(Path(__file__).resolve().parents[1] / 'static' / 'favicon.svg')
 
-# Language options. Keys are the values stored with files (CodeMirror language
-# names), values are the labels shown in the dropdown.
+# Language options offered by the LANG combo box. Keys are the values stored
+# with files (CodeMirror language names), values are the labels shown here.
 LANGUAGES: dict[str, str] = {
-    # HitBasic is a BASIC dialect, so use CodeMirror's BASIC (VBScript) highlighter.
-    'VBScript': 'HitBasic',
+    # HitBasic is a BASIC dialect. Its CodeMirror language support ships as a
+    # plugin (static/plugins/hitbasic/): it builds on the VBScript highlighter
+    # and declares "'" as the line-comment token, so Ctrl-/ works in BASIC.
+    'HitBasic': 'HitBasic',
     'Pascal': 'Pascal',
     'C': 'C',
     'Z80': 'Z80 Assembly',
     'Text': 'Text',
 }
 
+# Stored language ids that once existed in LANGUAGES but are no longer
+# offered by the combo box. Files saved with such an id keep working: they
+# resolve to the current id instead of falling back to plain text.
+LEGACY_LANGUAGES: dict[str, str] = {
+    'VBScript': 'HitBasic',
+}
+
+
+def _canonical_lang(lang: str | None) -> str | None:
+    """Resolve a stored language value to a current LANGUAGES key.
+
+    Returns None only for values that were never a real language id.
+    """
+    if lang in LANGUAGES:
+        return lang
+    return LEGACY_LANGUAGES.get(lang) if lang is not None else None
+
 # Maps stored CodeMirror language values to hint dictionary keys (files under
 # static/hints/<key>.json). Unknown languages fall back to plain text.
 HINT_KEYS: dict[str, str] = {
-    'VBScript': 'basic',
+    'HitBasic': 'basic',
     'Pascal': 'plaintext',
     'C': 'plaintext',
     'Z80': 'plaintext',
@@ -90,6 +109,11 @@ def _plugin_metadata(plugin_dir: Path) -> dict[str, Any] | None:
                 meta['languages'] = extra['languages']
             if isinstance(extra.get('enabledByDefault'), bool):
                 meta['enabledByDefault'] = extra['enabledByDefault']
+            # "boot": load and run the module factory at page startup so global
+            # side effects (e.g. registering a language in the catalog) happen
+            # before the server can activate an editor that needs them.
+            if isinstance(extra.get('boot'), bool):
+                meta['boot'] = extra['boot']
         except (OSError, ValueError):
             logging.warning('Invalid plugin.json in %s', plugin_dir)
     return meta
@@ -144,7 +168,7 @@ def editor_page() -> None:
                 lang_select = (
                     ui.select(
                         LANGUAGES,
-                        value='VBScript',
+                        value='HitBasic',
                         on_change=lambda e: _on_language_change(e.value),
                     )
                     .classes('wb-select')
@@ -279,7 +303,7 @@ def editor_page() -> None:
 
     def _ext_for_lang(lang: str) -> str:
         return {
-            'vbscript': 'bas', 'VBScript': 'bas',
+            'hitbasic': 'bas', 'HitBasic': 'bas', 'vbscript': 'bas', 'VBScript': 'bas',
             'pascal': 'pas', 'Pascal': 'pas',
             'c': 'c', 'C': 'c',
             'z80': 'asm', 'Z80': 'asm',
@@ -292,7 +316,7 @@ def editor_page() -> None:
     def _lang_for_name(name: str) -> str:
         lowered = name.lower()
         if lowered.endswith(('.bas', '.vb', '.vbs')):
-            return 'VBScript'
+            return 'HitBasic'
         if lowered.endswith(('.pas', '.pp', '.inc')):
             return 'Pascal'
         if lowered.endswith(('.c', '.h')):
@@ -303,7 +327,7 @@ def editor_page() -> None:
 
     def _file_icon(language: str) -> str:
         return {
-            'vbscript': 'BAS', 'VBScript': 'BAS',
+            'hitbasic': 'BAS', 'HitBasic': 'BAS', 'vbscript': 'BAS', 'VBScript': 'BAS',
             'pascal': 'PAS', 'Pascal': 'PAS',
             'c': 'C', 'C': 'C',
             'z80': 'ASM', 'Z80': 'ASM',
@@ -446,15 +470,17 @@ def editor_page() -> None:
         if fid in editor_slots:
             return editor_slots[fid]
         cm_lang = f.get('language', 'Text')
-        if cm_lang not in LANGUAGES:
-            cm_lang = 'Text'
+        canonical = _canonical_lang(cm_lang)
+        if canonical is None:
+            canonical = 'Text'
             f['language'] = 'Text'
+        cm_lang = canonical
         with editor_host:
             with ui.element('div').props(f'id=wb-edit-slot-{fid}').classes('wb-editor-slot wb-editor-hidden') as slot:
                 ed = (
                     ui.codemirror(
                         value=f.get('content', ''),
-                        language='VBScript',
+                        language=cm_lang,
                         theme='basicDark',
                         on_change=lambda e, fid=fid: _on_editor_change(fid, e.value),
                     )
@@ -478,8 +504,8 @@ def editor_page() -> None:
         fid = str(file.get('id') or f'file_{random.randint(100000, 999999)}')
         name = str(file.get('name') or 'untitled.txt')
         lang = str(file.get('language') or _lang_for_name(name))
-        if lang not in LANGUAGES:
-            lang = 'Text'
+        canonical = _canonical_lang(lang)
+        lang = canonical if canonical is not None else 'Text'
         content = file.get('content') if isinstance(file.get('content'), str) else ''
         target = next((f for f in client_state['files'] if f['id'] == fid), None)
         if target is None:
@@ -532,10 +558,11 @@ def editor_page() -> None:
         readonly = bool(f.get('readonly', False))
         file_name_label.set_text(f['name'] + (' 🔒' if readonly else ''))
         cm_lang = f.get('language', 'Text')
-        if cm_lang not in LANGUAGES:
-            # Migrate files saved with a language that no longer exists.
-            cm_lang = 'Text'
-            f['language'] = 'Text'
+        canon = _canonical_lang(cm_lang)
+        # Migrate files saved with a language that no longer exists (or with a
+        # legacy id superseded by a rename) to the current stored value.
+        f['language'] = canon if canon is not None else 'Text'
+        cm_lang = f['language']
         if cm_lang == 'Text':
             # Plain text: clear the language extension instead of passing the
             # name 'Text' (which CodeMirror does not know) to set_language.
@@ -750,7 +777,7 @@ def editor_page() -> None:
                         try {
                             var lang = 'Text';
                             var n = (f.name || '').toLowerCase();
-                            if (n.endsWith('.bas')) lang = 'VBScript';
+                            if (n.endsWith('.bas')) lang = 'HitBasic';
                             else if (n.endsWith('.pas') || n.endsWith('.pp') || n.endsWith('.inc')) lang = 'Pascal';
                             else if (n.endsWith('.c') || n.endsWith('.h')) lang = 'C';
                             else if (n.endsWith('.asm') || n.endsWith('.s') || n.endsWith('.z80')) lang = 'Z80';
@@ -872,7 +899,7 @@ def editor_page() -> None:
                                     try {
                                         var lang = 'Text';
                                         var n = (file.name || '').toLowerCase();
-                                        if (n.endsWith('.bas')) lang='VBScript';
+                                        if (n.endsWith('.bas')) lang='HitBasic';
                                         else if (n.endsWith('.pas') || n.endsWith('.pp') || n.endsWith('.inc')) lang='Pascal';
                                         else if (n.endsWith('.c') || n.endsWith('.h')) lang='C';
                                         else if (n.endsWith('.asm') || n.endsWith('.s') || n.endsWith('.z80')) lang='Z80';
@@ -1228,10 +1255,11 @@ def editor_page() -> None:
         client_state['active_id'] = data.get('active')
 
         # Migrate files that carry a language no longer offered by the editor
-        # (e.g. saved as Python or Markdown) to plain text.
+        # (e.g. saved as Python or Markdown) to plain text, and legacy ids
+        # (e.g. "VBScript") to their renamed value.
         for f in client_state['files']:
-            if f.get('language') not in LANGUAGES:
-                f['language'] = 'Text'
+            canon = _canonical_lang(f.get('language'))
+            f['language'] = canon if canon is not None else 'Text'
 
         # If there are no files in storage, create a starter file so the UI
         # shows an initial file next to the '+ NEW' button and loads it into
@@ -1301,6 +1329,7 @@ def editor_page() -> None:
                         {'keys': 'Ctrl++', 'action': 'Increase font size'},
                         {'keys': 'Ctrl+-', 'action': 'Decrease font size'},
                         {'keys': 'Ctrl+Space', 'action': 'Open SETTINGS menu'},
+                        {'keys': 'Ctrl+/', 'action': 'Toggle comment (HitBasic, Pascal, C)'},
                         {'keys': 'F1', 'action': 'Open shortcuts window'},
                         {'keys': 'F2', 'action': 'Reload hints root page'},
                         {'keys': 'F5', 'action': 'Refresh editor'},
