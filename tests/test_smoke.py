@@ -330,6 +330,76 @@ async def ligatures_toggle(page, msgs):
     assert msgs == []
 
 
+async def fold_keyword_basic(page, msgs):
+    # The foldService keyword provider folds HitBasic blocks (IF/END IF,
+    # FOR/NEXT...) with the native fold gutter and keys, even though the
+    # stream highlighter has no syntax tree. Text (and Z80) stay unfoldable.
+    # Folding only hides lines in the view; the stored document is untouched.
+    await h.new_file(page, 2)
+    await h.active_cm(page).click()
+    await page.keyboard.type(
+        'IF A THEN\nPRINT 1\nFOR I = 1 TO 3\nPRINT I\nNEXT\nEND IF')
+    await page.wait_for_timeout(400)
+
+    # The gutter shows one fold marker per block opener (IF and FOR).
+    markers = page.locator(
+        '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement span[title="Fold line"]')
+    await markers.first.wait_for(state='attached', timeout=10000)
+    assert await markers.count() >= 2, \
+        f'IF and FOR lines must be foldable, got {await markers.count()} markers'
+
+    # Ctrl-Shift-[ collapses the block whose body the cursor sits in (fold
+    # ranges start right after the opener keyword, keeping that line visible).
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Control+Shift+[')
+    await page.wait_for_function("""() =>
+        document.querySelectorAll(
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-gutterElement span[title="Unfold line"]').length >= 1""")
+
+    # Ctrl-Shift-] unfolds again; the cursor now sits on the opener line.
+    # (CodeMirror styles some closed gutter markers with visibility:hidden,
+    # so drive the last one - the fold-start block - with a real click.)
+    await page.evaluate("""() => {
+        const marks = document.querySelectorAll(
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-gutterElement span[title="Unfold line"]');
+        marks[marks.length - 1].dispatchEvent(
+            new MouseEvent('click', {bubbles: true, cancelable: true}));
+    }""")
+    await page.wait_for_function("""() =>
+        document.querySelectorAll(
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-gutterElement span[title="Unfold line"]').length === 0""")
+
+    # Text files have no block structure: no fold markers at all.
+    await h.set_language(page, 'Text')
+    await page.wait_for_function("""() =>
+        document.querySelectorAll(
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement span' +
+            '[title="Fold line"]').length === 0""")
+    assert msgs == []
+
+
+async def fold_keyword_c(page, msgs):
+    # C folding keys off '{...}' brace pairs found anywhere in a line.
+    await h.new_file(page, 2)
+    await h.set_language(page, 'C')
+    await h.active_cm(page).click()
+    await page.keyboard.type('int main() {\nprintf("hi");\nreturn 0;\n}')
+    await page.wait_for_timeout(400)
+
+    open_marker = page.locator(
+        '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement span[title="Fold line"]')
+    await open_marker.first.wait_for(state='attached', timeout=10000)
+    before = await h.doc_text(page)
+    # Clicking the gutter marker folds the block.
+    await open_marker.first.click()
+    await page.wait_for_function("""() =>
+        document.querySelectorAll(
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-gutterElement span[title="Unfold line"]').length >= 1""")
+    assert await h.doc_text(page) == before
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -342,4 +412,6 @@ SMOKE_SUITES = [
     ('smoke/f1-shortcuts-window', f1_shortcuts_window),
     ('smoke/comment-toggle', comment_toggle_basic),
     ('smoke/ligatures-toggle', ligatures_toggle),
+    ('smoke/fold-keyword-basic', fold_keyword_basic),
+    ('smoke/fold-keyword-c', fold_keyword_c),
 ]

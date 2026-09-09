@@ -127,6 +127,7 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/vendor/marked.min.js"></script>')
     ui.add_head_html('<script src="/static/hints.js"></script>')
     ui.add_head_html('<script src="/static/plugins.js"></script>')
+    ui.add_head_html('<script src="/static/folding.js"></script>')
     plugin_manifest_by_name: dict[str, Any] = {}
 
     def collect(base_url: str, plugins_dir: Path) -> None:
