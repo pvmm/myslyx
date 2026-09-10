@@ -1,4 +1,5 @@
-// Settings flyout for the wrap toggle and plugins submenu.
+// Settings flyout for the wrap toggle, the LIGATURES toggle and the
+// PLUGINS submenu, plus its keyboard navigation and F1 shortcut.
 (function() {
     function install() {
         (function() {
@@ -33,6 +34,7 @@
                     }
                 }
 
+                // "PLUGINS" row -> opens the plugins submenu.
                 var pluginsRow = document.createElement('div');
                 pluginsRow.id = 'wb-settings-plugins';
                 pluginsRow.className = 'wb-settings-row';
@@ -52,6 +54,7 @@
                 });
                 menu.appendChild(pluginsRow);
 
+                // "WRAP" row -> toggles word wrap for every editor.
                 var wrapRow = document.createElement('div');
                 wrapRow.id = 'wb-settings-wrap';
                 wrapRow.className = 'wb-settings-row';
@@ -77,6 +80,8 @@
                             el.setLineWrapping(on);
                         }
                     });
+                    // Do not use .active here: that is the orange hover /
+                    // open-flyout highlight. Wrap state shows in the value.
                     wrapValue.classList.toggle('on', on);
                     wrapValue.textContent = on ? 'ON' : 'OFF';
                 }
@@ -92,50 +97,206 @@
                 menu.appendChild(wrapRow);
                 applyWrap();
 
+                // Re-assert wrapping whenever the server activates an editor.
+                window.addEventListener('wb-active-editor', function() {
+                    try { applyWrap(); } catch(e) {}
+                });
+
+                // "LIGATURES" row -> toggles font ligatures for every editor.
+                // Off by default (retro fonts draw ugly "fi" pairs).
+                var ligatureRow = document.createElement('div');
+                ligatureRow.id = 'wb-settings-ligatures';
+                ligatureRow.className = 'wb-settings-row';
+                ligatureRow.tabIndex = 0;
+                ligatureRow.setAttribute('role', 'button');
+                var ligatureLabel = document.createElement('span');
+                ligatureLabel.className = 'wb-settings-row-label';
+                ligatureLabel.textContent = 'LIGATURES';
+                var ligatureValue = document.createElement('span');
+                ligatureValue.className = 'wb-settings-value';
+                ligatureRow.appendChild(ligatureLabel);
+                ligatureRow.appendChild(ligatureValue);
+
+                function ligaturesOn() {
+                    try { return !!window.WBStorage.loadConfig().ligatures; } catch(e) { return false; }
+                }
+                function applyLigatures() {
+                    var on = ligaturesOn();
+                    document.querySelectorAll('.cm-editor .cm-content').forEach(function(el) {
+                        if (on) {
+                            el.style.fontVariantLigatures = 'common-ligatures';
+                            el.style.fontFeatureSettings = '"liga" 1, "clig" 1';
+                        } else {
+                            el.style.fontVariantLigatures = 'no-common-ligatures';
+                            el.style.fontFeatureSettings = '"liga" 0, "clig" 0';
+                        }
+                    });
+                    ligatureValue.classList.toggle('on', on);
+                    ligatureValue.textContent = on ? 'ON' : 'OFF';
+                }
+                ligatureRow.addEventListener('click', function(ev) {
+                    ev.stopPropagation();
+                    try {
+                        var cfg = window.WBStorage.loadConfig();
+                        cfg.ligatures = !cfg.ligatures;
+                        window.WBStorage.saveConfig(cfg);
+                        applyLigatures();
+                    } catch(e) { console.warn('settings ligatures toggle failed', e); }
+                });
+                menu.appendChild(ligatureRow);
+                applyLigatures();
+
+                // Re-assert ligatures whenever the server activates an editor.
+                window.addEventListener('wb-active-editor', function() {
+                    try { applyLigatures(); } catch(e) {}
+                });
+
+                // Plugins submenu (a panel beside the settings menu).
+                var submenu = document.createElement('div');
+                submenu.id = 'wb-plugins-menu';
+                submenu.className = 'wb-plugins-menu';
+                submenu.style.display = 'none';
+                menu.appendChild(submenu);
+
+                var subTitle = document.createElement('div');
+                subTitle.className = 'wb-plugins-title';
+                subTitle.textContent = 'PLUGINS';
+                submenu.appendChild(subTitle);
+
+                var hint = document.createElement('div');
+                hint.className = 'wb-plugins-hint';
+                hint.textContent = 'changes reload the editor';
+                submenu.appendChild(hint);
+
                 function rebuildPlugins() {
-                    if (!window.WBPlugins || !window.WBPlugins.list) return;
-                    var list = window.WBPlugins.list();
-                    if (!list || list.length === 0) return;
-                    var rows = menu.querySelectorAll('.wb-plugin-toggle');
-                    rows.forEach(function(r) { r.remove(); });
-                    list.forEach(function(info) {
-                        var row = document.createElement('div');
-                        row.className = 'wb-settings-row wb-plugin-toggle';
-                        row.tabIndex = 0;
-                        var label = document.createElement('span');
-                        label.className = 'wb-settings-row-label';
-                        label.textContent = info.name;
-                        var value = document.createElement('span');
-                        value.className = 'wb-settings-value';
-                        value.textContent = info.enabled ? 'ON' : 'OFF';
-                        row.appendChild(label);
-                        row.appendChild(value);
-                        row.addEventListener('click', function(ev) {
-                            ev.stopPropagation();
-                            window.WBPlugins.toggle(info.name);
-                            value.textContent = window.WBPlugins.isEnabled(info.name) ? 'ON' : 'OFF';
+                    submenu.querySelectorAll('.wb-plugin-row').forEach(function(r) { r.remove(); });
+                    var defs = window.WBPlugins.list();
+                    if (!defs.length) {
+                        var empty = document.createElement('div');
+                        empty.className = 'wb-plugin-empty';
+                        empty.textContent = '(no plugins installed)';
+                        submenu.appendChild(empty);
+                        return;
+                    }
+                    defs.forEach(function(def) {
+                        var row = document.createElement('label');
+                        row.className = 'wb-plugin-row';
+                        var name = document.createElement('span');
+                        name.className = 'wb-plugin-name';
+                        name.textContent = def.name;
+                        var cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.className = 'wb-plugin-check';
+                        cb.checked = !!window.WBPlugins._enabled(def);
+                        cb.addEventListener('change', function() {
+                            try {
+                                var cfg = window.WBStorage.loadConfig();
+                                cfg.plugins = cfg.plugins || {};
+                                cfg.plugins[def.name] = cb.checked;
+                                window.WBStorage.saveConfig(cfg);
+                                clearTimeout(menu._reloadT);
+                                menu._reloadT = setTimeout(function() {
+                                    window.location.reload();
+                                }, 300);
+                            } catch(e) { console.warn('plugins toggle failed', e); }
                         });
-                        menu.appendChild(row);
+                        row.appendChild(name);
+                        row.appendChild(cb);
+                        submenu.appendChild(row);
                     });
                 }
 
-                // Keep the menu bound to the button, even when the plugin state changes.
+                function position() {
+                    var r = btn.getBoundingClientRect();
+                    menu.style.left = r.right + 'px';
+                    menu.style.top = (r.bottom + 6) + 'px';
+                    var w = menu.offsetWidth;
+                    if (r.right - w >= 0) menu.style.left = (r.right - w) + 'px';
+                }
+
+                function settingsRows() {
+                    return Array.prototype.slice.call(
+                        menu.querySelectorAll('.wb-settings-row'));
+                }
+                function clearRowFocus() {
+                    settingsRows().forEach(function(r) { r.classList.remove('keyboard'); });
+                }
+                function focusRow(delta) {
+                    var rows = settingsRows();
+                    if (!rows.length) return;
+                    var idx = rows.indexOf(menu.querySelector('.wb-settings-row.keyboard'));
+                    var next = idx < 0 ? (delta > 0 ? 0 : rows.length - 1) : idx + delta;
+                    if (next < 0) next = rows.length - 1;
+                    if (next >= rows.length) next = 0;
+                    clearRowFocus();
+                    rows[next].classList.add('keyboard');
+                }
+                function restoreEditorFocus() {
+                    try {
+                        var c = document.querySelector(
+                            '.wb-editor-slot:not(.wb-editor-hidden) .cm-content');
+                        if (c) c.focus();
+                    } catch(e) {}
+                }
+
+                function open() {
+                    applyWrap();
+                    clearRowFocus();
+                    menu.style.display = 'block';
+                    position();
+                    btn.classList.add('active');
+                    try { menu.focus({ preventScroll: true }); } catch(e) { menu.focus(); }
+                }
+                function close() {
+                    closeSubmenu();
+                    clearRowFocus();
+                    menu.style.display = 'none';
+                    btn.classList.remove('active');
+                    restoreEditorFocus();
+                }
+
                 btn.addEventListener('click', function(ev) {
                     ev.stopPropagation();
-                    var shown = menu.style.display === 'block';
-                    menu.style.display = shown ? 'none' : 'block';
-                    if (!shown) {
-                        rebuildPlugins();
+                    if (menu.style.display === 'block') close(); else open();
+                });
+                document.addEventListener('click', function(ev) {
+                    if (menu.style.display === 'block' && !menu.contains(ev.target)) close();
+                });
+                document.addEventListener('keydown', function(ev) {
+                    if (menu.style.display !== 'block') return;
+                    if (ev.key === 'Escape') { close(); return; }
+                    if (ev.key === 'ArrowDown') { ev.preventDefault(); focusRow(1); }
+                    else if (ev.key === 'ArrowUp') { ev.preventDefault(); focusRow(-1); }
+                    else if (ev.key === 'Enter' || ev.key === ' ') {
+                        var cur = menu.querySelector('.wb-settings-row.keyboard');
+                        if (cur) { ev.preventDefault(); cur.click(); }
                     }
                 });
-                document.addEventListener('click', function() {
-                    menu.style.display = 'none';
-                    if (pluginsRow) pluginsRow.classList.remove('active');
+
+                // Ctrl+Space opens/closes the SETTINGS menu from anywhere.
+                document.addEventListener('keydown', function(ev) {
+                    if ((ev.ctrlKey || ev.metaKey) && (ev.key === ' ' || ev.code === 'Space')) {
+                        ev.preventDefault();
+                        if (menu.style.display === 'block') close(); else open();
+                    }
                 });
+
+                // F1 opens the Shortcut window from anywhere.
+                document.addEventListener('keydown', function(ev) {
+                    if (ev.key === 'F1') {
+                        ev.preventDefault();
+                        var s = document.getElementById('wb-shortcut-btn');
+                        if (s && s.click) s.click();
+                    }
+                });
+
                 return true;
             }
 
-            setupSettingsMenu();
+            var _attempts = 0;
+            var _iv = setInterval(function() {
+                if (setupSettingsMenu() || ++_attempts > 50) clearInterval(_iv);
+            }, 200);
         })();
     }
 
