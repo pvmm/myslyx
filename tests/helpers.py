@@ -36,7 +36,7 @@ async def set_language(page, label):
     """Pick a language from the toolbar LANG dropdown by its shown label."""
     await page.click('.wb-select')
     await page.wait_for_timeout(500)
-    await page.click(f'.q-menu .q-item:has-text("{label}")')
+    await page.locator('.q-menu').get_by_text(label, exact=True).first.click()
     await page.wait_for_timeout(600)
 
 

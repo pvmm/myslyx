@@ -104,7 +104,7 @@
         name = String(name).toLowerCase();
         if (name.indexOf('hitbasic') >= 0 || name.indexOf('basic') >= 0 || name === 'vbscript') return 'hitbasic';
         if (name.indexOf('pascal') >= 0) return 'pascal';
-        if (name === 'c') return 'c';
+        if (name === 'c' || name === 'cpp' || name === 'clike' || name === 'c++') return 'c';
         return null;
     }
 
@@ -250,43 +250,142 @@
 
     // --- install machinery (mirrors static/plugins.js) -------------------------
 
-    function install(view) {
-        if (!view || view._wbFoldInstalled) return;
-        view._wbFoldInstalled = true;
-        import('nicegui-codemirror').then(function(CM) {
-            CM_NS = CM_NS || CM;
-            if (!view) return;
+    var RETRY_MS = 400;
+    var MAX_RETRIES = 8;
+
+    // The fold gutter only rebuilds its markers when the document, viewport,
+    // syntax tree, fold state or foldService facet change. Reconfiguring the
+    // editor's language is none of those for the stream-parser languages, so
+    // markers computed under the old language linger after a switch. Watch for
+    // language changes: clearing then re-adding a fold range churns the fold
+    // state (which triggers a gutter rebuild) without touching the document.
+    function languageRefreshListener(CM, view) {
+        var lastLangName = null;
+        try {
+            var lf0 = view.state && view.state.facet(CM.language);
+            if (lf0 && lf0.name) lastLangName = lf0.name;
+        } catch (e) {}
+        return CM.EditorView.updateListener.of(function(update) {
+            if (update.docChanged) return; // rebuilds the gutter anyway
+            var name = null;
             try {
-                view.dispatch({
-                    effects: CM.StateEffect.appendConfig.of([CM.foldService.of(foldProvider)])
-                });
-            } catch (e) {
-                console.warn('WBFold: install failed', e);
-            }
-        }).catch(function(e) {
-            console.warn('WBFold: failed to load CodeMirror namespace', e);
+                var lf = update.state.facet(CM.language);
+                if (lf && lf.name) name = lf.name;
+            } catch (e) {}
+            if (name === lastLangName) return;
+            lastLangName = name;
+            if (update.state.doc.length < 1) return;
+            var one = { from: 0, to: 1 };
+            setTimeout(function() {
+                try {
+                    update.view.dispatch({ effects: CM.foldEffect.of(one) });
+                    update.view.dispatch({ effects: CM.unfoldEffect.of(one) });
+                } catch (e) {
+                    console.warn('WBFold: language refresh failed', e);
+                }
+            }, 0);
         });
     }
 
-    function tryHook() {
+    function ensureFoldService(view, CM) {
+        if (!view || !view.state) return false;
+        var st = view.state;
+        var have = false;
+        try {
+            have = (st.facet(CM.foldService) || []).some(function(f) { return f === foldProvider; });
+        } catch (e) {
+            return false;
+        }
+        if (have) return true;
+        var ext = [CM.foldService.of(foldProvider), languageRefreshListener(CM, view)];
+        if (CM.foldKeymap && !(st.facet(CM.keymap) || []).some(function(k) {
+            return k && k['Shift-Ctrl-['];
+        })) {
+            ext.push(CM.keymap.of(CM.foldKeymap));
+        }
+        try {
+            view.dispatch({ effects: CM.StateEffect.appendConfig.of(ext) });
+        } catch (e) {
+            console.warn('WBFold: install failed', e);
+        }
+        return false;
+    }
+
+    function currentView() {
         var elId = window.__wbEditorId;
-        if (!elId) return false;
+        if (!elId) return null;
         var el = window.getElement ? window.getElement(elId) : null;
-        if (!el || !el.editorPromise) return false;
-        el.editorPromise.then(install);
-        return true;
+        return (el && el.editorPromise) ? el.editorPromise : null;
+    }
+
+    // CodeMirror's own capture keydown handler tries the unshifted variant
+    // of a character key first, so a Gesture produced as Ctrl+Shift+[ with
+    // key='[' (as Playwright does) resolves to Mod-[ (indentLess) and the
+    // fold binding never fires. Real keyboards emit key='{' and CodeMirror
+    // folds fine. Intercept the gesture on the window in the capture phase
+    // (which runs before CodeMirror's content-DOM handler) and fold/unfold
+    // explicitly, so both cases behave identically.
+    var foldKeysBound = false;
+    function bindFoldKeys() {
+        if (foldKeysBound) return;
+        foldKeysBound = true;
+        window.addEventListener('keydown', function(e) {
+            if (!((e.ctrlKey || e.metaKey) && e.shiftKey)) return;
+            if (e.code !== 'BracketLeft' && e.code !== 'BracketRight') return;
+            var p = currentView();
+            if (p) {
+                p.then(function(view) {
+                    import('nicegui-codemirror').then(function(CM) {
+                        CM_NS = CM_NS || CM;
+                        if (!view || !view.state) return;
+                        if (e.code === 'BracketLeft') CM.foldCode(view);
+                        else CM.unfoldCode(view);
+                    });
+                });
+            }
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        }, true);
+    }
+
+    function install() {
+        var p = currentView();
+        if (!p) return;
+        bindFoldKeys();
+        p.then(function(view) {
+            import('nicegui-codemirror').then(function(CM) {
+                CM_NS = CM_NS || CM;
+                if (ensureFoldService(view, CM)) return;
+                // CodeMirror can rebuild the editor state shortly after mount,
+                // dropping appended config facets; keep reapplying until it sticks.
+                var n = 0;
+                var iv = setInterval(function() {
+                    var p2 = currentView();
+                    if (p2) {
+                        p2.then(function(v) {
+                            import('nicegui-codemirror').then(function(CM2) {
+                                CM_NS = CM_NS || CM2;
+                                if (ensureFoldService(v, CM2)) clearInterval(iv);
+                            });
+                        });
+                    }
+                    if (++n > MAX_RETRIES) clearInterval(iv);
+                }, RETRY_MS);
+            });
+        });
     }
 
     window.WBFold = { install: install };
 
     var attempts = 0;
     var iv = setInterval(function() {
-        if (tryHook() || ++attempts > 100) clearInterval(iv);
-    }, 200);
+        if (window.__wbEditorId || ++attempts > 50) clearInterval(iv);
+    }, 100);
+    install();
 
     // Re-bind whenever the server activates a (possibly new) editor; installs
-    // are idempotent per view (view._wbFoldInstalled).
+    // are idempotent per view + fold-service presence.
     window.addEventListener('wb-active-editor', function() {
-        try { tryHook(); } catch (e) {}
+        try { install(); } catch (e) {}
     });
 })();

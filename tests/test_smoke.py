@@ -342,11 +342,14 @@ async def fold_keyword_basic(page, msgs):
     await page.wait_for_timeout(400)
 
     # The gutter shows one fold marker per block opener (IF and FOR).
+    # (The fold gutter also renders a visibility:hidden spacer row with the
+    # same "Unfold line" title; it is excluded via the inline-style filter.)
     markers = page.locator(
         '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement span[title="Fold line"]')
     await markers.first.wait_for(state='attached', timeout=10000)
     assert await markers.count() >= 2, \
         f'IF and FOR lines must be foldable, got {await markers.count()} markers'
+    before = await h.doc_text(page)
 
     # Ctrl-Shift-[ collapses the block whose body the cursor sits in (fold
     # ranges start right after the opener keyword, keeping that line visible).
@@ -355,20 +358,17 @@ async def fold_keyword_basic(page, msgs):
     await page.keyboard.press('Control+Shift+[')
     await page.wait_for_function("""() =>
         document.querySelectorAll(
-            '.wb-editor-slot:not(.wb-editor-hidden) .cm-gutterElement span[title="Unfold line"]').length >= 1""")
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement' +
+            ':not([style*="visibility"]) span[title="Unfold line"]').length >= 1""")
+    assert await h.doc_text(page) == before
 
-    # Ctrl-Shift-] unfolds again; the cursor now sits on the opener line.
-    # (CodeMirror styles some closed gutter markers with visibility:hidden,
-    # so drive the last one - the fold-start block - with a real click.)
-    await page.evaluate("""() => {
-        const marks = document.querySelectorAll(
-            '.wb-editor-slot:not(.wb-editor-hidden) .cm-gutterElement span[title="Unfold line"]');
-        marks[marks.length - 1].dispatchEvent(
-            new MouseEvent('click', {bubbles: true, cancelable: true}));
-    }""")
+    # Ctrl-Shift-] unfolds again; the cursor sits on the opener line.
+    await page.keyboard.press('Control+Shift+]')
     await page.wait_for_function("""() =>
         document.querySelectorAll(
-            '.wb-editor-slot:not(.wb-editor-hidden) .cm-gutterElement span[title="Unfold line"]').length === 0""")
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement' +
+            ':not([style*="visibility"]) span[title="Unfold line"]').length === 0""")
+    assert await h.doc_text(page) == before
 
     # Text files have no block structure: no fold markers at all.
     await h.set_language(page, 'Text')
@@ -391,11 +391,21 @@ async def fold_keyword_c(page, msgs):
         '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement span[title="Fold line"]')
     await open_marker.first.wait_for(state='attached', timeout=10000)
     before = await h.doc_text(page)
-    # Clicking the gutter marker folds the block.
-    await open_marker.first.click()
+    # The C fold key folds the block that opens with the brace on the
+    # brace line, so fold ranges start right after the '{'.
+    # Ctrl-Shift-[ on the brace line folds, Ctrl-Shift-] unfolds.
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('Control+Shift+[')
     await page.wait_for_function("""() =>
         document.querySelectorAll(
-            '.wb-editor-slot:not(.wb-editor-hidden) .cm-gutterElement span[title="Unfold line"]').length >= 1""")
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement' +
+            ':not([style*="visibility"]) span[title="Unfold line"]').length >= 1""")
+    assert await h.doc_text(page) == before
+    await page.keyboard.press('Control+Shift+]')
+    await page.wait_for_function("""() =>
+        document.querySelectorAll(
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement' +
+            ':not([style*="visibility"]) span[title="Unfold line"]').length === 0""")
     assert await h.doc_text(page) == before
     assert msgs == []
 

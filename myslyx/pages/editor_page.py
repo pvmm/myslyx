@@ -863,6 +863,8 @@ def editor_page() -> None:
                         {'keys': 'Ctrl+-', 'action': 'Decrease font size'},
                         {'keys': 'Ctrl+Space', 'action': 'Open SETTINGS menu'},
                         {'keys': 'Ctrl+/', 'action': 'Toggle comment (HitBasic, Pascal, C)'},
+                        {'keys': 'Ctrl+Shift+[', 'action': 'Fold block'},
+                        {'keys': 'Ctrl+Shift+]', 'action': 'Unfold block'},
                         {'keys': 'F1', 'action': 'Open shortcuts window'},
                         {'keys': 'F2', 'action': 'Reload hints root page'},
                         {'keys': 'F5', 'action': 'Refresh editor'},
