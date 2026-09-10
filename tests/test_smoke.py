@@ -183,7 +183,7 @@ async def hints_root_page(page, msgs):
 
 
 async def settings_menu_keyboard(page, msgs):
-    # Ctrl+Space opens and closes the SETTINGS menu; arrows move the focus.
+    # Ctrl+, opens and closes the SETTINGS menu; arrows move the focus.
     await page.locator('#wb-settings-btn').wait_for(state='visible', timeout=10000)
     async def menu_open():
         return await page.evaluate("""() => {
@@ -196,7 +196,7 @@ async def settings_menu_keyboard(page, msgs):
             return !!a && a.classList && a.classList.contains('cm-content');
         }""")
     assert not await menu_open(), 'menu starts closed'
-    await page.keyboard.press('Control+Space')
+    await page.keyboard.press('Control+,')
     await page.wait_for_function("""
         () => { const m = document.getElementById('wb-settings-menu');
                 return !!m && m.style.display !== 'none'; }
@@ -217,14 +217,14 @@ async def settings_menu_keyboard(page, msgs):
             : false;
     }""")
     assert moved, 'ArrowUp must move focus to the last settings row'
-    # Escape closes and restores the editor focus; Ctrl+Space re-opens.
+    # Escape closes and restores the editor focus; Ctrl+, re-opens.
     await page.keyboard.press('Escape')
     assert not await menu_open(), 'Escape must close the menu'
     await page.wait_for_function("""() => {
         const a = document.activeElement;
         return !!a && a.classList && a.classList.contains('cm-content');
     }""")
-    await page.keyboard.press('Control+Space')
+    await page.keyboard.press('Control+,')
     await page.wait_for_function("""
         () => { const m = document.getElementById('wb-settings-menu');
                 return !!m && m.style.display !== 'none'; }

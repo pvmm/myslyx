@@ -273,9 +273,10 @@
                     }
                 });
 
-                // Ctrl+Space opens/closes the SETTINGS menu from anywhere.
+                // Ctrl+, opens/closes the SETTINGS menu from anywhere
+                // (Ctrl+Space belongs to the editor's autocompletion).
                 document.addEventListener('keydown', function(ev) {
-                    if ((ev.ctrlKey || ev.metaKey) && (ev.key === ' ' || ev.code === 'Space')) {
+                    if ((ev.ctrlKey || ev.metaKey) && (ev.key === ',' || ev.code === 'Comma')) {
                         ev.preventDefault();
                         if (menu.style.display === 'block') close(); else open();
                     }
