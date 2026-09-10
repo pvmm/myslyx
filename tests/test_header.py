@@ -66,8 +66,44 @@ async def plugins_submenu_lists_plugins(page, msgs):
     assert msgs == []
 
 
+async def plugin_toggle_preserves_file_pool(page, msgs):
+    # Regression: toggling a plugin in the Settings menu schedules a page
+    # reload, and that reload must NOT wipe the user's file pool (it used to
+    # get replaced with a fresh STARTUP starter on every reload).
+    await h.new_file(page, 2)
+    name = await h.active_tab_name(page)
+    assert name, 'expected a writable active file after NEW FILE'
+    await h.active_cm(page).click()
+    await page.keyboard.type('PRINT 42')
+    await page.wait_for_timeout(400)
+    # Open the settings menu and the PLUGINS submenu so the plugin rows exist.
+    btn = page.locator('#wb-settings-btn')
+    await btn.wait_for(state='visible', timeout=10000)
+    await btn.click()
+    await page.wait_for_timeout(500)
+    await page.click('#wb-settings-plugins')
+    await page.wait_for_timeout(500)
+    # Toggle the first plugin row; the change handler persists config and
+    # reloads the page after ~300ms.
+    async with page.expect_navigation(wait_until='load'):
+        await page.evaluate("""() => {
+            const cb = document.querySelector('.wb-plugin-check');
+            cb.checked = !cb.checked;
+            cb.dispatchEvent(new Event('change', {bubbles: true}));
+        }""")
+    # The editor comes back once the storage sync bridge hands the pool over.
+    await page.wait_for_selector('.wb-file-tab', timeout=20000)
+    await page.wait_for_timeout(1500)
+    tabs = await page.evaluate("""() => Array.from(
+        document.querySelectorAll('.wb-file-tab .file-name')).map(n => n.textContent)""")
+    assert name in tabs, f'created file vanished after plugin toggle: {tabs}'
+    assert await h.doc_text(page) == 'PRINT 42', 'doc content lost after plugin toggle'
+    assert msgs == []
+
+
 HEADER_SUITES = [
     ('header/favicon-background', favicon_button),
     ('header/settings-menu-opens', settings_menu_opens),
     ('header/plugins-submenu', plugins_submenu_lists_plugins),
+    ('header/plugin-toggle-preserves-files', plugin_toggle_preserves_file_pool),
 ]

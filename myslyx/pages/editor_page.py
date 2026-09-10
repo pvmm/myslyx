@@ -770,9 +770,15 @@ def editor_page() -> None:
 
     def _init() -> None:
         ui.run_javascript('window.WBEditorBoot.run();')
-        # Fallback: call storage loader without client result; client storage will
-        # be used by client-side code and saved back to server on changes.
-        _on_storage_loaded(None)
+        # Ask the client to push its localStorage file pool back to the server
+        # so server state matches what the browser owns.  The bridge (below)
+        # forwards it into _on_storage_loaded.  This keeps a user's files
+        # intact across reloads (e.g. toggling a plugin in the Settings menu)
+        # instead of overwriting them with a fresh starter file.
+        ui.run_javascript(
+            "const el = document.getElementById('wb-storage-sync-bridge');"
+            "if (el) el.dispatchEvent(new CustomEvent('wb-storage-sync', { detail: {} }));"
+        )
         ui.run_javascript('window.WBEditorKeyboard.install();')
         ui.run_javascript('window.WBSettingsMenu.install();')
 
@@ -840,7 +846,38 @@ def editor_page() -> None:
         # newly created starter file remains available on subsequent loads.
         _save_to_storage()
 
+    # Hidden bridge for client->server file pool sync.  The client owns the
+    # source of truth (localStorage); on page load it pushes its pool here so
+    # the server adopts it.  Mirrors the wb-open-bridge pattern above.
+    _storage_sync_done = {'done': False}
+
+    def _on_storage_sync(e) -> None:
+        if _storage_sync_done['done']:
+            return
+        _storage_sync_done['done'] = True
+        _on_storage_loaded(e.args)
+
+    ui.element('div').props('id=wb-storage-sync-bridge').style('display:none;').on(
+        'wb-storage-sync',
+        _on_storage_sync,
+        js_handler=(
+            "() => { try { const fs = WBStorage.loadFiles(); "
+            "const act = WBStorage.loadActive(); "
+            "emit(fs && fs.length ? JSON.stringify({files: fs, active: act}) : null); } "
+            "catch(e) { emit(null); } }"
+        ),
+    )
+
     ui.timer(0.8, _init, once=True)
+
+    # Safety net: if the bridge never fires (e.g. client storage broken),
+    # fall back to the previous behavior of creating the README starter file.
+    def _storage_sync_fallback() -> None:
+        if not _storage_sync_done['done']:
+            _storage_sync_done['done'] = True
+            _on_storage_loaded(None)
+
+    ui.timer(2.5, _storage_sync_fallback, once=True)
 
     # ===== Shortcuts dialog =====
     shortcut_dialog = ui.dialog()

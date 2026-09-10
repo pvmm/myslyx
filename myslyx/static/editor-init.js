@@ -19,9 +19,6 @@
                              'wb_editor_font', 'wb_editor_font_size']
                                 .forEach(k => localStorage.removeItem(k));
                         } catch(e) {}
-                        if (window.__wbPyBridge && window.__wbPyBridge.initDefaults) {
-                            window.__wbPyBridge.initDefaults();
-                        }
                         localStorage.setItem(SCHEMA_KEY, SCHEMA_VERSION);
                         var reloadNow = function() {
                             try {
@@ -55,23 +52,21 @@
                     } catch(e) {}
                 } catch(e) {}
 
-                // If schema changed or missing, reinitialize client storage.
+                // Ensure the schema marker is set, but do NOT pre-seed the
+                // file pool here.  Empty storage is left alone: once the page
+                // connects, the server pushes the pool back through the
+                // storage sync bridge and installs the read-only STARTUP
+                // starter when there are no files.  Pre-seeding here made
+                // every reload (e.g. toggling a plugin in the Settings menu)
+                // report the client defaults, and following that up by
+                // overwriting the pool wiped the user's files with a starter.
                 if (localStorage.getItem(SCHEMA_KEY) !== SCHEMA_VERSION) {
-                    try {
-                        if (window.__wbPyBridge && window.__wbPyBridge.initDefaults) {
-                            window.__wbPyBridge.initDefaults();
-                        }
-                    } catch(e) {}
                     localStorage.setItem(SCHEMA_KEY, SCHEMA_VERSION);
-                } else {
-                    if (window.__wbPyBridge && !window.__wbPyBridge.hasFiles()) {
-                        window.__wbPyBridge.initDefaults();
-                    }
                 }
             } catch(e) {}
 
-            // Do not rely on server-side callback here; storage will be read
-            // when the client interacts or on subsequent syncs.
+            // The file pool is synced to the server via the storage sync
+            // bridge once the page connects.
 
             function importFile(file, content, lang) {
                 try {

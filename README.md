@@ -11,6 +11,10 @@ Features
 - Wrap around, code completion and code folding
 - Undo/redo, rename, delete, save, download/upload, drag-and-drop import
 
+Privacy & storage
+- Your files persist in the browser's localStorage. To render the editor, the page mirrors the active pool into the running server session (memory only), but the server never stores your files — there is no database or on-disk backend.
+- Running Myslyx yourself (see "Running" above) keeps everything on your own machine.
+
 Requirements
 - Python 3.10+
 

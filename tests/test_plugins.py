@@ -167,7 +167,10 @@ async def plugin_lazy_disabled_by_default(page, msgs):
     }""")
     await page.reload(wait_until='load')
     await page.wait_for_timeout(2500)
-    await h.new_file(page, 2)
+    # Reloads preserve the pool, so base the expected tab count on the actual
+    # number instead of assuming a fresh reset.
+    n = await page.evaluate("document.querySelectorAll('.wb-file-tab').length")
+    await h.new_file(page, n + 1)
     await page.keyboard.type('#00ff00')
     await page.wait_for_timeout(900)
     colors = await _render_state(page)
@@ -182,7 +185,8 @@ async def plugin_lazy_disabled_by_default(page, msgs):
     }""")
     await page.reload(wait_until='load')
     await page.wait_for_timeout(2500)
-    await h.new_file(page, 2)
+    n = await page.evaluate("document.querySelectorAll('.wb-file-tab').length")
+    await h.new_file(page, n + 1)
     await page.keyboard.type('#00ff00')
     await page.wait_for_timeout(900)
     colors = await _render_state(page)
