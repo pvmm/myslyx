@@ -12,9 +12,11 @@ in `static/retro.js` and rendered by `static/hints.js` (markdown via
 | Language          | Hint file             |
 |-------------------|-----------------------|
 | `HitBasic` (BASIC) | `basic.json`          |
+| `C`               | `c.json`              |
+| `Pascal`          | `pascal.json`         |
 | `Text`            | `plaintext.json`      |
 
-Any unrecognized language falls back to `plaintext`.
+Any unrecognized language (`Z80`, etc.) falls back to `plaintext`.
 
 ## Schema
 

@@ -48,8 +48,8 @@ def _canonical_lang(lang: str | None) -> str | None:
 # static/hints/<key>.json). Unknown languages fall back to plain text.
 HINT_KEYS: dict[str, str] = {
     'HitBasic': 'basic',
-    'Pascal': 'plaintext',
-    'C': 'plaintext',
+    'Pascal': 'pascal',
+    'C': 'c',
     'Z80': 'plaintext',
     'Text': 'plaintext',
 }

@@ -438,19 +438,19 @@ async def lang_combo_tracks_active_file(page, msgs):
     assert msgs == []
 
 
-async def hints_plaintext_for_c_pascal(page, msgs):
-    # C and Pascal have no hint dictionary; the HINTS panel must show the
-    # plain-text root page while such a file is displayed.
+async def hints_c_pascal_root_pages(page, msgs):
+    # C and Pascal have their own hint dictionaries; the HINTS panel must show
+    # each language's root page when such a file is displayed.
     await h.new_file(page, 2)
     await h.set_language(page, 'Pascal')
     await page.wait_for_function("""() => {
-        const t = document.querySelector('#hints-content .hint-text');
-        return !!t && t.textContent.indexOf('Plain Text') !== -1;
+        const h = document.querySelector('#hints-content .hint-text h1');
+        return !!h && h.textContent.trim() === 'Pascal';
     }""")
     await h.set_language(page, 'C')
     await page.wait_for_function("""() => {
-        const t = document.querySelector('#hints-content .hint-text');
-        return !!t && t.textContent.indexOf('Plain Text') !== -1;
+        const h = document.querySelector('#hints-content .hint-text h1');
+        return !!h && h.textContent.trim() === 'C';
     }""")
     assert msgs == []
 
@@ -610,7 +610,7 @@ SMOKE_SUITES = [
     ('smoke/fold-keyword-basic', fold_keyword_basic),
     ('smoke/fold-keyword-c', fold_keyword_c),
     ('smoke/lang-combo-tracks-file', lang_combo_tracks_active_file),
-    ('smoke/hints-plaintext-c-pascal', hints_plaintext_for_c_pascal),
+    ('smoke/hints-c-pascal-root', hints_c_pascal_root_pages),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
     ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),
     ('smoke/shortcuts-toolbar-actions', shortcuts_toolbar_actions),

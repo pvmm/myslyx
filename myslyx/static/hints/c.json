@@ -1,0 +1,38 @@
+{
+  "root": "# C\n\nC99-ish reference for this editor.\n\n- `printf`/`scanf` I/O and format strings\n- `if`/`else`, `for`, `while`, `switch` control flow\n- `struct`, `enum`, `typedef` types\n- `malloc`/`free` heap memory\n\nPress **F2** to return here.",
+  "keywords": [
+    "auto", "break", "case", "char", "const", "continue", "default",
+    "do", "double", "else", "enum", "extern", "float", "for", "goto",
+    "if", "inline", "int", "long", "register", "restrict", "return",
+    "short", "signed", "sizeof", "static", "struct", "switch",
+    "typedef", "union", "unsigned", "void", "volatile", "while"
+  ],
+  "builtins": [
+    "printf", "scanf", "sprintf", "snprintf", "fprintf", "puts", "putchar",
+    "getchar", "gets", "fopen", "fclose", "fgets", "fputs", "fread", "fwrite",
+    "malloc", "calloc", "realloc", "free", "memcpy", "memset", "strlen",
+    "strcpy", "strncpy", "strcat", "strcmp", "strchr", "strstr",
+    "atoi", "atof", "strtol", "abs", "rand", "srand", "exit", "time", "clock"
+  ],
+  "tips": {
+    "PRINTF": "Formatted output: `printf(\"value = %d\\n\", x);`\nSpecifiers: `%d` int, `%f` double, `%s` string, `%c` char.\nA literal `%` is written as `%%`.",
+    "SCANF": "Read formatted input: `scanf(\"%d\", &x);`\nScalars need an address (`&`); arrays and strings are passed as-is.",
+    "FOR": "Loop:\n\n```c\nfor (int i = 0; i < 10; i++) {\n    printf(\"%d\\n\", i);\n}\n```",
+    "IF": "Conditional:\n\n```c\nif (x > 5) {\n    puts(\"big\");\n} else {\n    puts(\"small\");\n}\n```",
+    "WHILE": "Loop:\n\n```c\nwhile (running) {\n    step();\n}\n```\nTest happens before each iteration.",
+    "SWITCH": "Branch on a value:\n\n```c\nswitch (c) {\n    case 'a': ...; break;\n    default: ...;\n}\n```\nEach `case` needs a `break` unless you want fall-through.",
+    "STRUCT": "Composite type:\n\n```c\nstruct point { int x; int y; };\n```\nAccess fields with `.` or `->`.",
+    "MALLOC": "Heap allocation: `int* p = malloc(sizeof(int));`\nAlways check for NULL and pair with `free(p);`.",
+    "FREE": "Release heap memory: `free(p);`\nOnly free what `malloc`/`calloc`/`realloc` returned, and only once.",
+    "TYPEDEF": "Alias a type: `typedef unsigned int u32;`",
+    "RETURN": "Exit a function: `return expr;`\n`main` returns 0 to signal success.",
+    "EXIT": "Terminate the program immediately: `exit(0);`\nFlushes buffers; 0 means success."
+  },
+  "patterns": [
+    { "re": "#include\\s*[<\"]\\s*\\w+\\.h", "tip": "Header include: `#include <stdio.h>` for printf/scanf, `<string.h>` for string helpers, `<stdlib.h>` for malloc/atoi." },
+    { "re": "\\bfor\\s*\\(", "tip": "A `for` must have three parts: init; condition; increment." },
+    { "re": "\\bprintf\\s*\\(", "tip": "End printf formats with `\\n`; use `%d` for int, `%f` for double, `%s` for strings." },
+    { "re": "\\bmalloc\\s*\\(", "tip": "`malloc` needs a matching `free` somewhere in the same scope." },
+    { "re": "\\bgets\\s*\\(", "tip": "`gets` is unsafe (no bounds). Use `fgets(buf, sizeof(buf), stdin)`." }
+  ]
+}

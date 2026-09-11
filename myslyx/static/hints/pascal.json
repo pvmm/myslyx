@@ -1,0 +1,42 @@
+{
+  "root": "# Pascal\n\nTurbo Pascal-style reference for this editor.\n\n- `program` name and `uses` units\n- `var`, `const`, `type` declarations\n- `begin`/`end`, `if`/`then`/`else`, `case`\n- `for`, `while`, `repeat` loops\n- `function`/`procedure` subroutines\n- `write`/`writeln` output, `read`/`readln` input\n\nPress **F2** to return here.",
+  "keywords": [
+    "program", "uses", "const", "type", "var", "label", "forward",
+    "function", "procedure", "begin", "end", "if", "then", "else",
+    "case", "of", "while", "do", "repeat", "until", "for", "to",
+    "downto", "goto", "with", "and", "or", "not", "div", "mod",
+    "xor", "shl", "shr", "in", "array", "record", "set", "file",
+    "nil", "write", "writeln", "read", "readln", "external"
+  ],
+  "builtins": [
+    "string", "integer", "real", "boolean", "char", "byte", "word", "longint",
+    "abs", "sqr", "sqrt", "sin", "cos", "arctan", "exp", "ln", "round",
+    "trunc", "odd", "succ", "pred", "ord", "chr", "upcase", "lowcase",
+    "length", "copy", "concat", "pos", "val", "str", "inc", "dec",
+    "random", "randomize", "eof", "eoln", "new", "dispose", "get", "put",
+    "halt", "exit"
+  ],
+  "tips": {
+    "WRITELN": "Output a line: `writeln('HELLO');`\nArguments are space-separated: `writeln('x = ', x);`",
+    "WRITE": "Output without a newline: `write('Loading...');`\nUse `writeln` to end the line.",
+    "READLN": "Read a line of input: `readln(NAME);`\nString variables take text; `readln` waits for Return.",
+    "BEGIN": "`begin ... end` groups statements (like `{ }` in C).",
+    "IF": "Conditional:\n\n```pascal\nif x > 5 then\n    writeln('big')\nelse\n    writeln('small');\n```\nMulti-statement bodies need `begin ... end`.",
+    "FOR": "Loop:\n\n```pascal\nfor i := 1 to 10 do\n    writeln(i);\n```\nCount downwards with `down to`.",
+    "WHILE": "Loop:\n\n```pascal\nwhile x < 100 do\nbegin\n    x := x * 2;\nend;\n```",
+    "REPEAT": "Loop: `repeat ... until cond;`\nAlways runs at least once and tests at the end.",
+    "CASE": "Branch on a value:\n\n```pascal\ncase n of\n  1: writeln('one');\n  2: writeln('two');\nelse writeln('other');\nend;\n```",
+    "VAR": "Declare variables: `var x: integer;`\nDeclarations go in the `var` block before the first `begin`.",
+    "CONST": "Named constant: `const PI = 3.14;`\nImmutable once assigned.",
+    "FUNCTION": "Subroutine returning a value:\n\n```pascal\nfunction Double(n: integer): integer;\nbegin\n    Double := n * 2;\nend;\n```",
+    "PROCEDURE": "Subroutine with no return value:\n\n```pascal\nprocedure Greet;\nbegin\n    writeln('Hello');\nend;\n```",
+    "USES": "Pull in units: `uses Crt;`\n`Crt` provides cursor and keyboard helpers.",
+    "ARRAY": "Fixed-size list: `var a: array[1..10] of integer;`\nIndex with square brackets: `a[3] := 7;`"
+  },
+  "patterns": [
+    { "re": "\\bprogram\\s+\\w+", "tip": "Every program starts `program name;` then `uses`/`var` blocks and a final `begin` ... `end.`" },
+    { "re": "\\bfor\\s+\\w+\\s*:=", "tip": "A `for` needs `:=` for the start value, `to`/`downto`, and a final `do`." },
+    { "re": "\\bif\\s+.*\\bthen", "tip": "`if cond then` — wrap multi-statement bodies in `begin ... end`." },
+    { "re": "\\bwriteln\\s*\\(", "tip": "`writeln` formats each argument space-separated: `writeln(a, ' ', b);`" }
+  ]
+}
