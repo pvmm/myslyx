@@ -339,10 +339,12 @@
     var popup = null;
     var popupItems = [];
     var popupIndex = 0;
+    var popupMatches = [];
 
     function removePopup() {
         if (popup) { popup.remove(); popup = null; }
         popupItems = [];
+        popupMatches = [];
         popupIndex = 0;
     }
 
@@ -387,6 +389,7 @@
             popup.appendChild(item);
             popupItems.push(item);
         });
+        popupMatches = matches;
 
         document.body.appendChild(popup);
         var coords = view.coordsAtPos(pos);
@@ -497,15 +500,24 @@
                     ])
                 });
 
-                // Keyboard navigation for the popup, and close on blur.
+                // Keyboard navigation for the popup, and close on blur. The
+                // listener uses the capture phase so it runs before CodeMirror
+                // handles Enter/Tab/arrows (otherwise a newline slips in before
+                // the completion is inserted).
                 active.contentDOM.addEventListener('keydown', function(e) {
                     if (!popup) return;
-                    if (e.key === 'ArrowDown') { e.preventDefault(); movePopup(1); }
-                    else if (e.key === 'ArrowUp') { e.preventDefault(); movePopup(-1); }
-                    else if (e.key === 'Enter' || e.key === 'Tab') {
-                        if (popupItems.length > 0) { e.preventDefault(); insertCompletion(popupItems[popupIndex]); }
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault(); e.stopPropagation(); movePopup(1);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault(); e.stopPropagation(); movePopup(-1);
+                    } else if (e.key === 'Enter' || e.key === 'Tab') {
+                        if (popupItems.length > 0) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            insertCompletion(popupMatches[popupIndex]);
+                        }
                     } else if (e.key === 'Escape') { removePopup(); }
-                });
+                }, true);
                 active.contentDOM.addEventListener('blur', function() {
                     setTimeout(removePopup, 150);
                 });

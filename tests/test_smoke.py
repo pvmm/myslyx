@@ -455,6 +455,24 @@ async def hints_plaintext_for_c_pascal(page, msgs):
     assert msgs == []
 
 
+async def autocomplete_enter_completes(page, msgs):
+    # Enter in the autocompletion popup must insert the selected completion
+    # (replacing the typed prefix) without leaving a stray newline.
+    await h.new_file(page, 2)
+    await h.active_cm(page).click()
+    await page.keyboard.type('PRI')
+    await page.wait_for_selector('.wb-autocomplete-popup', timeout=5000)
+    await page.keyboard.press('Enter')
+    await page.wait_for_function("""() => new Promise(res => {
+        try {
+            const el = getElement(window.__wbEditorId);
+            el.editorPromise.then(v => res(v.state.doc.toString() === 'PRINT'));
+        } catch(e) { res(false); }
+    })""")
+    assert await h.doc_text(page) == 'PRINT', 'Enter must complete the word, not insert a newline'
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -471,4 +489,5 @@ SMOKE_SUITES = [
     ('smoke/fold-keyword-c', fold_keyword_c),
     ('smoke/lang-combo-tracks-file', lang_combo_tracks_active_file),
     ('smoke/hints-plaintext-c-pascal', hints_plaintext_for_c_pascal),
+    ('smoke/autocomplete-enter', autocomplete_enter_completes),
 ]
