@@ -845,7 +845,8 @@ html, body {
     background: var(--wb-white);
 }
 
-.wb-plugin-row:hover {
+.wb-plugin-row:hover,
+.wb-plugin-row.keyboard {
     background: var(--wb-orange);
     color: var(--wb-white);
 }

@@ -497,11 +497,23 @@ async def plugins_submenu_keyboard_nav(page, msgs):
         const k = document.querySelector('#wb-plugins-menu .wb-plugin-row.keyboard');
         return !!k;
     }""")
+    # The keyboard-focused plugin row must show the same orange highlight as
+    # a mouse hover (the .keyboard class needs matching CSS).
+    await page.wait_for_function("""() => {
+        const k = document.querySelector('#wb-plugins-menu .wb-plugin-row.keyboard');
+        if (!k) return false;
+        const c = getComputedStyle(k).backgroundColor;
+        return c === 'rgb(255, 136, 0)' || c === '#ff8800';
+    }""")
     # ArrowDown moves within the plugin rows (still exactly one focused).
     await page.keyboard.press('ArrowDown')
     n_focused = await page.evaluate("""() =>
         document.querySelectorAll('#wb-plugins-menu .wb-plugin-row.keyboard').length""")
     assert n_focused == 1, 'expected exactly one focused plugin row'
+    await page.wait_for_function("""() => {
+        const k = document.querySelector('#wb-plugins-menu .wb-plugin-row.keyboard');
+        return !!k && getComputedStyle(k).backgroundColor === 'rgb(255, 136, 0)';
+    }""")
     # ArrowLeft returns to the main menu with PLUGINS refocused.
     await page.keyboard.press('ArrowLeft')
     await page.wait_for_function("""() => {
