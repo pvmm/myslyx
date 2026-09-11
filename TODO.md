@@ -1,6 +1,6 @@
 # higher priority (one commit per entry, update this document when done)
 - [x] Update LANG combo box according to the current visible file on the text editor.
-- [x] The HINTS window display "Plain text" when a C or Pascal file is displayed in the text editor.
+- [x] Show a distinct HINTS root page for each language; C and Pascal now have their own hint dictionaries.
 - [x] Pressing enter in the autocompletion context menu doesn't select that option and write it on the text editor component.
 - [x] Pressing enter or right arrow when over the PLUGIN submenu in the favicon menu doesn't send the cursor to the submenu. The cursor still moves around in the same menu section.
 - [x] Create a short cut for "EXPORT SYMBOLS ON/OFF" that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
