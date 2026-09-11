@@ -108,8 +108,7 @@ async def drag_drop_bridge(page, msgs):
         document.dispatchEvent(ev);
     }""")
     await page.wait_for_function(f"document.querySelectorAll('.wb-file-tab').length === {before + 1}")
-    await page.wait_for_timeout(800)
-    assert await h.doc_text(page) == 'DEMO CONTENT\nX', 'imported file content must load'
+    await h.doc_equals(page, 'DEMO CONTENT\nX')
     assert await h.tab_by_name(page, 'demo').count() == 1, 'exactly ONE dock tab for the import'
     assert await h.visible_editors(page) == 1
     assert _console_errors(msgs) == []

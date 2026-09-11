@@ -19,20 +19,33 @@ async def visible_editors(page):
 
 
 async def open_settings(page):
-    """Open the settings menu (favicon button) and wait for it to settle.
+    """Open the settings menu (favicon button) and wait until it is shown.
 
-    Clicking the button toggles the menu, so only click when it is closed.
+    Polls the menu's display state instead of sleeping a fixed amount. The
+    button toggles the menu, so only click it when the menu is closed.
     """
-    for _ in range(3):
-        is_open = await page.evaluate("""() => {
-            const m = document.getElementById('wb-settings-menu');
-            return !!m && m.style.display !== 'none';
-        }""")
-        if is_open:
-            break
+    is_open = await page.evaluate("""() => {
+        const m = document.getElementById('wb-settings-menu');
+        return !!m && m.style.display === 'block';
+    }""")
+    if not is_open:
         await page.click('#wb-settings-btn')
-        await page.wait_for_timeout(300)
-    await page.wait_for_timeout(300)
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-settings-menu');
+        return !!m && m.style.display === 'block';
+    }""", timeout=10000)
+
+
+async def wait_for_settings_value(page, row_id, value, timeout=10000):
+    """Poll until the settings row ``row_id`` acks ``value`` as applied.
+
+    The rows stamp a machine-readable data-value ack synchronously when they
+    applying config to every editor, so consumers observe the settled state
+    instead of sleeping a fixed amount and guessing.
+    """
+    await page.wait_for_function(
+        f"document.getElementById('{row_id}')?.dataset.value === '{value}'",
+        timeout=timeout)
 
 
 async def set_language(page, label):

@@ -80,6 +80,10 @@
                     // open-flyout highlight. Wrap state shows in the value.
                     wrapValue.classList.toggle('on', on);
                     wrapValue.textContent = on ? 'ON' : 'OFF';
+                    // Machine-readable ack on the row so the applied state can
+                    // be polled instead of guessed after a fixed delay.
+                    wrapRow.dataset.value = on ? 'ON' : 'OFF';
+                    document.body.dataset.wbWrap = on ? 'on' : 'off';
                 }
                 wrapRow.addEventListener('click', function(ev) {
                     ev.stopPropagation();
@@ -129,6 +133,9 @@
                     });
                     ligatureValue.classList.toggle('on', on);
                     ligatureValue.textContent = on ? 'ON' : 'OFF';
+                    // Machine-readable ack on the row (see applyWrap above).
+                    ligatureRow.dataset.value = on ? 'ON' : 'OFF';
+                    document.body.dataset.wbLigatures = on ? 'on' : 'off';
                 }
                 ligatureRow.addEventListener('click', function(ev) {
                     ev.stopPropagation();

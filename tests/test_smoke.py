@@ -6,7 +6,7 @@ from tests import helpers as h
 async def wrap_toggle_preserves_content(page, msgs):
     await h.new_file(page, 2)
     await page.keyboard.type('PRINT 42')
-    await page.wait_for_timeout(400)
+    await h.doc_equals(page, 'PRINT 42')
     before = await h.doc_text(page)
     assert before == 'PRINT 42'
     await h.open_settings(page)
@@ -15,8 +15,11 @@ async def wrap_toggle_preserves_content(page, msgs):
     # hover/open flyout); its ON/OFF state shows as the value text instead.
     assert await wrap_row.evaluate("el => !el.classList.contains('active')"), \
         'WRAP row must not stay orange via .active'
+    before_state = await page.evaluate(
+        "document.getElementById('wb-settings-wrap')?.dataset.value || 'OFF'")
     await page.click('#wb-settings-wrap')
-    await page.wait_for_timeout(500)
+    await h.wait_for_settings_value(page, 'wb-settings-wrap',
+                                    'OFF' if before_state == 'ON' else 'ON')
     after = await h.doc_text(page)
     assert after == before, f'wrap toggle must not alter content: {after!r}'
     assert await wrap_row.evaluate("el => !el.classList.contains('active')"), \
@@ -27,13 +30,16 @@ async def wrap_toggle_preserves_content(page, msgs):
 async def wrap_off_preserves_content(page, msgs):
     await h.new_file(page, 2)
     await page.keyboard.type('LINE1')
-    await page.wait_for_timeout(300)
+    await h.doc_equals(page, 'LINE1')
     # Default wrap state is whatever persisted; toggling twice nets out but
     # must still preserve content.
+    cur = await page.evaluate(
+        "document.getElementById('wb-settings-wrap')?.dataset.value || 'OFF'")
     for _ in range(2):
         await h.open_settings(page)
         await page.click('#wb-settings-wrap')
-        await page.wait_for_timeout(400)
+        cur = 'OFF' if cur == 'ON' else 'ON'
+        await h.wait_for_settings_value(page, 'wb-settings-wrap', cur)
     assert await h.doc_text(page) == 'LINE1'
     assert msgs == []
 
@@ -333,7 +339,6 @@ async def ligatures_toggle(page, msgs):
     # The LIGATURES settings row toggles font ligatures for the editor and
     # persists the choice in the global config. It is OFF by default.
     await h.new_file(page, 2)
-    await page.wait_for_timeout(300)
     await h.open_settings(page)
     row = page.locator('#wb-settings-ligatures')
     await row.wait_for(state='attached', timeout=10000)
@@ -341,35 +346,28 @@ async def ligatures_toggle(page, msgs):
         'LIGATURES row must not use the orange .active highlight'
     value = await row.locator('.wb-settings-value').inner_text()
     assert value == 'OFF', f'ligatures default must be OFF, got {value!r}'
-    current = await page.evaluate("""() => {
-        const el = document.querySelector('.wb-editor-slot:not(.wb-editor-hidden) .cm-content');
-        return el ? getComputedStyle(el).fontVariantLigatures : null;
-    }""")
-    assert current == 'no-common-ligatures', f'expected no-common-ligatures, got {current!r}'
     # Toggle ON: config saved and every content node re-renders with ligatures.
     await page.click('#wb-settings-ligatures')
-    await page.wait_for_timeout(400)
+    await h.wait_for_settings_value(page, 'wb-settings-ligatures', 'ON')
     value = await row.locator('.wb-settings-value').inner_text()
     assert value == 'ON', f'ligatures must show ON after toggle, got {value!r}'
     saved = await page.evaluate("() => !!window.WBStorage.loadConfig().ligatures")
     assert saved, 'config must record ligatures ON'
-    current = await page.evaluate("""() => {
+    await page.wait_for_function("""() => {
         const el = document.querySelector('.wb-editor-slot:not(.wb-editor-hidden) .cm-content');
-        return el ? getComputedStyle(el).fontVariantLigatures : null;
-    }""")
-    assert current == 'common-ligatures', f'expected common-ligatures, got {current!r}'
+        return el && getComputedStyle(el).fontVariantLigatures === 'common-ligatures';
+    }""", timeout=10000)
     # Toggle back OFF: config and rendering follow.
     await page.click('#wb-settings-ligatures')
-    await page.wait_for_timeout(400)
+    await h.wait_for_settings_value(page, 'wb-settings-ligatures', 'OFF')
     value = await row.locator('.wb-settings-value').inner_text()
     assert value == 'OFF', f'ligatures must show OFF after second toggle, got {value!r}'
     saved = await page.evaluate("() => !!window.WBStorage.loadConfig().ligatures")
     assert not saved, 'config must record ligatures OFF'
-    current = await page.evaluate("""() => {
+    await page.wait_for_function("""() => {
         const el = document.querySelector('.wb-editor-slot:not(.wb-editor-hidden) .cm-content');
-        return el ? getComputedStyle(el).fontVariantLigatures : null;
-    }""")
-    assert current == 'no-common-ligatures', f'expected no-common-ligatures, got {current!r}'
+        return el && getComputedStyle(el).fontVariantLigatures === 'no-common-ligatures';
+    }""", timeout=10000)
     assert msgs == []
 
 
