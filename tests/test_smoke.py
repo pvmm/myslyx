@@ -260,6 +260,11 @@ async def f1_shortcuts_window(page, msgs):
         const d = document.querySelector('.wb-dialog.wb-shortcut-dialog');
         return !!d && Math.round(d.getBoundingClientRect().width) > 520;
     }""", timeout=10000)
+    # The first column ("Shortcut") is separated from "Action" by a grey line.
+    await page.wait_for_function("""() => {
+        const th = document.querySelector('.wb-shortcuts-table thead th:first-child');
+        return !!th && getComputedStyle(th).borderRightWidth === '1px';
+    }""")
     await page.keyboard.press('Escape')
     await page.wait_for_function("""() => {
         const t = document.querySelector('.wb-dialog .title-text');

@@ -928,6 +928,12 @@ html, body {
     background-color: var(--wb-blue);
 }
 
+/* Grey vertical line separating the Shortcut and Action columns */
+.wb-shortcuts-table thead th:first-child,
+.wb-shortcuts-table tbody td:first-child {
+    border-right: 1px solid #cccccc;
+}
+
 /* Favicon as text decoration – shows the favicon inside the element's text */
 .app-title {
     -webkit-background-clip: text;
