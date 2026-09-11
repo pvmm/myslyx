@@ -49,7 +49,7 @@ def home_page() -> None:
                     ui.element('br')
                     ui.html('© 2026 Pedro "pvm" Medeiros')
                     ui.label(
-                        'Your files persist in your browser (localStorage).\n'
+                        'Your files persist in your browser (local storage).\n'
                         'They are mirrored into the editor session to be shown\n'
                         'and completed, but the server never stores them.\n'
                         'Run Myslyx yourself and nothing leaves your machine.'
