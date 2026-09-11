@@ -2,10 +2,26 @@
 
 
 async def doc_text(page):
-    """Return the active editor's document as plain text (or None)."""
-    return await page.evaluate("""() => new Promise(res => {
-        try { const el = getElement(window.__wbEditorId); el.editorPromise.then(function(v){ res(v.state.doc.toString()); }); }
-        catch(e) { res(null); }
+    """Return the active editor's document as plain text (or None).
+
+    Polls until the active editor is actually mounted (up to 3s) so a read
+    racing the cold-boot mount can never return a stale None.
+    """
+    return await page.evaluate("""() => new Promise((res) => {
+        const deadline = Date.now() + 3000;
+        const tick = () => {
+            try {
+                const el = getElement(window.__wbEditorId);
+                if (el && el.editorPromise) {
+                    el.editorPromise.then(
+                        (v) => res(v.state.doc.toString()),
+                        () => (Date.now() < deadline ? setTimeout(tick, 50) : res(null)));
+                    return;
+                }
+            } catch (e) {}
+            if (Date.now() < deadline) setTimeout(tick, 50); else res(null);
+        };
+        tick();
     })""")
 
 
@@ -70,3 +86,45 @@ async def new_file(page, expected_tabs):
     await page.click('.wb-new-file')
     await page.wait_for_function(
         f"document.querySelectorAll('.wb-file-tab').length === {expected_tabs}")
+
+
+async def focus_active_editor(page):
+    """Click the active editor and wait until browser focus lands inside it."""
+    await active_cm(page).click()
+    await page.wait_for_function("""() => {
+        const a = document.activeElement;
+        return a && a.closest && a.closest('.wb-editor-slot:not(.wb-editor-hidden) .cm-editor');
+    }""")
+
+
+async def readonly_guard_ready(page):
+    """Wait until the read-only input guard is attached to the active editor."""
+    await page.wait_for_function("""() => {
+        const c = document.querySelector('.wb-editor-slot:not(.wb-editor-hidden) .cm-content');
+        return !!(c && c._wbReadOnlyHandler);
+    }""")
+
+
+async def doc_unchanged_for(page, expected, ms=400):
+    """Observation-window check: poll the active doc and return True if it
+    stayed equal to ``expected`` for the whole ``ms`` window, False if it
+    ever changed. Replaces the sleep-then-assert antipattern."""
+    return await page.evaluate(
+        """({expected, ms}) => new Promise((res) => {
+            const start = Date.now();
+            const read = () => {
+                const el = getElement(window.__wbEditorId);
+                return el && el.editorPromise
+                    ? el.editorPromise.then(v => v.state.doc.toString())
+                    : Promise.resolve(null);
+            };
+            const tick = () => {
+                read().then((v) => {
+                    if (v !== expected) return res(false);
+                    if (Date.now() - start >= ms) return res(true);
+                    setTimeout(tick, 40);
+                });
+            };
+            tick();
+        })""",
+        {"expected": expected, "ms": ms})

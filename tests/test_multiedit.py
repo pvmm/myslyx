@@ -16,13 +16,17 @@ async def readonly_startup(page, msgs):
     start_name = await h.active_tab_name(page)
     assert start_name == 'STARTUP', f'expected STARTUP active, got {start_name!r}'
     assert await h.visible_editors(page) == 1
-    assert await page.locator('#wb-undo-btn').is_disabled()
-    assert await page.locator('#wb-redo-btn').is_disabled()
+    await page.wait_for_function("""() => {
+        const u = document.getElementById('wb-undo-btn');
+        const r = document.getElementById('wb-redo-btn');
+        return !!(u && u.disabled && r && r.disabled);
+    }""")
     before = await h.doc_text(page)
-    await h.active_cm(page).click()
+    await h.focus_active_editor(page)
+    await h.readonly_guard_ready(page)
     await page.keyboard.type('Q')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == before, 'readonly STARTUP must not accept typing'
+    assert await h.doc_unchanged_for(page, before), \
+        'readonly STARTUP must not accept typing'
     assert _console_errors(msgs) == []
 
 
