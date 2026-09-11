@@ -6,6 +6,7 @@ Guidelines for agents
 - Follow the project's coding conventions: keep changes small and focused.
 - When editing UI code, prefer client-side handlers in `myslyx/pages/editor_page.py`'s `_init()` and use `ui.run_javascript()` rather than inline attributes.
 - For Python changes, run: `.venv/bin/python -m py_compile myslyx/pages/editor_page.py` before pushing.
+- For testing, always use the shared debug runner `./tests/debug_suite.py` (see the `run-myslyx-suites` skill). Never write ad-hoc Playwright scripts, start a server/browser by hand, or run `pkill -f firefox` — the runner cleans up after itself.
 - When adding features that affect the frontend, include minimal manual test steps and a browser check (hard refresh).
 - Always clean up after yourself: every server (e.g. `python main.py`, test-run myslyx instances) started for a session must be killed before the task is finished — they accumulate and hog machine resources. Close stray Playwright/`firefox 127.0.0.1` tabs left pointing at dead test ports too.
 
