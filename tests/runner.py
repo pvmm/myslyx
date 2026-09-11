@@ -47,6 +47,19 @@ def free_port() -> int:
         return s.getsockname()[1]
 
 
+def neutralize_display_env() -> None:
+    """Ensure browser children get no graphical display to connect to.
+
+    Firefox ignores ``-headless`` and pops a window whenever a reachable
+    ``DISPLAY`` / ``WAYLAND_DISPLAY`` is present, so unsetting them in this
+    process (Playwright hands the node driver's inherited environment to the
+    browser) makes the headless launch actually stay headless. Must run
+    before any ``async_playwright()`` context opens.
+    """
+    os.environ['DISPLAY'] = ''
+    os.environ['WAYLAND_DISPLAY'] = ''
+
+
 async def wait_for_server(port: int, timeout: float = 45.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -99,6 +112,7 @@ async def run_suite(browser, page, suite_name, fn, port):
 async def run_browser(browser_type: str, port: int) -> list:
     results = []
     async with async_playwright() as pw:
+        console.log(browser_type, p[browser_type].executable_path)
         browser = await pw[browser_type].launch(headless=True)
         try:
             for suite_name, fn in ALL_SUITES:
@@ -114,6 +128,7 @@ async def run_browser(browser_type: str, port: int) -> list:
 
 
 async def main() -> int:
+    neutralize_display_env()
     parser = argparse.ArgumentParser()
     parser.add_argument('-b', '--browsers', nargs='*', default=DEFAULT_BROWSERS)
     parser.add_argument('-p', '--port', type=int, default=0)

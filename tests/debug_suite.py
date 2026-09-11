@@ -9,7 +9,7 @@ import traceback
 
 from playwright.async_api import Browser, BrowserContext, async_playwright
 
-from tests.runner import ALL_SUITES, free_port, start_server, wait_for_server
+from tests.runner import ALL_SUITES, free_port, neutralize_display_env, start_server, wait_for_server
 
 DEFAULT_BROWSER = "chromium"
 
@@ -86,6 +86,7 @@ def _kill_orphan_test_browsers() -> None:
 
 
 async def main() -> int:
+    neutralize_display_env()
     # CLI: [-b firefox|chromium] [-f filter...] — each -f consumes every
     # following token until the next option, so " -f a -f b" and " -f a b"
     # both work (the old "everything after the first -f" grab turned a second
