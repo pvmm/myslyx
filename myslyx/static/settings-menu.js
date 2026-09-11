@@ -166,7 +166,7 @@
 
                 var hint = document.createElement('div');
                 hint.className = 'wb-plugins-hint';
-                hint.textContent = 'changes reload the editor';
+                hint.textContent = 'changes reload the editor on close';
                 submenu.appendChild(hint);
 
                 function rebuildPlugins() {
@@ -195,10 +195,10 @@
                                 cfg.plugins = cfg.plugins || {};
                                 cfg.plugins[def.name] = cb.checked;
                                 window.WBStorage.saveConfig(cfg);
-                                clearTimeout(menu._reloadT);
-                                menu._reloadT = setTimeout(function() {
-                                    window.location.reload();
-                                }, 300);
+                                // Reloading while choosing is jarring, so the
+                                // page refresh is deferred until the menu is
+                                // closed (see close() below).
+                                menu._pluginsChanged = true;
                             } catch(e) { console.warn('plugins toggle failed', e); }
                         });
                         row.appendChild(name);
@@ -272,6 +272,13 @@
                     menu.style.display = 'none';
                     btn.classList.remove('active');
                     restoreEditorFocus();
+                    // Plugin checkboxes only persist config; reload the page
+                    // (so the new plugin set takes effect) when the menu is
+                    // actually closed.
+                    if (menu._pluginsChanged) {
+                        menu._pluginsChanged = false;
+                        window.location.reload();
+                    }
                 }
 
                 btn.addEventListener('click', function(ev) {

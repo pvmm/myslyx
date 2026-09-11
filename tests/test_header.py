@@ -83,14 +83,23 @@ async def plugin_toggle_preserves_file_pool(page, msgs):
     await page.wait_for_timeout(500)
     await page.click('#wb-settings-plugins')
     await page.wait_for_timeout(500)
-    # Toggle the first plugin row; the change handler persists config and
-    # reloads the page after ~300ms.
+    # Toggle the first plugin row: config is persisted but the page must NOT
+    # reload yet (the refresh happens when the menu is closed).
+    await page.evaluate("""() => {
+        const cb = document.querySelector('.wb-plugin-check');
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event('change', {bubbles: true}));
+    }""")
+    await page.wait_for_timeout(600)
+    # Still on the same page while the menu stays open.
+    assert await page.evaluate(
+        "() => document.querySelector('.wb-plugin-check') !== null"), \
+        'page must not reload while the settings menu stays open'
+    # Close the menu (Escape collapses the PLUGINS submenu first, a second
+    # Escape closes the whole menu) -> the deferred reload fires.
     async with page.expect_navigation(wait_until='load'):
-        await page.evaluate("""() => {
-            const cb = document.querySelector('.wb-plugin-check');
-            cb.checked = !cb.checked;
-            cb.dispatchEvent(new Event('change', {bubbles: true}));
-        }""")
+        await page.keyboard.press('Escape')
+        await page.keyboard.press('Escape')
     # The editor comes back once the storage sync bridge hands the pool over.
     await page.wait_for_selector('.wb-file-tab', timeout=20000)
     await page.wait_for_timeout(1500)
