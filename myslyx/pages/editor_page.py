@@ -664,6 +664,11 @@ def editor_page() -> None:
         target = next((f for f in client_state['files'] if f['id'] == fid), None)
         if target is None:
             return
+        # Read-only files (e.g. the bundled STARTUP.txt) keep their language.
+        # The combo is locked client-side too, but guard the handler anyway.
+        if target.get('readonly'):
+            lang_select.set_value(target['language'])
+            return
         # The LANG combo is synced programmatically whenever a file is
         # activated; if it already matches this file, the on_change is a
         # no-op so we do not rename/reconfigure a file just for showing it.

@@ -464,6 +464,66 @@ async def lang_combo_tracks_active_file(page, msgs):
     assert msgs == []
 
 
+async def lang_combo_locked_for_readonly(page, msgs):
+    # STARTUP.txt is read-only, so its LANG combo must be locked: greyed out,
+    # refusing to open, and the server must reject any language change anyway.
+    assert await h.active_tab_name(page) == 'STARTUP'
+    locked = await page.evaluate("""() => {
+        const el = document.getElementById('wb-lang-select');
+        return !!el && el.classList.contains('wb-locked');
+    }""")
+    assert locked, 'LANG combo must be locked for the read-only STARTUP.txt'
+    # A raw mouse press over the combo (the field has pointer-events: none,
+    # so Playwright's actionability-aware click would not click at all) must
+    # not open the popup.
+    pt = await page.evaluate("""() => {
+        const r = document.querySelector('.wb-select').getBoundingClientRect();
+        return {x: r.x + r.width / 2, y: r.y + r.height / 2};
+    }""")
+    await page.mouse.click(pt['x'], pt['y'])
+    await page.wait_for_timeout(500)
+    popup_open = await page.evaluate("""() => {
+        return Array.from(document.querySelectorAll('.q-menu')).some(function(m) {
+            const cs = getComputedStyle(m);
+            return cs.visibility !== 'hidden' && cs.opacity !== '0' &&
+                   m.getBoundingClientRect().width > 0;
+        });
+    }""")
+    assert not popup_open, 'LANG popup must stay closed for a read-only file'
+    # Bypass the client lock on purpose: the server must still reject it.
+    await page.evaluate("""() => {
+        const native = document.getElementById('wb-lang-select');
+        native.classList.remove('wb-locked');
+        const field = native.closest('.wb-select');
+        if (field) field.classList.remove('wb-locked');
+    }""")
+    await h.set_language(page, 'Pascal')
+    await page.wait_for_function("""() => {
+        const el = document.getElementById('wb-lang-select');
+        const t = el.querySelector('.ellipsis');
+        return (t || el).textContent.trim() === 'Text';
+    }""")
+    assert await h.active_tab_name(page) == 'STARTUP', \
+        'read-only file must keep its language and name'
+    assert 'STARTUP' == await page.evaluate("""() => {
+        const a = document.querySelector('.wb-file-tab.active .file-name');
+        return a ? a.textContent : null;
+    }""")
+    # A writable file unlocks the combo again.
+    await page.evaluate("""() => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['PRINT 42'], 'demo.bas', {type: 'text/plain'}));
+        const ev = new Event('drop', {bubbles: true, cancelable: true});
+        try { Object.defineProperty(ev, 'dataTransfer', {value: dt}); } catch(e) { ev.dataTransfer = dt; }
+        document.dispatchEvent(ev);
+    }""")
+    await page.wait_for_function("""() => {
+        const el = document.getElementById('wb-lang-select');
+        return !!el && !el.classList.contains('wb-locked');
+    }""")
+    assert msgs == []
+
+
 async def hints_c_pascal_root_pages(page, msgs):
     # C and Pascal have their own hint dictionaries; the HINTS panel must show
     # each language's root page when such a file is displayed.
@@ -648,6 +708,7 @@ SMOKE_SUITES = [
     ('smoke/fold-keyword-basic', fold_keyword_basic),
     ('smoke/fold-keyword-c', fold_keyword_c),
     ('smoke/lang-combo-tracks-file', lang_combo_tracks_active_file),
+    ('smoke/lang-combo-locked-readonly', lang_combo_locked_for_readonly),
     ('smoke/hints-c-pascal-root', hints_c_pascal_root_pages),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
     ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),

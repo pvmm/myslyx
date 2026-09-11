@@ -298,6 +298,19 @@ html, body {
     font-size: 12px;
 }
 
+/* Read-only files: the LANG combo is locked (greyed out, no popup).
+   The class lands on the .wb-select field root (see WBSetReadonly).
+   Quasar's q-field control forces pointer-events: auto on itself, so
+   !important beats it; a capture keydown handler in editor-toolbar.js
+   covers the keyboard (Enter/Arrows/Space open the popup in Quasar). */
+.wb-select.wb-locked,
+.wb-select.wb-locked * {
+    pointer-events: none !important;
+}
+.wb-select.wb-locked {
+    opacity: 0.55;
+}
+
 /* ===== File Pool (bottom dock) ===== */
 .wb-dock {
     background: var(--wb-bg-dark);
