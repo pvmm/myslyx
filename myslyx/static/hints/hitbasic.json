@@ -16,6 +16,7 @@
     "TIMER", "VPEEK", "VPOKE", "PEEK", "POKE", "OUT", "INP"
   ],
   "tips": {
+    "SUB": "Subroutine with no return value:\n\n```basic\nSUB beep()\n    PRINT CHR$(7)\nEND SUB\n```",
     "PRINT": "Output text: `PRINT \"HELLO\"`\nYou can use `;` to keep the cursor on the same line.",
     "INPUT": "Read input: `INPUT \"NAME? \"; A$`\nStore numeric values in numeric variables.",
     "LET": "Assignment: `LET A = 10`\n`LET` is optional: `A = 10`",
