@@ -24,6 +24,7 @@
                 function closeSubmenu() {
                     submenu.style.display = 'none';
                     pluginsRow.classList.remove('active');
+                    clearPluginFocus();
                 }
                 function toggleSubmenu() {
                     if (submenu.style.display === 'block') closeSubmenu();
@@ -231,6 +232,24 @@
                     clearRowFocus();
                     rows[next].classList.add('keyboard');
                 }
+                // Keyboard focus for the plugin rows inside the PLUGINS submenu.
+                function pluginRows() {
+                    return Array.prototype.slice.call(
+                        submenu.querySelectorAll('.wb-plugin-row'));
+                }
+                function clearPluginFocus() {
+                    pluginRows().forEach(function(r) { r.classList.remove('keyboard'); });
+                }
+                function focusPluginRow(delta) {
+                    var rows = pluginRows();
+                    if (!rows.length) return;
+                    var idx = rows.indexOf(submenu.querySelector('.wb-plugin-row.keyboard'));
+                    var next = idx < 0 ? (delta > 0 ? 0 : rows.length - 1) : idx + delta;
+                    if (next < 0) next = rows.length - 1;
+                    if (next >= rows.length) next = 0;
+                    clearPluginFocus();
+                    rows[next].classList.add('keyboard');
+                }
                 function restoreEditorFocus() {
                     try {
                         var c = document.querySelector(
@@ -264,12 +283,45 @@
                 });
                 document.addEventListener('keydown', function(ev) {
                     if (menu.style.display !== 'block') return;
+
+                    // Inside the PLUGINS submenu: arrows move between plugin
+                    // rows, Enter/Space toggles the focused plugin, and
+                    // Escape/ArrowLeft return to the main menu.
+                    if (submenu.style.display === 'block') {
+                        if (ev.key === 'Escape' || ev.key === 'ArrowLeft') {
+                            ev.preventDefault();
+                            closeSubmenu();
+                            focusRow(0);
+                        } else if (ev.key === 'ArrowDown') {
+                            ev.preventDefault(); focusPluginRow(1);
+                        } else if (ev.key === 'ArrowUp') {
+                            ev.preventDefault(); focusPluginRow(-1);
+                        } else if (ev.key === 'Enter' || ev.key === ' ') {
+                            var prow = submenu.querySelector('.wb-plugin-row.keyboard');
+                            if (prow) {
+                                ev.preventDefault();
+                                var c = prow.querySelector('input[type=checkbox]');
+                                if (c && !c.disabled) c.click();
+                            }
+                        }
+                        return;
+                    }
+
                     if (ev.key === 'Escape') { close(); return; }
                     if (ev.key === 'ArrowDown') { ev.preventDefault(); focusRow(1); }
                     else if (ev.key === 'ArrowUp') { ev.preventDefault(); focusRow(-1); }
-                    else if (ev.key === 'Enter' || ev.key === ' ') {
+                    else if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'ArrowRight') {
                         var cur = menu.querySelector('.wb-settings-row.keyboard');
-                        if (cur) { ev.preventDefault(); cur.click(); }
+                        if (cur) {
+                            ev.preventDefault();
+                            if (cur.id === 'wb-settings-plugins') {
+                                // Enter/Right over PLUGINS moves into the submenu.
+                                toggleSubmenu();
+                                focusPluginRow(0);
+                            } else if (ev.key !== 'ArrowRight') {
+                                cur.click();
+                            }
+                        }
                     }
                 });
 

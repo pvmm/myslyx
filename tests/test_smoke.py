@@ -473,6 +473,54 @@ async def autocomplete_enter_completes(page, msgs):
     assert msgs == []
 
 
+async def plugins_submenu_keyboard_nav(page, msgs):
+    # Enter/Right over the PLUGINS row must move the cursor INTO the submenu.
+    await page.locator('#wb-settings-btn').wait_for(state='visible', timeout=10000)
+    await page.keyboard.press('Control+,')
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-settings-menu');
+        return !!m && m.style.display !== 'none';
+    }""")
+    # ArrowDown focuses the first row (PLUGINS).
+    await page.keyboard.press('ArrowDown')
+    await page.wait_for_function("""() => {
+        const k = document.querySelector('#wb-settings-menu .wb-settings-row.keyboard');
+        return !!k && k.id === 'wb-settings-plugins';
+    }""")
+    # ArrowRight opens the submenu and focuses its first plugin row.
+    await page.keyboard.press('ArrowRight')
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-plugins-menu');
+        return m && m.style.display !== 'none';
+    }""")
+    await page.wait_for_function("""() => {
+        const k = document.querySelector('#wb-plugins-menu .wb-plugin-row.keyboard');
+        return !!k;
+    }""")
+    # ArrowDown moves within the plugin rows (still exactly one focused).
+    await page.keyboard.press('ArrowDown')
+    n_focused = await page.evaluate("""() =>
+        document.querySelectorAll('#wb-plugins-menu .wb-plugin-row.keyboard').length""")
+    assert n_focused == 1, 'expected exactly one focused plugin row'
+    # ArrowLeft returns to the main menu with PLUGINS refocused.
+    await page.keyboard.press('ArrowLeft')
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-plugins-menu');
+        return !m || m.style.display === 'none';
+    }""")
+    await page.wait_for_function("""() => {
+        const k = document.querySelector('#wb-settings-menu .wb-settings-row.keyboard');
+        return !!k && k.id === 'wb-settings-plugins';
+    }""")
+    # Escape closes the whole menu.
+    await page.keyboard.press('Escape')
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-settings-menu');
+        return !m || m.style.display === 'none';
+    }""")
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -490,4 +538,5 @@ SMOKE_SUITES = [
     ('smoke/lang-combo-tracks-file', lang_combo_tracks_active_file),
     ('smoke/hints-plaintext-c-pascal', hints_plaintext_for_c_pascal),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
+    ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),
 ]
