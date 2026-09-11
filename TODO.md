@@ -1,11 +1,11 @@
 # high priority (one commit each)
 - [x] firefox `multiedit/readonly-startup` is flaky: the first suite run after the 6s boot settle (runner.py:90), relies on fixed wait_for_timeout(400) typing settles. Harden it with poll-based waits and re-verify on firefox + chromium.
 - [x] if changing the LANG of a file creates a name clash with another file, ask the user to rename the filename until the new name no longer clashes.
-- [ ] add button to download all files in the file pool ("DOWNLOAD\nALL") as a zipped single file. Put it left of "RESET FILE POOL", unstacked.
+- [x] add button to download all files in the file pool ("DOWNLOAD\nALL") as a zipped single file. Put it left of "RESET FILE POOL", unstacked.
 - [x] the sub folding in HitBasic displays "sub...end sub" when folded, but I would like it to display the name of the subroutine too, like the way the folding in the C language displays the name of the function even when the function is folded. The same thing happens to "function...end function" in HitBasic. Can you fix it to display the name of the function/sub even when folded?
 - [x] the if/end if folding in HitBasic displays "if...end if" when folded, but I would like it to display the test condition of the condition too, like the way the folding of conditions work in the C language. Can you fix it?
 - [x] when user presses Ctrl+, to display the favicon menu, the top item of the menu should be activated instead of no item being activated, forcing the user to move the arrow keys to figure out where the cursor is.
-- [ ] mark code with sleep antipattern in the "Sensitive / flaky code" list below.
+- [x] mark code with sleep antipattern in the "Sensitive / flaky code" list below.
 - [ ] create an example of a link in the HINTS documentation. For instance: the for keyword in the C language root page is now a link pointing to the "FOR Loop" hint. Make the link appear like a dashed line below the text of the link.
 
 # Sensitive / flaky code to keep an eye on (check each when fixed):
@@ -14,3 +14,4 @@
 - [ ] Settings rows (WRAP/LIGATURES) (1022-1200): fire-and-forget saveConfig + inline restyle, no ack; tests add fixed 400ms waits; querySelectorAll('.cm-editor .cm-content') restyles all editors.
 - [ ] _load_file_into_editor (541-660): f-string values interpolated into run_javascript ({readonly}, {cm_lang}); a quote in any value breaks the JS; readonly STARTUP enforced client-side only.
 - [ ] _on_editor_change trusts client value; tests read doc via view editorPromise (helpers.py:6-9) not the Python echo, so content is only ever validated client-side.
+- [ ] Sleep-antipattern hotbeds (69 fixed waits in 7 files): type/click → `wait_for_timeout` → assert, where the target state is observable and should be polled with `wait_for_function` instead. Locations: helpers.py:47-56,81 (open_settings/set_language settles); test_smoke.py (18 sites, e.g. 9/91-95/314-431 type-then-400ms); test_header.py (28,42,56,78-105); test_plugins.py (132-228, reload-resume waits 800-2500ms); test_multiedit.py (38-96 typing settles, 111-148 undo-group separators 300-800ms — this group needs a real settle by design); infrastructure boot settles runner.py:90 (6000ms) and debug_suite.py:158,171 (5000ms). Prefer poll-based waits (h.doc_equals, h.doc_unchanged_for, wait_for_function) wherever the awaited change is observable.
