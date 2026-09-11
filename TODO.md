@@ -1,16 +1,16 @@
 # higher priority (one commit per entry, update this document when done)
-- [ ] Update LANG combo box according to the current visible file on the text editor.
-- [ ] The HINTS window display "Plain text" when a C or Pascal file is displayed in the text editor.
-- [ ] Pressing enter in the autocompletion context menu doesn't select that option and write it on the text editor component.
-- [ ] Pressing enter or right arrow when over the PLUGIN submenu in the favicon menu doesn't send the cursor to the submenu. The cursor still moves around in the same menu section.
-- [ ] Create a short cut for "EXPORT SYMBOLS ON/OFF" that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
-- [ ] Create a short cut for the "RENAME" button that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
-- [ ] Create a short cut for the "UPLOAD" button that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
-- [ ] Create a short cut for the "DOWNLOAD" button that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
-- [ ] Create a short cut for the "DELETE" button that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
-- [ ] Create a short cut for the "+ NEW" button that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
-- [ ] Create short cut to move around the open files in the file pool that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
-- [ ] Move all inline javascript to their own files in the static subdirectory when they have 5+ lines and don't have string interpolation.
+- [x] Update LANG combo box according to the current visible file on the text editor.
+- [x] The HINTS window display "Plain text" when a C or Pascal file is displayed in the text editor.
+- [x] Pressing enter in the autocompletion context menu doesn't select that option and write it on the text editor component.
+- [x] Pressing enter or right arrow when over the PLUGIN submenu in the favicon menu doesn't send the cursor to the submenu. The cursor still moves around in the same menu section.
+- [x] Create a short cut for "EXPORT SYMBOLS ON/OFF" that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
+- [x] Create a short cut for the "RENAME" button that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
+- [x] Create a short cut for the "UPLOAD" button that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
+- [x] Create a short cut for the "DOWNLOAD" button that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
+- [x] Create a short cut for the "DELETE" button that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
+- [x] Create a short cut for the "+ NEW" button that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
+- [x] Create short cut to move around the open files in the file pool that doesn't collide with CodeMirror or the browser predefined short cuts. Add it to the short cuts window.
+- [x] Move all inline javascript to their own files in the static subdirectory when they have 5+ lines and don't have string interpolation.
 
 # Sensitive / flaky JS-in-Python spots to keep an eye on (check each when fixed):
 - [ ] `window.__wbPyBridge` (editor_page.py:76-91) = unguarded global storage API; Python writes whole file pool via json.dumps into run_javascript (375-379). Any JS can call setFiles/setActive and bypass _open_file_request, dedupe, rename/conflict checks and the readonly STARTUP flag.
