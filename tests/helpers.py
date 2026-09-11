@@ -4,25 +4,12 @@
 async def doc_text(page):
     """Return the active editor's document as plain text (or None).
 
-    Polls until the active editor is actually mounted (up to 3s) so a read
-    racing the cold-boot mount can never return a stale None.
+    Resolves through the shared race-safe WBEditorActive view helper, which
+    polls the current __wbEditorId until the CodeMirror view mounts (up to 3s)
+    so a read racing the cold-boot mount can never return a stale None.
     """
-    return await page.evaluate("""() => new Promise((res) => {
-        const deadline = Date.now() + 3000;
-        const tick = () => {
-            try {
-                const el = getElement(window.__wbEditorId);
-                if (el && el.editorPromise) {
-                    el.editorPromise.then(
-                        (v) => res(v.state.doc.toString()),
-                        () => (Date.now() < deadline ? setTimeout(tick, 50) : res(null)));
-                    return;
-                }
-            } catch (e) {}
-            if (Date.now() < deadline) setTimeout(tick, 50); else res(null);
-        };
-        tick();
-    })""")
+    return await page.evaluate("""() => window.WBEditorActive.current(3000).then(
+        (v) => (v ? v.state.doc.toString() : null))""")
 
 
 async def visible_editors(page):
@@ -112,12 +99,8 @@ async def doc_unchanged_for(page, expected, ms=400):
     return await page.evaluate(
         """({expected, ms}) => new Promise((res) => {
             const start = Date.now();
-            const read = () => {
-                const el = getElement(window.__wbEditorId);
-                return el && el.editorPromise
-                    ? el.editorPromise.then(v => v.state.doc.toString())
-                    : Promise.resolve(null);
-            };
+            const read = () => window.WBEditorActive.current(3000).then(
+                (v) => (v ? v.state.doc.toString() : null));
             const tick = () => {
                 read().then((v) => {
                     if (v !== expected) return res(false);
@@ -133,9 +116,6 @@ async def doc_unchanged_for(page, expected, ms=400):
 async def doc_equals(page, expected, timeout=10000):
     """Wait until the active editor's document equals ``expected``."""
     await page.wait_for_function(
-        """expected => new Promise((res) => {
-            const el = getElement(window.__wbEditorId);
-            if (!el || !el.editorPromise) { res(false); return; }
-            el.editorPromise.then(v => res(v.state.doc.toString() === expected));
-        })""",
-        arg=expected, timeout=timeout)
+        """expected => window.WBEditorActive.current(10000).then(v =>
+            !!(v && v.state.doc.toString() === expected))""",
+        arg=expected, timeout=timeout + 2000)

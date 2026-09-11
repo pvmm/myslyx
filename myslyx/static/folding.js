@@ -347,10 +347,8 @@
     }
 
     function currentView() {
-        var elId = window.__wbEditorId;
-        if (!elId) return null;
-        var el = window.getElement ? window.getElement(elId) : null;
-        return (el && el.editorPromise) ? el.editorPromise : null;
+        // Race-safe active-editor view resolution (single shared helper).
+        return window.WBEditorActive.current();
     }
 
     // CodeMirror's own capture keydown handler tries the unshifted variant

@@ -10,9 +10,12 @@
 
             function wbCmDo(action) {
                 if (window.__wbActiveReadonly) return;
-                var elId = window.__wbEditorId;
-                if (!elId) return;
-                getElement(elId).editorPromise.then(function(p) {
+                // Resolve the active editor view through the shared race-safe
+                // helper: __wbEditorId is published before the CodeMirror view
+                // mounts, so a raw getElement(...).editorPromise here could
+                // crash (or drop the keypress) during the boot race.
+                window.WBEditorActive.withView(function(p) {
+                    if (!p) return;
                     try {
                         import('nicegui-codemirror').then(function(CM) {
                             try {

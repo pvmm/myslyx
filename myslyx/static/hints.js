@@ -594,11 +594,12 @@
     }
 
     function tryHook() {
-        var elId = window.__wbEditorId;
-        if (!elId) return false;
-        var el = window.getElement ? window.getElement(elId) : null;
-        if (!el || !el.editorPromise) return false;
-        el.editorPromise.then(activateView);
+        // Resolve the active editor view through the shared race-safe helper
+        // (same as static/plugins.js): __wbEditorId is published before the
+        // CodeMirror view mounts, so the view may not exist yet right now.
+        window.WBEditorActive.withView(function(v) {
+            if (v) activateView(v);
+        });
         return true;
     }
 

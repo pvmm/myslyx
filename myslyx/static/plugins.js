@@ -81,13 +81,10 @@
             });
         },
 
-        // Same editor-id resolution + retry strategy used by static/hints.js.
+        // Resolve the active CodeMirror view through the shared race-safe
+        // helper (same as static/hints.js) and install the enabled plugins.
         tryHook: function() {
-            var elId = window.__wbEditorId;
-            if (!elId) return false;
-            var el = window.getElement ? window.getElement(elId) : null;
-            if (!el || !el.editorPromise) return false;
-            el.editorPromise.then(WBPlugins.install);
+            window.WBEditorActive.withView(WBPlugins.install);
             return true;
         }
     };

@@ -114,6 +114,39 @@
         }
     };
 
+    // ===== Active editor view resolution =====
+    // __wbEditorId is published by the server before the CodeMirror view for
+    // the new file finishes mounting, so everyone used to hand-roll the same
+    // getElement(id).editorPromise dance (with slight differences, one of them
+    // crashing when the element was not registered yet). This is the single
+    // race-tolerant resolver: it polls the CURRENT __wbEditorId until the
+    // element registers its editorPromise, then yields the view — but only if
+    // that editor is still the active one when the promise settles, so a
+    // stale mount from a just-switched-away file can never be returned.
+
+    window.WBEditorActive = {
+        current: function(timeoutMs) {
+            var deadline = Date.now() + (timeoutMs || 3000);
+            return new Promise(function(resolve) {
+                (function tick() {
+                    var elId = window.__wbEditorId;
+                    var el = elId && window.getElement ? window.getElement(elId) : null;
+                    if (el && el.editorPromise) {
+                        el.editorPromise.then(function(view) {
+                            resolve(elId === window.__wbEditorId ? view : null);
+                        });
+                        return;
+                    }
+                    if (Date.now() < deadline) setTimeout(tick, 50);
+                    else resolve(null);
+                })();
+            });
+        },
+        withView: function(cb, timeoutMs) {
+            this.current(timeoutMs).then(cb);
+        }
+    };
+
     // ===== User-defined symbol persistence (discovered functions/subroutines) =====
 
     var SYMBOLS_KEY = 'wb_editor_symbols';
