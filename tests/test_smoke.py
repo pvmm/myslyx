@@ -62,7 +62,10 @@ async def export_disabled_for_text(page, msgs):
     }""")
     await page.wait_for_function(
         f"document.querySelectorAll('.wb-file-tab').length === {before + 1}")
-    await page.wait_for_timeout(800)
+    await page.wait_for_function("""() => {
+        const b = document.getElementById('wb-export-btn');
+        return !!b && !b.disabled;
+    }""", timeout=15000)
     assert not await export.is_disabled(), 'export toggle must re-enable for a code language'
     label = (await export.inner_text()).replace('\n', ' ')
     assert 'ON' in label, f'unexpected label for enabled export: {label!r}'
@@ -77,6 +80,10 @@ async def export_disabled_on_language_switch(page, msgs):
     assert not await export.is_disabled(), 'code language -> export toggle enabled'
     # Switching the active file to plain text disables the toggle.
     await h.set_language(page, 'Text')
+    await page.wait_for_function("""() => {
+        const b = document.getElementById('wb-export-btn');
+        return !!b && b.disabled;
+    }""", timeout=10000)
     assert await export.is_disabled(), 'export must disable after switching to Text'
     label = (await export.inner_text()).replace('\n', ' ')
     assert '---' in label, f'unexpected label for disabled export: {label!r}'
@@ -89,16 +96,26 @@ async def export_disabled_on_language_switch(page, msgs):
     assert state is True, f'export_symbols must stay untouched in Text: {state}'
     # Switching back to a code language re-enables the toggle.
     await h.set_language(page, 'HitBasic')
+    await page.wait_for_function("""() => {
+        const b = document.getElementById('wb-export-btn');
+        return !!b && !b.disabled;
+    }""", timeout=10000)
     assert not await export.is_disabled(), 'export must re-enable after leaving Text'
     label = (await export.inner_text()).replace('\n', ' ')
     assert 'ON' in label, f'unexpected re-enabled label: {label!r}'
     # The toggle itself still flips ON <-> OFF for code languages.
     await page.click('#wb-export-btn')
-    await page.wait_for_timeout(400)
+    await page.wait_for_function("""() => {
+        const t = document.getElementById('wb-export-btn');
+        return !!t && t.textContent.indexOf('OFF') !== -1;
+    }""", timeout=10000)
     label = (await export.inner_text()).replace('\n', ' ')
     assert 'OFF' in label, f'toggle did not switch OFF: {label!r}'
     await page.click('#wb-export-btn')
-    await page.wait_for_timeout(400)
+    await page.wait_for_function("""() => {
+        const t = document.getElementById('wb-export-btn');
+        return !!t && t.textContent.indexOf('ON') !== -1;
+    }""", timeout=10000)
     label = (await export.inner_text()).replace('\n', ' ')
     assert 'ON' in label, f'toggle did not switch back ON: {label!r}'
     assert msgs == []
@@ -317,21 +334,22 @@ async def comment_toggle_basic(page, msgs):
     await h.new_file(page, 2)
     await h.active_cm(page).click()
     await page.keyboard.type('PRINT 42\nGOTO 10')
-    await page.wait_for_timeout(300)
+    await h.doc_equals(page, 'PRINT 42\nGOTO 10')
     expected = "' PRINT 42\n' GOTO 10"
     toggled = False
     for _ in range(6):
         await page.keyboard.press('Control+a')
         await page.keyboard.press('Control+/')
-        await page.wait_for_timeout(150)
-        if await h.doc_text(page) == expected:
+        try:
+            await h.doc_equals(page, expected, timeout=2000)
             toggled = True
             break
+        except Exception:
+            continue
     assert toggled, 'Ctrl+/ must comment HitBasic lines with a leading apostrophe'
     await page.keyboard.press('Control+a')
     await page.keyboard.press('Control+/')
-    await page.wait_for_timeout(150)
-    assert await h.doc_text(page) == 'PRINT 42\nGOTO 10', 'Ctrl+/ second press must uncomment'
+    await h.doc_equals(page, 'PRINT 42\nGOTO 10', msg='Ctrl+/ second press must uncomment')
     assert msgs == []
 
 
@@ -380,9 +398,9 @@ async def fold_keyword_basic(page, msgs):
     await h.active_cm(page).click()
     await page.keyboard.type(
         'IF A THEN\nPRINT 1\nFOR I = 1 TO 3\nPRINT I\nNEXT\nEND IF')
-    await page.wait_for_timeout(400)
 
-    # The gutter shows one fold marker per block opener (IF and FOR).
+    # The gutter shows one fold marker per block opener (IF and FOR); waiting
+    # on the markers doubles as the settle for the typed text being applied.
     # (The fold gutter also renders a visibility:hidden spacer row with the
     # same "Unfold line" title; it is excluded via the inline-style filter.)
     markers = page.locator(
@@ -426,7 +444,6 @@ async def fold_keyword_c(page, msgs):
     await h.set_language(page, 'C')
     await h.active_cm(page).click()
     await page.keyboard.type('int main() {\nprintf("hi");\nreturn 0;\n}')
-    await page.wait_for_timeout(400)
 
     open_marker = page.locator(
         '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement span[title="Fold line"]')
@@ -460,7 +477,12 @@ async def fold_name_placeholder(page, msgs):
     await page.keyboard.type(
         'SUB GREET(NAME)\nPRINT NAME\nEND SUB\n'
         'IF X > 2 THEN\nPRINT "big"\nEND IF')
-    await page.wait_for_timeout(400)
+
+    # Wait for the SUB/IF fold markers; this doubles as the settle for the
+    # typed text being applied before the fold shortcuts run.
+    markers = page.locator(
+        '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement span[title="Fold line"]')
+    await markers.first.wait_for(state='attached', timeout=10000)
 
     async def fold_placeholder():
         await page.keyboard.press('Control+Shift+[')
@@ -842,7 +864,8 @@ async def shortcuts_toolbar_actions(page, msgs):
         return !!t && t.textContent === 'Rename current file';
     }""")
     await page.keyboard.press('Escape')
-    await page.wait_for_timeout(200)
+    await page.wait_for_function("""() =>
+        !document.querySelector('.wb-dialog .title-text')""", timeout=10000)
     # EXPORT SYMBOLS toggles OFF.
     await page.keyboard.press('Control+Alt+e')
     await page.wait_for_function("""() => {
@@ -943,8 +966,7 @@ async def js_interpolation_quoting(page, msgs):
     assert await h.doc_text(page) == 'PRINT 1', \
         'quote-laden id must not break the editor-boot JS'
     await h.go(page, 'notes')
-    assert await h.doc_text(page) == 'SAFE', \
-        'quote-laden name must not break switching to the file'
+    await h.doc_equals(page, 'SAFE', msg='quote-laden name must not break switching to the file')
     assert msgs == []
 
 

@@ -25,7 +25,10 @@ async def settings_menu_opens(page, msgs):
     btn = page.locator('#wb-settings-btn')
     await btn.wait_for(state='visible', timeout=10000)
     await btn.click()
-    await page.wait_for_timeout(500)
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-settings-menu');
+        return !!m && m.style.display === 'block';
+    }""", timeout=10000)
     state = await page.evaluate(
         "(() => { const m = document.getElementById('wb-settings-menu'); "
         "if (!m || m.style.display === 'none') return null; "
@@ -39,7 +42,10 @@ async def plugins_submenu_lists_plugins(page, msgs):
     btn = page.locator('#wb-settings-btn')
     await btn.wait_for(state='visible', timeout=10000)
     await btn.click()
-    await page.wait_for_timeout(500)
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-settings-menu');
+        return !!m && m.style.display === 'block';
+    }""", timeout=10000)
     # Both settings rows must be present, and the WRAP row must report a state.
     rows = await page.evaluate("""() => {
         const m = document.getElementById('wb-settings-menu');
@@ -53,11 +59,10 @@ async def plugins_submenu_lists_plugins(page, msgs):
     assert rows['wrap'] in ('ON', 'OFF'), f'unexpected WRAP value: {rows["wrap"]}'
     # The plugins submenu opens on demand and lists the installed plugins.
     await page.click('#wb-settings-plugins')
-    await page.wait_for_timeout(500)
-    open_ = await page.evaluate(
-        "(() => { const m = document.getElementById('wb-plugins-menu'); "
-        "return m && m.style.display !== 'none'; })()")
-    assert open_, 'plugins submenu did not open'
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-plugins-menu');
+        return !!m && m.style.display === 'block';
+    }""", timeout=10000)
     names = await page.evaluate("""() => {
         const m = document.getElementById('wb-plugins-menu');
         return Array.from(m.querySelectorAll('.wb-plugin-name')).map(n => n.textContent);
@@ -75,14 +80,20 @@ async def plugin_toggle_preserves_file_pool(page, msgs):
     assert name, 'expected a writable active file after NEW FILE'
     await h.active_cm(page).click()
     await page.keyboard.type('PRINT 42')
-    await page.wait_for_timeout(400)
+    await h.doc_equals(page, 'PRINT 42')
     # Open the settings menu and the PLUGINS submenu so the plugin rows exist.
     btn = page.locator('#wb-settings-btn')
     await btn.wait_for(state='visible', timeout=10000)
     await btn.click()
-    await page.wait_for_timeout(500)
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-settings-menu');
+        return !!m && m.style.display === 'block';
+    }""", timeout=10000)
     await page.click('#wb-settings-plugins')
-    await page.wait_for_timeout(500)
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-plugins-menu');
+        return !!m && m.style.display === 'block';
+    }""", timeout=10000)
     # Toggle the first plugin row: config is persisted but the page must NOT
     # reload yet (the refresh happens when the menu is closed).
     await page.evaluate("""() => {
@@ -90,7 +101,7 @@ async def plugin_toggle_preserves_file_pool(page, msgs):
         cb.checked = !cb.checked;
         cb.dispatchEvent(new Event('change', {bubbles: true}));
     }""")
-    await page.wait_for_timeout(600)
+    await page.wait_for_timeout(600)   # observation window: still on this page
     # Still on the same page while the menu stays open.
     assert await page.evaluate(
         "() => document.querySelector('.wb-plugin-check') !== null"), \
@@ -102,11 +113,10 @@ async def plugin_toggle_preserves_file_pool(page, msgs):
         await page.keyboard.press('Escape')
     # The editor comes back once the storage sync bridge hands the pool over.
     await page.wait_for_selector('.wb-file-tab', timeout=20000)
-    await page.wait_for_timeout(1500)
+    await h.doc_equals(page, 'PRINT 42', msg='doc content lost after plugin toggle')
     tabs = await page.evaluate("""() => Array.from(
         document.querySelectorAll('.wb-file-tab .file-name')).map(n => n.textContent)""")
     assert name in tabs, f'created file vanished after plugin toggle: {tabs}'
-    assert await h.doc_text(page) == 'PRINT 42', 'doc content lost after plugin toggle'
     assert msgs == []
 
 

@@ -7,9 +7,11 @@ On macOS the user plugins dir is HOME-based, so this automated routine only
 exercises the Linux and Windows layouts.
 """
 
+import asyncio
 import json
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from tests import helpers as h
@@ -99,8 +101,9 @@ def _write_user_plugin(plugins: Path, name: str, color: str, meta: dict | None =
 async def _render_state(page) -> dict:
     """Count the color widgets rendered by user plugins in the active editor."""
     return await page.evaluate(
-        """() => getElement(window.__wbEditorId).editorPromise.then(v => {
+        """() => window.WBEditorActive.current(3000).then(v => {
             const out = { red: 0, green: 0, orange: 0, cyan: 0 };
+            if (!v) return out;
             v.contentDOM.querySelectorAll('.cm-line span').forEach(s => {
                 const c = getComputedStyle(s).backgroundColor;
                 if (c === 'rgb(255, 0, 0)') out.red++;
@@ -112,7 +115,32 @@ async def _render_state(page) -> dict:
         })""")
 
 
+async def _wait_render(page, cond, timeout: int = 10000) -> dict:
+    """Poll render counts until the callable ``cond`` holds on them.
+
+    Re-snapshots on every retry so extensions that finish mounting after the
+    first read are still caught (they register a StateField whose create() runs
+    against the current document). The returned dict is the exact snapshot that
+    satisfied the condition — no separate read that could race a later render.
+    """
+    deadline = time.monotonic() + timeout / 1000.0
+    while True:
+        colors = await _render_state(page)
+        if cond(colors):
+            return colors
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f'render never satisfied: {colors}')
+        await asyncio.sleep(0.05)
+
+
 async def user_installed_plugins(page, msgs):
+    # Drop any plugin overrides a previous suite may have written (config is
+    # not wiped by ?reset=1) so both default plugins are restored.
+    await page.evaluate("""() => {
+        const cfg = WBStorage.loadConfig();
+        cfg.plugins = {};
+        WBStorage.saveConfig(cfg);
+    }""")
     manifest = await page.evaluate('window.WB_PLUGIN_MANIFEST || []')
     by_name = {e['name']: e for e in manifest}
     names = [e['name'] for e in manifest]
@@ -129,8 +157,7 @@ async def user_installed_plugins(page, msgs):
     # Types on screen, both plugins must render their widgets.
     await h.new_file(page, 2)
     await page.keyboard.type('#ff00ff')
-    await page.wait_for_timeout(900)
-    colors = await _render_state(page)
+    colors = await _wait_render(page, lambda c: c['red'] >= 1 and c['green'] >= 1)
     assert colors['red'] >= 1, f'user color-swatches (red) missing: {colors}'
     assert colors['green'] >= 1, f'user-swatches (green) missing: {colors}'
     assert msgs == []
@@ -140,17 +167,14 @@ async def plugin_disable_via_config(page, msgs):
     """Disabling a user plugin in the shared config stops it rendering."""
     await page.evaluate("""() => {
         const cfg = WBStorage.loadConfig();
-        cfg.plugins = cfg.plugins || {};
-        cfg.plugins['color-swatches'] = true;
-        cfg.plugins['user-swatches'] = false;
+        cfg.plugins = { 'color-swatches': true, 'user-swatches': false };
         WBStorage.saveConfig(cfg);
     }""")
     await page.reload(wait_until='load')
-    await page.wait_for_timeout(2500)
+    await page.wait_for_selector('.wb-file-tab', timeout=20000)
     await h.new_file(page, 2)
     await page.keyboard.type('#ff00ff')
-    await page.wait_for_timeout(900)
-    colors = await _render_state(page)
+    colors = await _wait_render(page, lambda c: c['red'] >= 1 and c['green'] == 0)
     assert colors['red'] >= 1, f'enabled color-swatches must render: {colors}'
     assert colors['green'] == 0, f'disabled user-swatches must not render: {colors}'
     assert msgs == []
@@ -158,38 +182,35 @@ async def plugin_disable_via_config(page, msgs):
 
 async def plugin_lazy_disabled_by_default(page, msgs):
     """A user plugin with enabledByDefault:false stays off until enabled."""
-    # Clear any persisted override so the default (false) applies.
+    # Clear any persisted override (this suite owns the whole plugin map) so
+    # the default (false) applies.
     await page.evaluate("""() => {
         const cfg = WBStorage.loadConfig();
-        cfg.plugins = cfg.plugins || {};
-        delete cfg.plugins['lazy-swatches'];
+        cfg.plugins = {};
         WBStorage.saveConfig(cfg);
     }""")
     await page.reload(wait_until='load')
-    await page.wait_for_timeout(2500)
+    await page.wait_for_selector('.wb-file-tab', timeout=20000)
     # Reloads preserve the pool, so base the expected tab count on the actual
     # number instead of assuming a fresh reset.
     n = await page.evaluate("document.querySelectorAll('.wb-file-tab').length")
     await h.new_file(page, n + 1)
     await page.keyboard.type('#00ff00')
-    await page.wait_for_timeout(900)
-    colors = await _render_state(page)
+    colors = await _wait_render(page, lambda c: c['red'] >= 1 and c['green'] >= 1)
     assert colors['orange'] == 0, f'lazy-swatches must be off by default: {colors}'
 
     # Enabling it in the config makes it render after the next reload.
     await page.evaluate("""() => {
         const cfg = WBStorage.loadConfig();
-        cfg.plugins = cfg.plugins || {};
-        cfg.plugins['lazy-swatches'] = true;
+        cfg.plugins = { 'lazy-swatches': true };
         WBStorage.saveConfig(cfg);
     }""")
     await page.reload(wait_until='load')
-    await page.wait_for_timeout(2500)
+    await page.wait_for_selector('.wb-file-tab', timeout=20000)
     n = await page.evaluate("document.querySelectorAll('.wb-file-tab').length")
     await h.new_file(page, n + 1)
     await page.keyboard.type('#00ff00')
-    await page.wait_for_timeout(900)
-    colors = await _render_state(page)
+    colors = await _wait_render(page, lambda c: c['orange'] >= 1)
     assert colors['orange'] >= 1, f'lazy-swatches must render once enabled: {colors}'
     assert msgs == []
 
@@ -198,35 +219,40 @@ async def plugin_language_filter(page, msgs):
     """A user plugin limited to languages:['C'] skips non-C editors."""
     await page.evaluate("""() => {
         const cfg = WBStorage.loadConfig();
-        cfg.plugins = cfg.plugins || {};
-        delete cfg.plugins['c-swatches'];
+        cfg.plugins = {};
         WBStorage.saveConfig(cfg);
     }""")
     await page.reload(wait_until='load')
-    await page.wait_for_timeout(2500)
+    await page.wait_for_selector('.wb-file-tab', timeout=20000)
     # New files default to HitBasic -> the C-only plugin must not render.
     await h.new_file(page, 2)
     await page.keyboard.type('#00ffff')
-    await page.wait_for_timeout(900)
-    colors = await _render_state(page)
+    colors = await _wait_render(page, lambda c: c['red'] >= 1 and c['green'] >= 1)
     assert colors['cyan'] == 0, f'c-swatches must not render in HitBasic file: {colors}'
 
     # Import a C source file -> the C-only plugin must now render.
     before = await page.evaluate("document.querySelectorAll('.wb-file-tab').length")
-    await page.evaluate("""() => {
-        const dt = new DataTransfer();
-        dt.items.add(new File(['int main(void){return 0;}'], 'prog.c', {type: 'text/plain'}));
-        const ev = new Event('drop', {bubbles: true, cancelable: true});
-        try { Object.defineProperty(ev, 'dataTransfer', {value: dt}); } catch(e) { ev.dataTransfer = dt; }
-        document.dispatchEvent(ev);
-    }""")
-    await page.wait_for_function(
-        f"document.querySelectorAll('.wb-file-tab').length === {before + 1}")
-    await page.wait_for_timeout(800)
+    for attempt in range(3):
+        await page.evaluate("""() => {
+            const dt = new DataTransfer();
+            dt.items.add(new File(['int main(void){return 0;}'], 'prog.c', {type: 'text/plain'}));
+            const ev = new Event('drop', {bubbles: true, cancelable: true});
+            try { Object.defineProperty(ev, 'dataTransfer', {value: dt}); } catch(e) { ev.dataTransfer = dt; }
+            document.dispatchEvent(ev);
+        }""")
+        try:
+            await page.wait_for_function(
+                f"document.querySelectorAll('.wb-file-tab').length > {before}",
+                timeout=15000)
+            break
+        except Exception:
+            continue
+    else:
+        raise AssertionError('importing prog.c produced no new tab')
+    await h.doc_equals(page, 'int main(void){return 0;}')
     await h.active_cm(page).click()
     await page.keyboard.type('#00ffff')
-    await page.wait_for_timeout(900)
-    colors = await _render_state(page)
+    colors = await _wait_render(page, lambda c: c['cyan'] >= 1)
     assert colors['cyan'] >= 1, f'c-swatches must render in a C file: {colors}'
     assert msgs == []
 

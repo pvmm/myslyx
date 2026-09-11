@@ -35,66 +35,53 @@ async def native_grouping(page, msgs):
     name_a = await h.active_tab_name(page)
     assert name_a
     await page.keyboard.type('AB')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == 'AB'
+    await h.doc_equals(page, 'AB')
     assert await h.visible_editors(page) == 1
 
     await page.click('#wb-undo-btn')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == '', 'single UNDO should clear the whole AB group'
-
+    await h.doc_equals(page, '')
     await page.click('#wb-redo-btn')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == 'AB'
+    await h.doc_equals(page, 'AB')
 
 
 async def per_file_isolation(page, msgs):
     await h.new_file(page, 2)
     name_a = await h.active_tab_name(page)
     await page.keyboard.type('X')
-    await page.wait_for_timeout(400)
+    await h.doc_equals(page, 'X')
     await h.new_file(page, 3)
     name_b = await h.active_tab_name(page)
     assert name_b and name_b != name_a
     await page.keyboard.type('C')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == 'C'
+    await h.doc_equals(page, 'C')
 
     await page.click('#wb-undo-btn')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == ''
+    await h.doc_equals(page, '')
     await page.click('#wb-redo-btn')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == 'C'
+    await h.doc_equals(page, 'C')
     assert await h.visible_editors(page) == 1
 
     # switch back: A untouched, undo/redo still local
     await h.go(page, name_a)
-    assert await h.doc_text(page) == 'X'
+    await h.doc_equals(page, 'X')
     await page.click('#wb-undo-btn')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == '', 'undo in A gives A baseline, not B content'
+    await h.doc_equals(page, '', msg='undo in A gives A baseline, not B content')
     await page.click('#wb-redo-btn')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == 'X'
+    await h.doc_equals(page, 'X')
 
     # keyboard isolation
     await h.active_cm(page).click()
     await page.keyboard.press('Control+z')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == ''
+    await h.doc_equals(page, '')
     await page.keyboard.press('Control+y')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == 'X'
+    await h.doc_equals(page, 'X')
     await h.go(page, name_b)
-    assert await h.doc_text(page) == 'C'
+    await h.doc_equals(page, 'C')
     await h.active_cm(page).click()
     await page.keyboard.press('Control+z')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == '', 'Ctrl+Z in B must not touch A'
+    await h.doc_equals(page, '', msg='Ctrl+Z in B must not touch A')
     await page.keyboard.press('Control+y')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == 'C'
+    await h.doc_equals(page, 'C')
     assert _console_errors(msgs) == []
 
 
@@ -119,33 +106,30 @@ async def no_double_undo(page, msgs):
     name_g = await h.active_tab_name(page)
     await h.active_cm(page).click()
     await page.keyboard.type('W')
-    await page.wait_for_timeout(700)   # separate undo group
+    await page.wait_for_timeout(700)   # separate undo group (by design)
     await page.keyboard.type('E')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == 'WE'
+    await h.doc_equals(page, 'WE')
     await page.keyboard.press('Control+z')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == 'W', 'one Ctrl+Z must undo exactly one group'
+    await h.doc_equals(page, 'W', msg='one Ctrl+Z must undo exactly one group')
     await page.keyboard.press('Control+z')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == ''
+    await h.doc_equals(page, '')
     await page.keyboard.press('Control+z')
-    await page.wait_for_timeout(400)
-    assert await h.doc_text(page) == ''
+    await h.doc_equals(page, '')
     await h.go(page, name_g)
     assert _console_errors(msgs) == []
 
 
 async def readonly_after_switches(page, msgs):
     await h.new_file(page, 2)
-    await page.wait_for_timeout(400)
     await h.go(page, 'STARTUP')
-    await page.wait_for_timeout(400)
+    # The readonly guard attaching to the active editor doubles as the settle
+    # for the tab switch (empty new file and STARTUP content are otherwise
+    # indistinguishable by document text alone).
+    await h.readonly_guard_ready(page)
     before = await h.doc_text(page)
     await h.active_cm(page).click()
     await page.keyboard.type('W')
-    await page.wait_for_timeout(300)
-    assert await h.doc_text(page) == before, 'STARTUP typing still blocked'
+    assert await h.doc_unchanged_for(page, before), 'STARTUP typing still blocked'
     assert await page.locator('#wb-undo-btn').is_disabled()
     assert _console_errors(msgs) == []
 

@@ -135,6 +135,12 @@
                         el.editorPromise.then(function(view) {
                             resolve(elId === window.__wbEditorId ? view : null);
                         });
+                        // resolve() is idempotent, so a view that never settles
+                        // (hung plugin import) cannot wedge callers past the
+                        // deadline: fall back to null once it passes.
+                        setTimeout(function() {
+                            resolve(null);
+                        }, Math.max(0, deadline - Date.now()) + 50);
                         return;
                     }
                     if (Date.now() < deadline) setTimeout(tick, 50);

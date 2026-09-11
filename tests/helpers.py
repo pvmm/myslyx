@@ -49,11 +49,25 @@ async def wait_for_settings_value(page, row_id, value, timeout=10000):
 
 
 async def set_language(page, label):
-    """Pick a language from the toolbar LANG dropdown by its shown label."""
+    """Pick a language from the toolbar LANG dropdown by its shown label.
+
+    Waits for the dropdown to actually open and then close instead of sleeping.
+    Nothing here assumes the selection was accepted (read-only files reject it,
+    clash dialogs interrupt it) — callers poll on their own observable after.
+    """
     await page.click('.wb-select')
-    await page.wait_for_timeout(500)
+    await page.wait_for_function("""() => {
+        const m = document.querySelector('.q-menu');
+        if (!m) return false;
+        const cs = getComputedStyle(m);
+        return cs.visibility !== 'hidden' && cs.opacity !== '0'
+            && m.getBoundingClientRect().width > 0;
+    }""", timeout=10000)
     await page.locator('.q-menu').get_by_text(label, exact=True).first.click()
-    await page.wait_for_timeout(600)
+    await page.wait_for_function("""() => {
+        const m = document.querySelector('.q-menu');
+        return !m || m.getBoundingClientRect().width === 0;
+    }""", timeout=10000)
 
 
 def active_cm(page):
@@ -76,9 +90,17 @@ async def active_tab_name(page):
 
 
 async def go(page, name):
-    """Click the dock tab named ``name`` and wait for the switch to settle."""
+    """Click the dock tab named ``name`` and wait for the switch to land.
+
+    Polls until the tab actually becomes the active one (a server round trip)
+    instead of sleeping a fixed amount.
+    """
     await tab_by_name(page, name).click()
-    await page.wait_for_timeout(700)
+    await page.wait_for_function(
+        f"""() => {{
+            const t = document.querySelector('.wb-file-tab.active .file-name');
+            return !!t && t.textContent.includes({name!r});
+        }}""", timeout=15000)
 
 
 async def new_file(page, expected_tabs):
@@ -126,9 +148,12 @@ async def doc_unchanged_for(page, expected, ms=400):
         {"expected": expected, "ms": ms})
 
 
-async def doc_equals(page, expected, timeout=10000):
+async def doc_equals(page, expected, timeout=10000, msg=None):
     """Wait until the active editor's document equals ``expected``."""
-    await page.wait_for_function(
-        """expected => window.WBEditorActive.current(10000).then(v =>
-            !!(v && v.state.doc.toString() === expected))""",
-        arg=expected, timeout=timeout + 2000)
+    try:
+        await page.wait_for_function(
+            """expected => window.WBEditorActive.current(10000).then(v =>
+                !!(v && v.state.doc.toString() === expected))""",
+            arg=expected, timeout=timeout + 2000)
+    except Exception as exc:
+        raise AssertionError(msg) if msg else exc
