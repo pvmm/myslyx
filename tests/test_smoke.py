@@ -524,6 +524,65 @@ async def lang_combo_locked_for_readonly(page, msgs):
     assert msgs == []
 
 
+async def lang_clash_prompts_rename(page, msgs):
+    # Changing a file's language derives a new filename; if that name already
+    # belongs to another file, a dialog must ask for a different base name.
+    await h.new_file(page, 2)   # untitled_2.bas (HitBasic)
+    await h.new_file(page, 3)   # untitled_3.bas (HitBasic)
+    # Give untitled_2 a Pascal extension: it becomes the clashing target.
+    await h.go(page, 'untitled_2')
+    await h.set_language(page, 'Pascal')
+    # Rename the active untitled_3.bas so its Pascal name would collide:
+    # base 'untitled_2' + '.pas' == untitled_2.pas (already taken).
+    await h.go(page, 'untitled_3')
+    await page.keyboard.press('Control+Alt+r')
+    await page.locator('.wb-dialog:visible .title-text').filter(
+        has_text='Rename current file').wait_for(timeout=10000)
+    await page.locator('.wb-dialog:visible input.q-field__native').click()
+    await page.keyboard.press('Control+a')
+    await page.keyboard.type('untitled_2.txt')
+    await page.locator('.wb-dialog:visible').locator(
+        '.wb-button', has_text='OK').click()
+    await page.wait_for_function("""() => {
+        const a = document.querySelector('.wb-file-tab.active .file-name');
+        return !!a && a.textContent === 'untitled_2';
+    }""")
+    # Setting Pascal now must trigger the clash dialog instead of renaming.
+    await h.set_language(page, 'Pascal')
+    await page.locator('.wb-dialog:visible .title-text').filter(
+        has_text='File name clash').wait_for(timeout=10000)
+    prompt = await page.text_content('#wb-clash-prompt')
+    assert 'untitled_2.pas' in prompt, f'clash message missing clashing name: {prompt!r}'
+    # Cancelling reverts the combo to the file's actual language (HitBasic).
+    await page.locator('.wb-dialog:visible').locator(
+        '.wb-button', has_text='Cancel').click()
+    await page.wait_for_function("""() => {
+        const el = document.getElementById('wb-lang-select');
+        const t = el ? el.querySelector('.ellipsis') : null;
+        return !!t && t.textContent.trim() === 'HitBasic';
+    }""")
+    # Trying again opens the clash dialog; pick a free base name to succeed.
+    await h.set_language(page, 'Pascal')
+    await page.locator('.wb-dialog:visible .title-text').filter(
+        has_text='File name clash').wait_for(timeout=10000)
+    await page.locator('.wb-dialog:visible input.q-field__native').click()
+    await page.keyboard.press('Control+a')
+    await page.keyboard.type('untitled_4')
+    await page.locator('.wb-dialog:visible').locator(
+        '.wb-button', has_text='OK').click()
+    # The file is now untitled_4.pas with Pascal active.
+    await page.wait_for_function("""() => {
+        const a = document.querySelector('.wb-file-tab.active .file-name');
+        return !!a && a.textContent === 'untitled_4';
+    }""")
+    await page.wait_for_function("""() => {
+        const el = document.getElementById('wb-lang-select');
+        const t = el ? el.querySelector('.ellipsis') : null;
+        return !!t && t.textContent.trim() === 'Pascal';
+    }""")
+    assert msgs == []
+
+
 async def hints_c_pascal_root_pages(page, msgs):
     # C and Pascal have their own hint dictionaries; the HINTS panel must show
     # each language's root page when such a file is displayed.
@@ -709,6 +768,7 @@ SMOKE_SUITES = [
     ('smoke/fold-keyword-c', fold_keyword_c),
     ('smoke/lang-combo-tracks-file', lang_combo_tracks_active_file),
     ('smoke/lang-combo-locked-readonly', lang_combo_locked_for_readonly),
+    ('smoke/lang-clash-prompts-rename', lang_clash_prompts_rename),
     ('smoke/hints-c-pascal-root', hints_c_pascal_root_pages),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
     ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),

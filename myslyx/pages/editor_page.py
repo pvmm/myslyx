@@ -674,8 +674,19 @@ def editor_page() -> None:
         # no-op so we do not rename/reconfigure a file just for showing it.
         if target['language'] == language:
             return
+        new_name = _base_name(target['name']) + '.' + _ext_for_lang(language)
+        if any(f['id'] != fid and f['name'] == new_name for f in client_state['files']):
+            _start_lang_clash_resolution(target, language)
+            return
+        _apply_language_change(fid, language, None)
+
+    def _apply_language_change(fid: str, language: str, name: str | None) -> None:
+        """Apply a language switch (and optional explicit new filename)."""
+        target = next((f for f in client_state['files'] if f['id'] == fid), None)
+        if target is None:
+            return
         target['language'] = language
-        target['name'] = _base_name(target['name']) + '.' + _ext_for_lang(language)
+        target['name'] = name or (_base_name(target['name']) + '.' + _ext_for_lang(language))
         file_name_label.set_text(target['name'] + (' 🔒' if target.get('readonly') else ''))
         ed = editors.get(fid)
         if ed is not None:
@@ -962,6 +973,70 @@ def editor_page() -> None:
         _refresh_file_pool()
         _save_to_storage()
         rename_dialog.close()
+
+    # ===== LANG-clash dialog =====
+    # Changing a file's LANG derives a new filename; if another file already
+    # has that name, ask the user to pick a different base name until the new
+    # name no longer clashes (or Cancel aborts the language change).
+    _clash_state: dict = {}
+
+    lang_clash_dialog = ui.dialog().props('persistent')
+    with lang_clash_dialog:
+        with ui.element('div').classes('wb-dialog'):
+            with ui.element('div').classes('wb-title-bar'):
+                ui.label('File name clash').classes('title-text')
+            with ui.element('div').classes('wb-dialog-body'):
+                clash_prompt = ui.label('').style('white-space:pre-line;').props('id=wb-clash-prompt')
+                clash_input = ui.input(label='New base name').props('id=wb-clash-input')
+            with ui.element('div').classes('wb-dialog-buttons'):
+                ui.button('Cancel', on_click=lambda: _cancel_lang_clash()).classes('wb-button')
+                ui.button('OK', on_click=lambda: _confirm_lang_clash()).classes('wb-button')
+
+    def _start_lang_clash_resolution(target: dict, language: str) -> None:
+        ext = _ext_for_lang(language)
+        clash_name = _base_name(target['name']) + '.' + ext
+        _clash_state.update({'fid': target['id'], 'language': language, 'ext': ext})
+        clash_prompt.set_text(
+            f'{clash_name} is already used by another file.\n'
+            f'Choose a different base name for {target["name"]} so it can be '
+            f'renamed to a {LANGUAGES.get(language, language)} file.')
+        clash_input.set_value(_base_name(target['name']))
+        lang_clash_dialog.open()
+        ui.run_javascript('window.WBFocusInput.focus("wb-clash-input");')
+
+    def _confirm_lang_clash() -> None:
+        base = clash_input.value.strip() if hasattr(clash_input, 'value') else None
+        fid = _clash_state.get('fid')
+        language = _clash_state.get('language')
+        ext = _clash_state.get('ext')
+        if not base or not fid or not language or not ext:
+            lang_clash_dialog.close()
+            return
+        cand = _base_name(base) + '.' + ext
+        if any(f['id'] != fid and f['name'] == cand for f in client_state['files']):
+            # Still clashing: keep asking until the name is free.
+            clash_prompt.set_text(
+                f'{cand} is still in use. Please pick another base name.')
+            clash_input.set_value(_base_name(base))
+            ui.run_javascript('window.WBFocusInput.focus("wb-clash-input");')
+            return
+        if client_state['active_id'] != fid:
+            # The user switched to another file while the dialog was open; the
+            # combo is synced to that file, so do not touch it.
+            lang_clash_dialog.close()
+            return
+        lang_clash_dialog.close()
+        _apply_language_change(fid, language, _base_name(base) + '.' + ext)
+
+    def _cancel_lang_clash() -> None:
+        fid = _clash_state.get('fid')
+        lang_clash_dialog.close()
+        if client_state['active_id'] != fid:
+            return
+        # Revert the combo to the file's actual (unchanged) language.
+        target = next((f for f in client_state['files'] if f['id'] == fid), None)
+        if target is not None:
+            lang_select.set_value(target['language'])
 
     # ===== Delete dialog (shared by the DELETE button and the dock X buttons) =====
     _pending_delete_fid: str | None = None

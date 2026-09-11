@@ -54,14 +54,16 @@
 
     window.WBFocusInput = {
         // Focus the first <input> of the element with the given id.
+        // Quasar consumes an 'id' prop on QInput as the datalist id
+        // (list="<id>-datalist"), so the id itself is never an element:
+        // fall back to the <input> that references that datalist.
         focus: function(elId) {
             setTimeout(function() {
                 try {
                     var el = document.getElementById(elId);
-                    if (el) {
-                        var inp = el.querySelector('input');
-                        if (inp) inp.focus();
-                    }
+                    var inp = el ? el.querySelector('input') : null;
+                    if (!inp) inp = document.querySelector('[list="' + elId + '-datalist"]');
+                    if (inp) inp.focus();
                 } catch (e) {}
             }, 50);
         }
