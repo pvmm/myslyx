@@ -843,6 +843,7 @@ html, body {
     cursor: pointer;
     border: 2px solid transparent;
     background: var(--wb-white);
+    margin-bottom: 2px;
 }
 
 .wb-plugin-row:hover,
