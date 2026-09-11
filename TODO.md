@@ -7,7 +7,7 @@
 - [x] when user presses Ctrl+, to display the favicon menu, the top item of the menu should be activated instead of no item being activated, forcing the user to move the arrow keys to figure out where the cursor is.
 - [x] mark code with sleep antipattern in the "Sensitive / flaky code" list below.
 - [x] create an example of a link in the HINTS documentation. For instance: the for keyword in the C language root page is now a link pointing to the "FOR Loop" hint. Make the link appear like a dashed line below the text of the link.
-- [ ] add slider to HINTS panel to adjust font size. Save it to Myslyx config so you can restore the setting back.
+- [x] add slider to HINTS panel to adjust font size. Save it to Myslyx config so you can restore the setting back.
 
 # Sensitive / flaky code to keep an eye on (check each when fixed):
 - [ ] `window.__wbPyBridge` (editor_page.py:76-91) = unguarded global storage API; Python writes whole file pool via json.dumps into run_javascript (375-379). Any JS can call setFiles/setActive and bypass _open_file_request, dedupe, rename/conflict checks and the readonly STARTUP flag.

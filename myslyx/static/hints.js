@@ -42,6 +42,39 @@
         var header = document.querySelector('.wb-hints-sidebar .hints-header');
         if (!header) return false;
 
+        // Font-size slider for the hint text, persisted in the Myslyx config.
+        var DEFAULT_FONT_SIZE = 8;
+        var slider = document.createElement('input');
+        slider.className = 'wb-hints-size';
+        slider.type = 'range';
+        slider.min = '6';
+        slider.max = '24';
+        slider.step = '1';
+        slider.title = 'HINTS font size';
+        try {
+            var cfg0 = window.WBStorage.loadConfig();
+            slider.value = (typeof cfg0.hintFontSize === 'number')
+                ? cfg0.hintFontSize : DEFAULT_FONT_SIZE;
+        } catch(e) {
+            slider.value = DEFAULT_FONT_SIZE;
+        }
+        header.appendChild(slider);
+
+        function applyHintFontSize(px) {
+            var el = document.getElementById(HINTS_CONTENT_ID);
+            if (el) el.style.fontSize = px + 'px';
+        }
+        slider.addEventListener('input', function() {
+            var px = Number(slider.value);
+            applyHintFontSize(px);
+            try {
+                var cfg = window.WBStorage.loadConfig();
+                cfg.hintFontSize = px;
+                window.WBStorage.saveConfig(cfg);
+            } catch(e) { console.warn('hints font size save failed', e); }
+        });
+        applyHintFontSize(Number(slider.value));
+
         var buttons = document.createElement('div');
         buttons.className = 'wb-hints-nav';
 

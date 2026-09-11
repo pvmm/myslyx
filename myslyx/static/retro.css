@@ -675,6 +675,15 @@ html, body {
     gap: 4px;
 }
 
+.wb-hints-sidebar .hints-header .wb-hints-size {
+    width: 64px;
+    height: 14px;
+    accent-color: var(--wb-orange);
+    background: var(--wb-window-bg);
+    border: 1px solid var(--wb-black);
+    cursor: pointer;
+}
+
 .wb-hints-nav-btn {
     font-family: var(--wb-font);
     font-size: 8px;

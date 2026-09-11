@@ -687,6 +687,32 @@ async def hint_link_jumps_to_tip(page, msgs):
     assert msgs == []
 
 
+async def hints_font_size_slider(page, msgs):
+    # The HINTS header has a font-size slider; it rescales the hint text and
+    # the chosen size is persisted in the Myslyx config (restored on reload).
+    await h.new_file(page, 2)
+    await page.locator('.wb-hints-size').wait_for(state='attached', timeout=10000)
+    assert await page.input_value('.wb-hints-size') == '8', 'slider must default to 8px'
+    initial = await page.evaluate("""() =>
+        document.getElementById('hints-content')
+            ? getComputedStyle(document.getElementById('hints-content')).fontSize : null""")
+    assert initial == '8px', f'hints content must start at 8px, got {initial!r}'
+    await page.evaluate("""() => {
+        const s = document.querySelector('.wb-hints-size');
+        s.value = '14';
+        s.dispatchEvent(new Event('input', { bubbles: true }));
+    }""")
+    await page.wait_for_function("""() =>
+        getComputedStyle(document.getElementById('hints-content')).fontSize === '14px'""")
+    # Reload: the slider position and the applied size must come back from config.
+    await page.reload()
+    await page.locator('.wb-hints-size').wait_for(state='attached', timeout=10000)
+    assert await page.input_value('.wb-hints-size') == '14', 'slider must restore from config'
+    await page.wait_for_function("""() =>
+        getComputedStyle(document.getElementById('hints-content')).fontSize === '14px'""")
+    assert msgs == []
+
+
 async def autocomplete_enter_completes(page, msgs):
     # Enter in the autocompletion popup must insert the selected completion
     # (replacing the typed prefix) without leaving a stray newline.
@@ -879,6 +905,7 @@ SMOKE_SUITES = [
     ('smoke/lang-clash-prompts-rename', lang_clash_prompts_rename),
     ('smoke/hints-c-pascal-root', hints_c_pascal_root_pages),
     ('smoke/hint-link-jumps-to-tip', hint_link_jumps_to_tip),
+    ('smoke/hints-font-size-slider', hints_font_size_slider),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
     ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),
     ('smoke/shortcuts-toolbar-actions', shortcuts_toolbar_actions),
