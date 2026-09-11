@@ -11,7 +11,7 @@ in `static/retro.js` and rendered by `static/hints.js` (markdown via
 
 | Language          | Hint file             |
 |-------------------|-----------------------|
-| `HitBasic` (BASIC) | `basic.json`          |
+| `HitBasic`        | `hitbasic.json`       |
 | `C`               | `c.json`              |
 | `Pascal`          | `pascal.json`         |
 | `Text`            | `plaintext.json`      |
@@ -81,7 +81,7 @@ flavor). The `tip` is plain markdown:
 After editing, check the file parses:
 
 ```bash
-.venv/bin/python -c "import json; json.load(open('static/hints/basic.json'))"
+.venv/bin/python -c "import json; json.load(open('static/hints/hitbasic.json'))"
 ```
 
 Then **hard-refresh** the browser (Ctrl+Shift+R). JSON is served statically, so no

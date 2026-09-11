@@ -47,7 +47,7 @@ def _canonical_lang(lang: str | None) -> str | None:
 # Maps stored CodeMirror language values to hint dictionary keys (files under
 # static/hints/<key>.json). Unknown languages fall back to plain text.
 HINT_KEYS: dict[str, str] = {
-    'HitBasic': 'basic',
+    'HitBasic': 'hitbasic',
     'Pascal': 'pascal',
     'C': 'c',
     'Z80': 'plaintext',
