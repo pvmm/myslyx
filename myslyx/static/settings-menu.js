@@ -16,11 +16,6 @@
                 menu.tabIndex = -1;
                 (btn.closest('.wb-app-header') || document.body).appendChild(menu);
 
-                var title = document.createElement('div');
-                title.className = 'wb-settings-title';
-                title.textContent = 'SETTINGS';
-                menu.appendChild(title);
-
                 function closeSubmenu() {
                     submenu.style.display = 'none';
                     pluginsRow.classList.remove('active');
@@ -158,11 +153,6 @@
                 submenu.className = 'wb-plugins-menu';
                 submenu.style.display = 'none';
                 menu.appendChild(submenu);
-
-                var subTitle = document.createElement('div');
-                subTitle.className = 'wb-plugins-title';
-                subTitle.textContent = 'PLUGINS';
-                submenu.appendChild(subTitle);
 
                 var hint = document.createElement('div');
                 hint.className = 'wb-plugins-hint';

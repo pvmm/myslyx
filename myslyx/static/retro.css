@@ -739,17 +739,6 @@ html, body {
     color: var(--wb-text);
 }
 
-.wb-settings-title {
-    background: var(--wb-blue);
-    color: var(--wb-title-text);
-    font-size: 9px;
-    padding: 4px 6px;
-    border: 2px solid var(--wb-black);
-    margin-bottom: 2px;
-    text-align: center;
-    letter-spacing: 1px;
-}
-
 .wb-settings-row {
     display: flex;
     align-items: center;
@@ -814,17 +803,6 @@ html, body {
     padding: 4px;
     font-family: var(--wb-font);
     color: var(--wb-text);
-}
-
-.wb-plugins-title {
-    background: var(--wb-blue);
-    color: var(--wb-title-text);
-    font-size: 9px;
-    padding: 4px 6px;
-    border: 2px solid var(--wb-black);
-    margin-bottom: 2px;
-    text-align: center;
-    letter-spacing: 1px;
 }
 
 .wb-plugins-hint {

@@ -29,9 +29,9 @@ async def settings_menu_opens(page, msgs):
     state = await page.evaluate(
         "(() => { const m = document.getElementById('wb-settings-menu'); "
         "if (!m || m.style.display === 'none') return null; "
-        "const t = m.querySelector('.wb-settings-title'); "
-        "return t ? t.textContent : ''; })()")
-    assert state == 'SETTINGS', f'settings menu did not open: {state!r}'
+        "const r = m.querySelector('.wb-settings-row-label'); "
+        "return r ? 'OPEN' : ''; })()")
+    assert state == 'OPEN', f'settings menu did not open: {state!r}'
     assert msgs == []
 
 
