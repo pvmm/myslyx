@@ -86,19 +86,29 @@ def _kill_orphan_test_browsers() -> None:
 
 
 async def main() -> int:
-    filters = [arg for arg in sys.argv[1:] if arg != "-f"]
-
+    # CLI: [-b firefox|chromium] [-f filter...] — each -f consumes every
+    # following token until the next option, so " -f a -f b" and " -f a b"
+    # both work (the old "everything after the first -f" grab turned a second
+    # "-f" into a filter that substring-matched every suite name containing
+    # "-f", e.g. download-all-files).
+    raw = sys.argv[1:]
+    filters: list[str] = []
     browser_type = DEFAULT_BROWSER
-    if "-b" in sys.argv:
-        index = sys.argv.index("-b")
-        try:
-            browser_type = sys.argv[index + 1]
-        except IndexError:
-            raise SystemExit("-b requires a browser name")
-
-    if "-f" in sys.argv:
-        index = sys.argv.index("-f")
-        filters = sys.argv[index + 1:]
+    i = 0
+    while i < len(raw):
+        arg = raw[i]
+        if arg == "-b" and i + 1 < len(raw):
+            browser_type = raw[i + 1]
+            i += 2
+            continue
+        if arg == "-f":
+            i += 1
+            while i < len(raw) and raw[i] not in ("-f", "-b"):
+                filters.append(raw[i])
+                i += 1
+            continue
+        filters.append(arg)
+        i += 1
 
     wanted = [
         (name, fn)
