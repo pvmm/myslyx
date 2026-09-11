@@ -739,6 +739,13 @@ html, body {
     color: var(--wb-text);
 }
 
+/* The menu focuses itself on open; don't let the browser draw a focus ring
+   around the whole window (Firefox renders one with the theme accent). */
+.wb-settings-menu,
+.wb-settings-menu * {
+    outline: none;
+}
+
 .wb-settings-row {
     display: flex;
     align-items: center;
