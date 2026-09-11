@@ -724,6 +724,27 @@ async def shortcuts_file_io(page, msgs):
     assert msgs == []
 
 
+async def download_all_files(page, msgs):
+    # DOWNLOAD ALL zips every editable file but skips locked ones (STARTUP.txt).
+    await h.new_file(page, 2)
+    await h.focus_active_editor(page)
+    await page.keyboard.type('PRINT 42')
+    await h.doc_equals(page, 'PRINT 42')
+    async with page.expect_download() as dl:
+        await page.click('#wb-download-all-btn')
+    download = await dl.value
+    assert download.suggested_filename.endswith('.zip'), download.suggested_filename
+    import zipfile
+    import io
+    data = await download.path()
+    with zipfile.ZipFile(io.BytesIO(open(data, 'rb').read())) as zf:
+        names = zf.namelist()
+        assert 'STARTUP.txt' not in names, names
+        assert 'untitled_2.bas' in names, names
+        assert zf.read('untitled_2.bas').decode() == 'PRINT 42'
+    assert msgs == []
+
+
 async def shortcuts_pool_cycle(page, msgs):
     # Ctrl+Alt+[ and Ctrl+Alt+] move through the open files in the dock.
     await h.new_file(page, 2)
@@ -775,4 +796,5 @@ SMOKE_SUITES = [
     ('smoke/shortcuts-toolbar-actions', shortcuts_toolbar_actions),
     ('smoke/shortcuts-file-io', shortcuts_file_io),
     ('smoke/shortcuts-pool-cycle', shortcuts_pool_cycle),
+    ('smoke/download-all-files', download_all_files),
 ]

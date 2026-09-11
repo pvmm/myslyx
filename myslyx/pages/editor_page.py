@@ -235,6 +235,12 @@ def editor_page() -> None:
                 with ui.element('div').style('display:flex;flex-direction:column;gap:4px;'):
                     ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button').props('id=wb-upload-btn')
                     ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button').props('id=wb-download-btn')
+                # Download the whole file pool as a single zip, unstacked.
+                download_all_btn = ui.button('DOWNLOAD\nALL', on_click=lambda: _download_all_files()).classes('wb-button').props('id=wb-download-all-btn')
+                with download_all_btn:
+                    # Nest the tooltip (the id override makes Quasar log an
+                    # 'Anchor not found' warning for unattached tooltips).
+                    ui.tooltip('Download every file in the pool as a single .zip')
                 # RESET FILE POOL unstacked
                 ui.button('RESET\nFILE\nPOOL', on_click=lambda: _open_reset_dialog(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
 
@@ -774,6 +780,30 @@ def editor_page() -> None:
                 URL.revokeObjectURL(url);
             }})()
         """)
+
+    def _download_all_files() -> None:
+        # Zip every editable (non-locked) file in the pool and stream it to
+        # the browser. Locked files (e.g. the read-only STARTUP.txt) are
+        # excluded. Duplicate member names (the pool does not enforce
+        # uniqueness) get a numeric suffix before the extension so no entry
+        # overwrites another.
+        from io import BytesIO
+        import zipfile
+        editable = [f for f in client_state['files'] if not f.get('readonly')]
+        if not editable:
+            return
+        buf = BytesIO()
+        seen: dict[str, int] = {}
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for f in editable:
+                name = f.get('name') or 'untitled.txt'
+                count = seen.get(name, 0)
+                seen[name] = count + 1
+                if count:
+                    stem, dot, ext = name.rpartition('.')
+                    name = f'{stem} ({count + 1}){dot}{ext}' if dot else f'{name} ({count + 1})'
+                zf.writestr(name, f.get('content', ''))
+        ui.download(buf.getvalue(), 'myslyx-files.zip')
 
     def _upload_file() -> None:
         # Use client-side file picker and hand the parsed file to the server via

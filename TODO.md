@@ -1,6 +1,6 @@
 # high priority (one commit each)
-- [ ] firefox `multiedit/readonly-startup` is flaky: the first suite run after the 6s boot settle (runner.py:90), relies on fixed wait_for_timeout(400) typing settles. Harden it with poll-based waits and re-verify on firefox + chromium.
-- [ ] if changing the LANG of a file creates a name clash with another file, ask the user to rename the filename until the new name no longer clashes.
+- [x] firefox `multiedit/readonly-startup` is flaky: the first suite run after the 6s boot settle (runner.py:90), relies on fixed wait_for_timeout(400) typing settles. Harden it with poll-based waits and re-verify on firefox + chromium.
+- [x] if changing the LANG of a file creates a name clash with another file, ask the user to rename the filename until the new name no longer clashes.
 - [ ] add button to download all files in the file pool ("DOWNLOAD\nALL") as a zipped single file. Put it left of "RESET FILE POOL", unstacked.
 - [ ] the sub folding in HitBasic displays "sub...end sub" when folded, but I would like it to display the name of the subroutine too, like the way the folding in the C language displays the name of the function even when the function is folded. The same thing happens to "function...end function" in HitBasic. Can you fix it to display the name of the function/sub even when folded?
 - [ ] the if/end if folding in HitBasic displays "if...end if" when folded, but I would like it to display the test condition of the condition too, like the way the folding of conditions work in the C language. Can you fix it?

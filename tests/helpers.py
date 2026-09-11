@@ -128,3 +128,14 @@ async def doc_unchanged_for(page, expected, ms=400):
             tick();
         })""",
         {"expected": expected, "ms": ms})
+
+
+async def doc_equals(page, expected, timeout=10000):
+    """Wait until the active editor's document equals ``expected``."""
+    await page.wait_for_function(
+        """expected => new Promise((res) => {
+            const el = getElement(window.__wbEditorId);
+            if (!el || !el.editorPromise) { res(false); return; }
+            el.editorPromise.then(v => res(v.state.doc.toString() === expected));
+        })""",
+        arg=expected, timeout=timeout)
