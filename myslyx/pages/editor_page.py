@@ -379,9 +379,8 @@ def editor_page() -> None:
         client_state['active_id'] = fid
         _refresh_file_pool()
         _save_to_storage()
-        # Ask the hints panel to open this language's root page after the
-        # new file's editor becomes active.
-        ui.run_javascript('window.__wbPendingRoot = true;')
+        # _load_file_into_editor asks the hints panel to open this language's
+        # root page after the new file's editor becomes active.
         _load_file_into_editor(new)
 
     def _toggle_symbol_export() -> None:
@@ -654,10 +653,12 @@ def editor_page() -> None:
             """
         )
         _update_export_button()
-        # Let static scripts (hints.js, plugins.js) bind to the now-active editor.
+        # Let static scripts (hints.js, plugins.js) bind to the now-active
+        # editor and have the hints panel open this file's language root page.
         ui.run_javascript(f'''
             (function() {{
                 try {{
+                    window.__wbPendingRoot = true;
                     window.dispatchEvent(new CustomEvent('wb-active-editor', {{ detail: '{fid}' }}));
                 }} catch(e) {{}}
             }})();
@@ -697,6 +698,7 @@ def editor_page() -> None:
         ui.run_javascript(f'''
             (function() {{
                 try {{
+                    window.__wbPendingRoot = true;
                     window.dispatchEvent(new CustomEvent('wb-active-editor', {{ detail: '{fid}' }}));
                 }} catch(e) {{}}
             }})();

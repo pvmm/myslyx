@@ -438,6 +438,23 @@ async def lang_combo_tracks_active_file(page, msgs):
     assert msgs == []
 
 
+async def hints_plaintext_for_c_pascal(page, msgs):
+    # C and Pascal have no hint dictionary; the HINTS panel must show the
+    # plain-text root page while such a file is displayed.
+    await h.new_file(page, 2)
+    await h.set_language(page, 'Pascal')
+    await page.wait_for_function("""() => {
+        const t = document.querySelector('#hints-content .hint-text');
+        return !!t && t.textContent.indexOf('Plain Text') !== -1;
+    }""")
+    await h.set_language(page, 'C')
+    await page.wait_for_function("""() => {
+        const t = document.querySelector('#hints-content .hint-text');
+        return !!t && t.textContent.indexOf('Plain Text') !== -1;
+    }""")
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -453,4 +470,5 @@ SMOKE_SUITES = [
     ('smoke/fold-keyword-basic', fold_keyword_basic),
     ('smoke/fold-keyword-c', fold_keyword_c),
     ('smoke/lang-combo-tracks-file', lang_combo_tracks_active_file),
+    ('smoke/hints-plaintext-c-pascal', hints_plaintext_for_c_pascal),
 ]
