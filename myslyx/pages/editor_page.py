@@ -908,7 +908,7 @@ def editor_page() -> None:
                         {'keys': 'F1', 'action': 'Open shortcuts window'},
                         {'keys': 'F2', 'action': 'Reload hints root page'},
                         {'keys': 'F5', 'action': 'Refresh editor'},
-                        {'keys': 'Ctrl+Shift+E', 'action': 'Toggle EXPORT SYMBOLS'},
+                        {'keys': 'Ctrl+Alt+E', 'action': 'Toggle EXPORT SYMBOLS'},
                         {'keys': 'Ctrl+Alt+R', 'action': 'Rename current file'},
                         {'keys': 'Ctrl+Alt+U', 'action': 'Upload file'},
                         {'keys': 'Ctrl+Alt+D', 'action': 'Download current file'},
