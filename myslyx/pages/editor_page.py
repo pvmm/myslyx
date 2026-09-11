@@ -44,6 +44,52 @@ def _canonical_lang(lang: str | None) -> str | None:
         return lang
     return LEGACY_LANGUAGES.get(lang) if lang is not None else None
 
+
+def _normalize_storage_pool(files: Any) -> list[dict[str, Any]]:
+    """Validate and normalize the file pool the client hands the server at boot.
+
+    The browser owns the pool (localStorage) and `__wbPyBridge.setFiles` writes
+    it verbatim, so any script can put arbitrary data there.  Normalize the
+    adopted pool so cheap-injected entries cannot slip past the server-side
+    checks (`_open_file_request` dedupe / rename / clash guards): non-dict
+    entries are dropped, missing fields are coerced to safe values, ids are
+    deduplicated, unknown languages fall back to 'Text', and the reserved
+    STARTUP.txt file always keeps its lock even if the stored flag was dropped.
+    """
+    if not isinstance(files, list):
+        return []
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for raw in files:
+        if not isinstance(raw, dict):
+            continue
+        fid = raw.get('id')
+        fid = str(fid) if fid is not None else ''
+        if not fid or fid in seen:
+            continue
+        name = raw.get('name')
+        name = str(name) if name is not None else 'untitled.txt'
+        lang = raw.get('language')
+        lang = str(lang) if lang is not None else ''
+        canon = _canonical_lang(lang)
+        content = raw.get('content')
+        content = content if isinstance(content, str) else ''
+        readonly = bool(raw.get('readonly'))
+        # The bundled STARTUP file is always locked; a client that drops the
+        # flag must not make it editable on the next reload.
+        if name == 'STARTUP.txt':
+            readonly = True
+        seen.add(fid)
+        out.append({
+            'id': fid,
+            'name': name,
+            'language': canon if canon is not None else 'Text',
+            'content': content,
+            'readonly': readonly,
+            'export_symbols': bool(raw.get('export_symbols', True)),
+        })
+    return out
+
 # Maps stored CodeMirror language values to hint dictionary keys (files under
 # static/hints/<key>.json). Unknown languages fall back to plain text.
 HINT_KEYS: dict[str, str] = {
@@ -841,15 +887,12 @@ def editor_page() -> None:
                 data = json.loads(result) if isinstance(result, str) else result
         except (json.JSONDecodeError, TypeError):
             data = {'files': [], 'active': None}
-        client_state['files'] = data.get('files', [])
-        client_state['active_id'] = data.get('active')
-
-        # Migrate files that carry a language no longer offered by the editor
-        # (e.g. saved as Python or Markdown) to plain text, and legacy ids
-        # (e.g. "VBScript") to their renamed value.
-        for f in client_state['files']:
-            canon = _canonical_lang(f.get('language'))
-            f['language'] = canon if canon is not None else 'Text'
+        # Never trust the raw pool: __wbPyBridge.setFiles writes localStorage
+        # verbatim, so anything a script injected is normalized before it
+        # reaches the server state (shapes, dedupe, readonly STARTUP, langs).
+        client_state['files'] = _normalize_storage_pool(data.get('files', []))
+        active = data.get('active')
+        client_state['active_id'] = str(active) if active is not None else None
 
         # If there are no files in storage, create a starter file so the UI
         # shows an initial file next to the '+ NEW' button and loads it into

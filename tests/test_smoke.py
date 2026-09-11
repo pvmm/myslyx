@@ -713,6 +713,45 @@ async def hints_font_size_slider(page, msgs):
     assert msgs == []
 
 
+async def storage_pool_hardened(page, msgs):
+    # __wbPyBridge.setFiles writes the whole pool to localStorage verbatim, so
+    # a script could inject junk or drop STARTUP's lock. Boot adoption must
+    # normalize: drop non-dict / duplicate-id entries, coerce shapes, map
+    # unknown languages to Text and keep STARTUP.txt locked.
+    await page.evaluate("""() => {
+        window.WBStorage.saveFiles([
+            { id: 'hack-1', name: 'hack.bas', language: 'Python', content: 123, export_symbols: 'yes' },
+            { name: 'nolabel.txt', content: 'JUNK' },
+            'just-a-string',
+            { id: 'hack-1', name: 'dup.c', language: 'C', content: 'int x;' },
+            { id: 'hack-2', name: 'STARTUP.txt', language: 'Python', content: 'injected', readonly: false },
+            { id: 'hack-3', name: 'ok.bas', language: 'HitBasic', content: 'PRINT 42' },
+        ]);
+        window.WBStorage.saveActive('hack-2');
+    }""")
+    await page.reload()
+    await page.wait_for_selector('.wb-file-tab', timeout=10000)
+    n_tabs = await page.locator('.wb-file-tab').count()
+    assert n_tabs == 3, f'normalized pool must keep 3 files, got {n_tabs}'
+    icons = await page.evaluate("""() => Array.from(
+        document.querySelectorAll('.wb-file-tab .file-icon')).map(e => e.textContent)""")
+    # hack.bas was coerced to Text (unknown language, non-str content); the
+    # duplicate hack-1 entry and the id-less entries were dropped.
+    assert icons == ['TXT', 'TXT', 'BAS'], f'icons: {icons}'
+    assert await h.active_tab_name(page) == 'STARTUP'
+    lock = await page.evaluate("""() =>
+        !!(document.querySelector('.wb-file-tab.active .file-lock'))""")
+    assert lock, 'STARTUP must stay locked even if the stored flag was dropped'
+    # The adopted STARTUP keeps its (injected) content but still blocks typing.
+    assert await h.doc_text(page) == 'injected'
+    await h.focus_active_editor(page)
+    await h.readonly_guard_ready(page)
+    await page.keyboard.type('Q')
+    assert await h.doc_unchanged_for(page, 'injected'), \
+        'readonly must be enforced server-side after reload'
+    assert msgs == []
+
+
 async def autocomplete_enter_completes(page, msgs):
     # Enter in the autocompletion popup must insert the selected completion
     # (replacing the typed prefix) without leaving a stray newline.
@@ -906,6 +945,7 @@ SMOKE_SUITES = [
     ('smoke/hints-c-pascal-root', hints_c_pascal_root_pages),
     ('smoke/hint-link-jumps-to-tip', hint_link_jumps_to_tip),
     ('smoke/hints-font-size-slider', hints_font_size_slider),
+    ('smoke/storage-pool-hardened', storage_pool_hardened),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
     ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),
     ('smoke/shortcuts-toolbar-actions', shortcuts_toolbar_actions),
