@@ -129,7 +129,7 @@ async def main() -> int:
             browser: Browser | None = None
 
             try:
-                browser = await pw[browser_type].launch()
+                browser = await pw[browser_type].launch(headless=True)
 
                 context: BrowserContext | None = None
 

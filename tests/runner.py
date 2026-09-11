@@ -99,7 +99,7 @@ async def run_suite(browser, page, suite_name, fn, port):
 async def run_browser(browser_type: str, port: int) -> list:
     results = []
     async with async_playwright() as pw:
-        browser = await pw[browser_type].launch()
+        browser = await pw[browser_type].launch(headless=True)
         try:
             for suite_name, fn in ALL_SUITES:
                 context = await browser.new_context(service_workers='block')
