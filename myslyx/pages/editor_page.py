@@ -111,6 +111,7 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/editor-upload.js"></script>')
     ui.add_head_html('<script src="/static/editor-keyboard.js"></script>')
     ui.add_head_html('<script src="/static/settings-menu.js"></script>')
+    ui.add_head_html('<script src="/static/editor-toolbar.js"></script>')
     ui.add_head_html('<script src="/static/shortcuts.js"></script>')
     plugin_manifest_by_name: dict[str, Any] = {}
 
@@ -636,23 +637,7 @@ def editor_page() -> None:
             }})();
         ''')
         # Disable/enable toolbar buttons for read-only files by ID
-        ui.run_javascript(
-            f"""
-            (function() {{
-                try {{
-                    var r = {str(readonly).lower()};
-                    var rn = document.getElementById('wb-rename-btn');
-                    if (rn) rn.disabled = r;
-                    var d = document.getElementById('wb-delete-btn');
-                    if (d) d.disabled = r;
-                    var u = document.getElementById('wb-undo-btn');
-                    if (u) u.disabled = r;
-                    var rr = document.getElementById('wb-redo-btn');
-                    if (rr) rr.disabled = r;
-                }} catch (e) {{}}
-            }})();
-            """
-        )
+        ui.run_javascript(f'window.WBSetReadonly.apply({str(readonly).lower()});')
         _update_export_button()
         # Let static scripts (hints.js, plugins.js) bind to the now-active
         # editor and have the hints panel open this file's language root page.
@@ -878,12 +863,7 @@ def editor_page() -> None:
     ui.element('div').props('id=wb-storage-sync-bridge').style('display:none;').on(
         'wb-storage-sync',
         _on_storage_sync,
-        js_handler=(
-            "() => { try { const fs = WBStorage.loadFiles(); "
-            "const act = WBStorage.loadActive(); "
-            "emit(fs && fs.length ? JSON.stringify({files: fs, active: act}) : null); } "
-            "catch(e) { emit(null); } }"
-        ),
+        js_handler="() => window.WBStorageSync.emitFiles(emit)",
     )
 
     ui.timer(0.8, _init, once=True)
@@ -961,17 +941,7 @@ def editor_page() -> None:
         rename_input.set_value(target.get('name', ''))
         rename_dialog.open()
         # focus the input inside the dialog after a short delay
-        ui.run_javascript(
-            """
-            setTimeout(function() {
-                const el = document.getElementById('wb-rename-input');
-                if (el) {
-                    const inp = el.querySelector('input');
-                    if (inp) inp.focus();
-                }
-            }, 50);
-            """
-        )
+        ui.run_javascript('window.WBFocusInput.focus("wb-rename-input");')
 
     def _confirm_rename() -> None:
         val = rename_input.value.strip() if hasattr(rename_input, 'value') else None
