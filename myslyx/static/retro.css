@@ -900,6 +900,11 @@ html, body {
     max-width: 500px;
 }
 
+/* Keyboard Shortcuts window: 50% wider than the standard dialog. */
+.wb-dialog.wb-shortcut-dialog {
+    max-width: 750px;
+}
+
 .wb-dialog .wb-title-bar {
     cursor: default;
 }

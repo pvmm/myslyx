@@ -880,7 +880,7 @@ def editor_page() -> None:
     # ===== Shortcuts dialog =====
     shortcut_dialog = ui.dialog()
     with shortcut_dialog:
-        with ui.element('div').classes('wb-dialog'):
+        with ui.element('div').classes('wb-dialog wb-shortcut-dialog'):
             with ui.element('div').classes('wb-title-bar'):
                 ui.label('Keyboard Shortcuts').classes('title-text')
             with ui.element('div').classes('wb-dialog-body'):

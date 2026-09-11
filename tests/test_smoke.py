@@ -253,6 +253,13 @@ async def f1_shortcuts_window(page, msgs):
         () => { const t = document.querySelector('.wb-dialog .title-text');
                 return !!t && t.textContent === 'Keyboard Shortcuts'; }
     """)
+    # The shortcuts window is 50% wider than the standard dialog (750px cap
+    # instead of 500px), so it must render above the old cap once the async
+    # q-table has laid out.
+    await page.wait_for_function("""() => {
+        const d = document.querySelector('.wb-dialog.wb-shortcut-dialog');
+        return !!d && Math.round(d.getBoundingClientRect().width) > 520;
+    }""", timeout=10000)
     await page.keyboard.press('Escape')
     await page.wait_for_function("""() => {
         const t = document.querySelector('.wb-dialog .title-text');
