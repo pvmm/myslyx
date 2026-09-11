@@ -245,7 +245,10 @@
 
                 function open() {
                     applyWrap();
+                    // Activate the top row (PLUGINS) so the cursor position is
+                    // never ambiguous when the menu appears via Ctrl+,.
                     clearRowFocus();
+                    focusRow(1);
                     menu.style.display = 'block';
                     position();
                     btn.classList.add('active');

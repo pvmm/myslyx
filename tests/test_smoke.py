@@ -203,11 +203,28 @@ async def settings_menu_keyboard(page, msgs):
     """)
     # While the menu is open the editor must not hold keyboard focus.
     assert not await in_editor(), 'menu must hold focus, not the editor'
-    # ArrowDown focuses the first row; ArrowUp cycles to the last.
+    # Opening activates the top row (PLUGINS) so the cursor position is never
+    # ambiguous; arrows move the focus and wrap around the ends.
+    await page.wait_for_function("""() => {
+        const m = document.getElementById('wb-settings-menu');
+        const k = m && m.querySelector('.wb-settings-row.keyboard');
+        return !!k && k.id === 'wb-settings-plugins';
+    }""")
+    # ArrowDown moves to the next row (still exactly one focused).
     await page.keyboard.press('ArrowDown')
     focused = await page.evaluate("""() =>
         document.querySelectorAll('#wb-settings-menu .wb-settings-row.keyboard').length""")
     assert focused == 1, f'ArrowDown must focus one row, got {focused}'
+    await page.wait_for_function("""() => {
+        const k = document.querySelector('#wb-settings-menu .wb-settings-row.keyboard');
+        return !!k && k.id === 'wb-settings-wrap';
+    }""")
+    # ArrowUp cycles back to the top row; another ArrowUp wraps to the last.
+    await page.keyboard.press('ArrowUp')
+    await page.wait_for_function("""() => {
+        const k = document.querySelector('#wb-settings-menu .wb-settings-row.keyboard');
+        return !!k && k.id === 'wb-settings-plugins';
+    }""")
     await page.keyboard.press('ArrowUp')
     moved = await page.evaluate("""() => {
         const rows = document.querySelectorAll('#wb-settings-menu .wb-settings-row');
@@ -216,7 +233,7 @@ async def settings_menu_keyboard(page, msgs):
             ? rows.item(rows.length - 1).classList.contains('keyboard')
             : false;
     }""")
-    assert moved, 'ArrowUp must move focus to the last settings row'
+    assert moved, 'ArrowUp on the top row must wrap focus to the last settings row'
     # Escape closes and restores the editor focus; Ctrl+, re-opens.
     await page.keyboard.press('Escape')
     assert not await menu_open(), 'Escape must close the menu'
@@ -669,8 +686,7 @@ async def plugins_submenu_keyboard_nav(page, msgs):
         const m = document.getElementById('wb-settings-menu');
         return !!m && m.style.display !== 'none';
     }""")
-    # ArrowDown focuses the first row (PLUGINS).
-    await page.keyboard.press('ArrowDown')
+    # Opening activates the top row, which is PLUGINS.
     await page.wait_for_function("""() => {
         const k = document.querySelector('#wb-settings-menu .wb-settings-row.keyboard');
         return !!k && k.id === 'wb-settings-plugins';
