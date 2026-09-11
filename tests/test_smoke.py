@@ -922,6 +922,32 @@ async def shortcuts_pool_cycle(page, msgs):
     assert msgs == []
 
 
+async def js_interpolation_quoting(page, msgs):
+    # Item 4: file ids, names and languages are interpolated into
+    # run_javascript. A quote in any of them used to break the generated JS,
+    # so a hostile pool carrying a quote-laden id/name must still load intact.
+    await page.evaluate("""() => {
+        const pool = [
+            {id: "fi'le\\"quoted", name: "O'Brian.txt", language: 'HitBasic',
+             content: 'PRINT 1'},
+            {id: 'plain', name: 'notes.txt', language: 'Text', content: 'SAFE'}
+        ];
+        WBStorage.saveFiles(pool);
+        WBStorage.saveActive("fi'le\\"quoted");
+    }""")
+    await page.reload(wait_until='load')
+    await page.wait_for_function("document.querySelectorAll('.wb-file-tab').length === 2")
+    assert await page.evaluate("window.__wbActiveFid") == 'fi\'le"quoted', \
+        'quote-laden id must reach the page as-is (no JS break)'
+    assert await page.evaluate("window.__wbCurrentLang") == 'HitBasic'
+    assert await h.doc_text(page) == 'PRINT 1', \
+        'quote-laden id must not break the editor-boot JS'
+    await h.go(page, 'notes')
+    assert await h.doc_text(page) == 'SAFE', \
+        'quote-laden name must not break switching to the file'
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -944,6 +970,7 @@ SMOKE_SUITES = [
     ('smoke/hint-link-jumps-to-tip', hint_link_jumps_to_tip),
     ('smoke/hints-font-size-slider', hints_font_size_slider),
     ('smoke/storage-pool-hardened', storage_pool_hardened),
+    ('smoke/js-interpolation-quoting', js_interpolation_quoting),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
     ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),
     ('smoke/shortcuts-toolbar-actions', shortcuts_toolbar_actions),

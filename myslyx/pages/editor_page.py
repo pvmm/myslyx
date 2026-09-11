@@ -477,12 +477,12 @@ def editor_page() -> None:
 
     def _close_file(fid: str) -> None:
         # Drop any persisted user symbols for this file.
-        ui.run_javascript(f'window.__wbPruneSymbols && window.__wbPruneSymbols("{fid}");')
+        ui.run_javascript(f'window.__wbPruneSymbols && window.__wbPruneSymbols({json.dumps(fid)});')
         ed = editors.pop(fid, None)
         slot = editor_slots.pop(fid, None)
         target_el = slot if slot is not None else ed
         if target_el is not None:
-            ui.run_javascript(f'window.__wbEditorIds && delete window.__wbEditorIds["{fid}"];')
+            ui.run_javascript(f'window.__wbEditorIds && delete window.__wbEditorIds[{json.dumps(fid)}];')
             try:
                 target_el.delete()
             except Exception:
@@ -532,7 +532,7 @@ def editor_page() -> None:
             ed.set_language(cm_lang)
         editors[fid] = ed
         editor_slots[fid] = slot
-        ui.run_javascript(f'window.__wbEditorIds["{fid}"] = {ed.id};')
+        ui.run_javascript(f'window.__wbEditorIds[{json.dumps(fid)}] = {json.dumps(ed.id)};')
         return slot
 
     def _open_file_request(file: Any) -> None:
@@ -613,16 +613,19 @@ def editor_page() -> None:
         # value matches the file's language, so _on_language_change no-ops.
         lang_select.set_value(cm_lang)
         f.setdefault('export_symbols', True)
-        ui.run_javascript(f"window.__wbCurrentLang = '{cm_lang}';")
+        # Interpolate values as JSON literals, never raw f-strings: file ids
+        # and names come from client localStorage and may contain quotes that
+        # would otherwise break the generated JS.
+        ui.run_javascript(f'window.__wbCurrentLang = {json.dumps(cm_lang)};')
         ui.run_javascript(
-            f"window.__wbHintKey = '{HINT_KEYS.get(cm_lang, 'plaintext')}';"
-            f"window.__wbActiveFid = '{fid}';"
-            f"window.__wbEditorId = {ed.id};"
+            f'window.__wbHintKey = {json.dumps(HINT_KEYS.get(cm_lang, "plaintext"))};'
+            f'window.__wbActiveFid = {json.dumps(fid)};' 
+            f'window.__wbEditorId = {json.dumps(ed.id)};'
         )
         status_lang.set_text(LANGUAGES.get(cm_lang, cm_lang))
         ui.run_javascript(f'''
             (function() {{
-                var id = {ed.id};
+                var id = {json.dumps(ed.id)};
                 var attempts = 0;
 
                 function wbFocus() {{
@@ -673,7 +676,7 @@ def editor_page() -> None:
                             if (blocked) {{ e.preventDefault(); e.stopPropagation(); return false; }}
                         }};
                     }}
-                    var slot = document.getElementById('wb-edit-slot-{fid}');
+                    var slot = document.getElementById({json.dumps(f'wb-edit-slot-{fid}')});
                     var wrap = slot ? slot.querySelector('.cm-editor') : null;
                     if (wrap){{
                         var el = wrap.querySelector('.cm-content');
@@ -699,7 +702,7 @@ def editor_page() -> None:
             (function() {{
                 try {{
                     window.__wbPendingRoot = true;
-                    window.dispatchEvent(new CustomEvent('wb-active-editor', {{ detail: '{fid}' }}));
+                    window.dispatchEvent(new CustomEvent('wb-active-editor', {{ detail: {json.dumps(fid)} }}));
                 }} catch(e) {{}}
             }})();
         ''')
@@ -748,14 +751,14 @@ def editor_page() -> None:
                 ed.set_language(None)
             else:
                 ed.set_language(language)
-        ui.run_javascript(f"window.__wbHintKey = '{HINT_KEYS.get(language, 'plaintext')}';")
-        ui.run_javascript(f"window.__wbCurrentLang = '{language}';")
+        ui.run_javascript(f'window.__wbHintKey = {json.dumps(HINT_KEYS.get(language, "plaintext"))};')
+        ui.run_javascript(f'window.__wbCurrentLang = {json.dumps(language)};')
         status_lang.set_text(LANGUAGES.get(language, language))
         ui.run_javascript(f'''
             (function() {{
                 try {{
                     window.__wbPendingRoot = true;
-                    window.dispatchEvent(new CustomEvent('wb-active-editor', {{ detail: '{fid}' }}));
+                    window.dispatchEvent(new CustomEvent('wb-active-editor', {{ detail: {json.dumps(fid)} }}));
                 }} catch(e) {{}}
             }})();
         ''')
@@ -765,15 +768,15 @@ def editor_page() -> None:
 
     def _apply_editor_font(font: str) -> None:
         """Apply the chosen font to the CodeMirror editor via a CSS variable."""
-        safe = f"'{font}', monospace"
+        safe = json.dumps(f'"{font}", monospace')
         ui.run_javascript(
-            f"document.documentElement.style.setProperty('--wb-editor-font', \"{safe}\");"
+            "document.documentElement.style.setProperty('--wb-editor-font', " + safe + ");"
         )
 
     def _on_font_change(font: str) -> None:
         _apply_editor_font(font)
         ui.run_javascript(
-            f"localStorage.setItem('wb_editor_font', '{font}');"
+            f"localStorage.setItem('wb_editor_font', {json.dumps(font)});"
         )
 
     def _apply_editor_font_size(font_size: float) -> None:
