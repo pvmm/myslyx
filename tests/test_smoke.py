@@ -660,6 +660,33 @@ async def hints_c_pascal_root_pages(page, msgs):
     assert msgs == []
 
 
+async def hint_link_jumps_to_tip(page, msgs):
+    # "hint:" markdown links in a root page navigate the panel to that entry's
+    # tip; the link itself is styled with a dashed underline.
+    await h.new_file(page, 2)
+    await h.set_language(page, 'C')
+    await page.wait_for_function("""() => {
+        const a = document.querySelector('#hints-content .hint-text a[href^="hint:"]');
+        return !!a && a.textContent === 'for';
+    }""")
+    styled = await page.evaluate("""() => {
+        const a = document.querySelector('#hints-content .hint-text a[href^="hint:"]');
+        return a ? getComputedStyle(a).borderBottomStyle : null;
+    }""")
+    assert styled == 'dashed', f'for link must be dashed-underlined, got {styled!r}'
+    await page.click('#hints-content .hint-text a[href^="hint:"]')
+    await page.wait_for_function("""() => {
+        const t = document.querySelector('#hints-content .hint-title');
+        return !!t && t.textContent === 'FOR';
+    }""")
+    text = await page.evaluate("""() => {
+        const t = document.querySelector('#hints-content .hint-text');
+        return t ? t.textContent : '';
+    }""")
+    assert 'Loop:' in text, f'FOR tip must render the loop example, got {text!r}'
+    assert msgs == []
+
+
 async def autocomplete_enter_completes(page, msgs):
     # Enter in the autocompletion popup must insert the selected completion
     # (replacing the typed prefix) without leaving a stray newline.
@@ -851,6 +878,7 @@ SMOKE_SUITES = [
     ('smoke/lang-combo-locked-readonly', lang_combo_locked_for_readonly),
     ('smoke/lang-clash-prompts-rename', lang_clash_prompts_rename),
     ('smoke/hints-c-pascal-root', hints_c_pascal_root_pages),
+    ('smoke/hint-link-jumps-to-tip', hint_link_jumps_to_tip),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
     ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),
     ('smoke/shortcuts-toolbar-actions', shortcuts_toolbar_actions),

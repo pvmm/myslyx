@@ -6,7 +6,7 @@
 - [x] the if/end if folding in HitBasic displays "if...end if" when folded, but I would like it to display the test condition of the condition too, like the way the folding of conditions work in the C language. Can you fix it?
 - [x] when user presses Ctrl+, to display the favicon menu, the top item of the menu should be activated instead of no item being activated, forcing the user to move the arrow keys to figure out where the cursor is.
 - [x] mark code with sleep antipattern in the "Sensitive / flaky code" list below.
-- [ ] create an example of a link in the HINTS documentation. For instance: the for keyword in the C language root page is now a link pointing to the "FOR Loop" hint. Make the link appear like a dashed line below the text of the link.
+- [x] create an example of a link in the HINTS documentation. For instance: the for keyword in the C language root page is now a link pointing to the "FOR Loop" hint. Make the link appear like a dashed line below the text of the link.
 - [ ] add slider to HINTS panel to adjust font size. Save it to Myslyx config so you can restore the setting back.
 
 # Sensitive / flaky code to keep an eye on (check each when fixed):

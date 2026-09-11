@@ -37,6 +37,21 @@ Any unrecognized language (`Z80`, etc.) falls back to `plaintext`.
 `root` is the language's **root page** (markdown). It is shown in the HINTS panel
 when a new file in that language is created, and **F2** reloads it at any time.
 
+## Cross-links between pages (`hint:` scheme)
+
+Any markdown rendered in the HINTS panel supports links that jump to another
+entry's tip: use the custom `hint:` scheme with the **upper-case** tip key.
+
+```markdown
+- [`for`](hint:FOR)
+```
+
+Clicking the link shows the `FOR` hint page (it participates in the ◀/▶
+history like any hint). `hints.js` intercepts `hint:` links in
+`static/hints.js`; the link is styled with a dashed underline
+(`static/retro.css`, `.hint-text a[href^="hint:"]`). If the key has no tip,
+the fallback is the generic *"X is a language keyword"* line.
+
 ## Writing a help text for a keyword or builtin
 
 1. Make sure the word is listed in `keywords` (language keyword) or `builtins`

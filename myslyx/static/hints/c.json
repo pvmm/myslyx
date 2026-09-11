@@ -1,5 +1,5 @@
 {
-  "root": "# C\n\nC99-ish reference for this editor.\n\n- `printf`/`scanf` I/O and format strings\n- `if`/`else`, `for`, `while`, `switch` control flow\n- `struct`, `enum`, `typedef` types\n- `malloc`/`free` heap memory\n\nPress **F2** to return here.",
+  "root": "# C\n\nC99-ish reference for this editor.\n\n- `printf`/`scanf` I/O and format strings\n- `if`/`else`, [`for`](hint:FOR), `while`, `switch` control flow\n- `struct`, `enum`, `typedef` types\n- `malloc`/`free` heap memory\n\nPress **F2** to return here.",
   "keywords": [
     "auto", "break", "case", "char", "const", "continue", "default",
     "do", "double", "else", "enum", "extern", "float", "for", "goto",

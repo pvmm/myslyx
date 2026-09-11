@@ -512,6 +512,13 @@ html, body {
     color: #333;
 }
 
+#hints-content .hint-text a[href^="hint:"] {
+    color: inherit;
+    border-bottom: 1px dashed currentColor;
+    padding-bottom: 1px;
+    cursor: pointer;
+}
+
 .wb-hints-panel .hint-empty {
     color: #888;
     font-style: italic;

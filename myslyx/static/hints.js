@@ -101,6 +101,35 @@
         });
     }
 
+    // ===== Cross-links between hint pages (e.g. root page -> FOR Loop tip) =====
+    // A markdown link with the custom "hint:" scheme (like [`for`](hint:FOR))
+    // jumps the panel to that entry's tip instead of navigating the whole page.
+
+    function showHintLink(href) {
+        var key = String(href).replace(/^hint:/i, '');
+        if (!key) return;
+        var token = ++panelToken;
+        WBHints.get(getHintKey()).then(function(hints) {
+            if (token !== panelToken) return; // a newer panel update superseded us
+            var upper = key.toUpperCase();
+            var tip = findTip(hints, upper);
+            if (tip) {
+                showHintPage(
+                    '<div class="hint-title">' + upper + '</div>' +
+                    '<div class="hint-text">' + renderMarkdown(tip) + '</div>');
+                return;
+            }
+            var known = hints && (
+                (hints.keywords || []).some(function(k) { return k.toUpperCase() === upper; }) ||
+                (hints.builtins || []).some(function(b) { return b.toUpperCase() === upper; }));
+            if (known) {
+                showHintPage(
+                    '<div class="hint-title">' + upper + '</div>' +
+                    '<div class="hint-text">' + upper + ' is a language keyword.</div>');
+            }
+        });
+    }
+
     function historyBack() {
         if (hintIndex <= 0) return;
         hintIndex--;
@@ -266,20 +295,22 @@
         });
     }
 
+    function findTip(hints, upper) {
+        if (!hints || !hints.tips) return null;
+        var tip = hints.tips[upper];
+        if (tip) return tip;
+        var keys = Object.keys(hints.tips);
+        for (var i = 0; i < keys.length; i++) {
+            if (keys[i].toUpperCase() === upper) return hints.tips[keys[i]];
+        }
+        return null;
+    }
+
     function renderPanel(hintsEl, word, hints) {
         var upper = word.toUpperCase();
 
         // 1. Curated tip (markdown). Match case-insensitively.
-        var tip = null;
-        if (hints.tips) {
-            tip = hints.tips[upper];
-            if (!tip) {
-                var keys = Object.keys(hints.tips);
-                for (var i = 0; i < keys.length; i++) {
-                    if (keys[i].toUpperCase() === upper) { tip = hints.tips[keys[i]]; break; }
-                }
-            }
-        }
+        var tip = findTip(hints, upper);
         if (tip) {
             showHintPage(
                 '<div class="hint-title">' + upper + '</div>' +
@@ -557,6 +588,15 @@
             e.preventDefault();
             try { showRootPage(); } catch(_) {}
         }
+    });
+
+    // Clicking a "hint:KEY" cross-link (rendered by any markdown source) shows
+    // that hint's page instead of letting the browser follow the custom scheme.
+    document.addEventListener('click', function(e) {
+        var a = e.target && e.target.closest ? e.target.closest('a[href^="hint:"]') : null;
+        if (!a) return;
+        e.preventDefault();
+        try { showHintLink(a.getAttribute('href')); } catch(_) {}
     });
 
     // Fallback poll for the very first editor at load time.
