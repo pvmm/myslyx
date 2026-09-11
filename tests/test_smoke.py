@@ -521,6 +521,80 @@ async def plugins_submenu_keyboard_nav(page, msgs):
     assert msgs == []
 
 
+async def shortcuts_toolbar_actions(page, msgs):
+    # + NEW, RENAME, EXPORT SYMBOLS and DELETE as non-colliding shortcuts.
+    await page.keyboard.press('Control+Alt+n')
+    await page.wait_for_function("document.querySelectorAll('.wb-file-tab').length === 2")
+    export = page.locator('#wb-export-btn')
+    await export.wait_for(state='visible', timeout=10000)
+    label_before = (await export.inner_text()).replace('\n', ' ')
+    assert 'ON' in label_before, f'unexpected export label before toggle: {label_before!r}'
+    # RENAME opens the rename dialog (new file is writable).
+    await page.keyboard.press('Control+Alt+r')
+    await page.wait_for_function("""() => {
+        const t = document.querySelector('.wb-dialog .title-text');
+        return !!t && t.textContent === 'Rename current file';
+    }""")
+    await page.keyboard.press('Escape')
+    await page.wait_for_timeout(200)
+    # EXPORT SYMBOLS toggles OFF.
+    await page.keyboard.press('Control+Alt+e')
+    await page.wait_for_function("""() => {
+        const t = document.getElementById('wb-export-btn');
+        return t && t.textContent.indexOf('OFF') !== -1;
+    }""")
+    # DELETE the (empty) new file: it closes without confirmation.
+    await page.keyboard.press('Control+Alt+x')
+    await page.wait_for_function("document.querySelectorAll('.wb-file-tab').length === 1")
+    assert msgs == []
+
+
+async def shortcuts_file_io(page, msgs):
+    # DOWNLOAD the visible file via shortcut.
+    async with page.expect_download() as dl:
+        await page.keyboard.press('Control+Alt+d')
+    download = await dl.value
+    assert 'STARTUP' in download.suggested_filename, download.suggested_filename
+    # UPLOAD via shortcut opens the picker; dropping a .c file creates a tab.
+    async with page.expect_file_chooser() as fc:
+        await page.keyboard.press('Control+Alt+u')
+    chooser = await fc.value
+    await chooser.set_files({
+        'name': 'demo.c', 'mimeType': 'text/plain',
+        'buffer': b'int main() { return 0; }',
+    })
+    await page.wait_for_function("document.querySelectorAll('.wb-file-tab').length === 2")
+    assert msgs == []
+
+
+async def shortcuts_pool_cycle(page, msgs):
+    # Ctrl+Alt+[ and Ctrl+Alt+] move through the open files in the dock.
+    await h.new_file(page, 2)
+    await h.new_file(page, 3)
+    assert await h.active_tab_name(page) == 'untitled_3'
+    await page.keyboard.press('Control+Alt+[')
+    await page.wait_for_function("""() => {
+        const a = document.querySelector('.wb-file-tab.active .file-name');
+        return !!a && a.textContent === 'untitled_2';
+    }""")
+    await page.keyboard.press('Control+Alt+[')
+    await page.wait_for_function("""() => {
+        const a = document.querySelector('.wb-file-tab.active .file-name');
+        return !!a && a.textContent === 'STARTUP';
+    }""")
+    await page.keyboard.press('Control+Alt+]')
+    await page.wait_for_function("""() => {
+        const a = document.querySelector('.wb-file-tab.active .file-name');
+        return !!a && a.textContent === 'untitled_2';
+    }""")
+    await page.keyboard.press('Control+Alt+]')
+    await page.wait_for_function("""() => {
+        const a = document.querySelector('.wb-file-tab.active .file-name');
+        return !!a && a.textContent === 'untitled_3';
+    }""")
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -539,4 +613,7 @@ SMOKE_SUITES = [
     ('smoke/hints-plaintext-c-pascal', hints_plaintext_for_c_pascal),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
     ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),
+    ('smoke/shortcuts-toolbar-actions', shortcuts_toolbar_actions),
+    ('smoke/shortcuts-file-io', shortcuts_file_io),
+    ('smoke/shortcuts-pool-cycle', shortcuts_pool_cycle),
 ]

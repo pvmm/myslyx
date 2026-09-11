@@ -111,6 +111,7 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/editor-upload.js"></script>')
     ui.add_head_html('<script src="/static/editor-keyboard.js"></script>')
     ui.add_head_html('<script src="/static/settings-menu.js"></script>')
+    ui.add_head_html('<script src="/static/shortcuts.js"></script>')
     plugin_manifest_by_name: dict[str, Any] = {}
 
     def collect(base_url: str, plugins_dir: Path) -> None:
@@ -231,8 +232,8 @@ def editor_page() -> None:
                 ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 # Upload/download stacked in two rows
                 with ui.element('div').style('display:flex;flex-direction:column;gap:4px;'):
-                    ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button')
-                    ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button')
+                    ui.button('UPLOAD', on_click=lambda: _upload_file()).classes('wb-button').props('id=wb-upload-btn')
+                    ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button').props('id=wb-download-btn')
                 # RESET FILE POOL unstacked
                 ui.button('RESET\nFILE\nPOOL', on_click=lambda: _open_reset_dialog(), color='red').classes('wb-button').style('background:#aa0000;color:#fff;')
 
@@ -273,7 +274,7 @@ def editor_page() -> None:
 
         # === File Pool Dock ===
         with ui.element('div').classes('wb-dock') as dock:
-            ui.button('+ NEW', on_click=lambda: _new_file()).classes('wb-new-file')
+            ui.button('+ NEW', on_click=lambda: _new_file()).classes('wb-new-file').props('id=wb-new-file-btn')
 
     # ===== Client-side state =====
     client_state: dict[str, Any] = {
@@ -796,6 +797,7 @@ def editor_page() -> None:
             "if (el) el.dispatchEvent(new CustomEvent('wb-storage-sync', { detail: {} }));"
         )
         ui.run_javascript('window.WBEditorKeyboard.install();')
+        ui.run_javascript('window.WBShortcuts.install();')
         ui.run_javascript('window.WBSettingsMenu.install();')
 
     def _on_storage_loaded(result: Any) -> None:
@@ -921,6 +923,14 @@ def editor_page() -> None:
                         {'keys': 'F1', 'action': 'Open shortcuts window'},
                         {'keys': 'F2', 'action': 'Reload hints root page'},
                         {'keys': 'F5', 'action': 'Refresh editor'},
+                        {'keys': 'Ctrl+Shift+E', 'action': 'Toggle EXPORT SYMBOLS'},
+                        {'keys': 'Ctrl+Alt+R', 'action': 'Rename current file'},
+                        {'keys': 'Ctrl+Alt+U', 'action': 'Upload file'},
+                        {'keys': 'Ctrl+Alt+D', 'action': 'Download current file'},
+                        {'keys': 'Ctrl+Alt+X', 'action': 'Delete current file'},
+                        {'keys': 'Ctrl+Alt+N', 'action': 'Create a new file'},
+                        {'keys': 'Ctrl+Alt+[', 'action': 'Previous file in pool'},
+                        {'keys': 'Ctrl+Alt+]', 'action': 'Next file in pool'},
                     ],
                     row_key='keys',
                 ).classes('wb-shortcuts-table').style('width:100%;')
