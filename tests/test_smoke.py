@@ -948,6 +948,34 @@ async def js_interpolation_quoting(page, msgs):
     assert msgs == []
 
 
+async def server_echoes_edits(page, msgs):
+    # Item 5: the server stores whatever the client's on_change reports, so
+    # assert the full client->server round trip by comparing the server-echoed
+    # pool (localStorage re-written by __wbPyBridge.setFiles) against the live
+    # CodeMirror view — never trusting either source in isolation.
+    await h.new_file(page, 2)
+    await page.keyboard.type('HELLO WORLD')
+    await page.wait_for_function(
+        """() => window.WBEditorActive.current(3000).then(v => {
+            if (!v) return false;
+            const f = JSON.parse(localStorage.getItem('wb_editor_files') || '[]')
+                .find(e => e && e.id === window.__wbActiveFid);
+            return !!(f && f.content === v.state.doc.toString());
+        })""",
+        timeout=10000)
+    # Ctrl+Z undoes in the view; the change must echo back to the pool too.
+    await page.keyboard.press('Control+z')
+    await page.wait_for_function(
+        """() => window.WBEditorActive.current(3000).then(v => {
+            if (!v) return false;
+            const f = JSON.parse(localStorage.getItem('wb_editor_files') || '[]')
+                .find(e => e && e.id === window.__wbActiveFid);
+            return !!(f && f.content === v.state.doc.toString());
+        })""",
+        timeout=10000)
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -971,6 +999,7 @@ SMOKE_SUITES = [
     ('smoke/hints-font-size-slider', hints_font_size_slider),
     ('smoke/storage-pool-hardened', storage_pool_hardened),
     ('smoke/js-interpolation-quoting', js_interpolation_quoting),
+    ('smoke/server-echoes-edits', server_echoes_edits),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
     ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),
     ('smoke/shortcuts-toolbar-actions', shortcuts_toolbar_actions),

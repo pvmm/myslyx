@@ -45,6 +45,23 @@ def _canonical_lang(lang: str | None) -> str | None:
     return LEGACY_LANGUAGES.get(lang) if lang is not None else None
 
 
+MAX_FILE_SIZE = 2 * 1024 * 1024
+
+
+def _sanitize_content(value: Any) -> str:
+    """Coerce editor content to a safe string, guarding the server state.
+
+    Editor contents arrive from the client (CodeMirror on_change / the adopted
+    pool), so a misbehaving client could hand the server a non-string or a
+    pathological blast. Non-strings are dropped; oversized values are capped.
+    """
+    if not isinstance(value, str):
+        return ''
+    if len(value) > MAX_FILE_SIZE:
+        value = value[:MAX_FILE_SIZE]
+    return value
+
+
 def _normalize_storage_pool(files: Any) -> list[dict[str, Any]]:
     """Validate and normalize the file pool the client hands the server at boot.
 
@@ -72,8 +89,7 @@ def _normalize_storage_pool(files: Any) -> list[dict[str, Any]]:
         lang = raw.get('language')
         lang = str(lang) if lang is not None else ''
         canon = _canonical_lang(lang)
-        content = raw.get('content')
-        content = content if isinstance(content, str) else ''
+        content = _sanitize_content(raw.get('content'))
         readonly = bool(raw.get('readonly'))
         # The bundled STARTUP file is always locked; a client that drops the
         # flag must not make it editable on the next reload.
@@ -546,7 +562,7 @@ def editor_page() -> None:
         lang = str(file.get('language') or _lang_for_name(name))
         canonical = _canonical_lang(lang)
         lang = canonical if canonical is not None else 'Text'
-        content = file.get('content') if isinstance(file.get('content'), str) else ''
+        content = _sanitize_content(file.get('content'))
         target = next((f for f in client_state['files'] if f['id'] == fid), None)
         if target is None:
             target = {
@@ -708,10 +724,13 @@ def editor_page() -> None:
         ''')
 
     def _on_editor_change(fid: str, value: str) -> None:
-        # Autosave: persist content to storage on every edit of a writable file.
+        # Autosave: persist content to storage on every edit of a writable
+        # file. The value is client-supplied (CodeMirror on_change), so run it
+        # through _sanitize_content before trusting it in the server state —
+        # this is the only place a bogus client value could corrupt the pool.
         cur = next((f for f in client_state['files'] if f['id'] == fid), None)
         if cur is not None and not cur.get('readonly'):
-            cur['content'] = value
+            cur['content'] = _sanitize_content(value)
         _save_to_storage()
 
     def _on_language_change(language: str) -> None:
