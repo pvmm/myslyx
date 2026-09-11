@@ -237,6 +237,8 @@ def editor_page() -> None:
                     ui.button('DOWNLOAD', on_click=lambda: _download_current_file()).classes('wb-button').props('id=wb-download-btn')
                 # Download the whole file pool as a single zip, unstacked.
                 download_all_btn = ui.button('DOWNLOAD\nALL', on_click=lambda: _download_all_files()).classes('wb-button').props('id=wb-download-all-btn')
+                # separator between DOWNLOAD ALL and RESET FILE POOL
+                ui.element('div').style('width:2px;height:20px;background:var(--wb-black);align-self:center;margin:0 6px;')
                 with download_all_btn:
                     # Nest the tooltip (the id override makes Quasar log an
                     # 'Anchor not found' warning for unattached tooltips).
