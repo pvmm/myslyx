@@ -301,6 +301,15 @@
         }
         if (have) return true;
         var ext = [CM.foldService.of(foldProvider), languageRefreshListener(CM, view)];
+        // Show the useful detail of a folded opener line (a SUB's name, an IF's
+        // test condition) instead of a bare ellipsis. Fold ranges for keyword
+        // blocks start right after the block keyword, so the hidden part still
+        // holds that detail; render it before the '…'. preparePlaceholder hands
+        // the placeholder DOM the fold start (the default passes null).
+        if (CM.codeFolding) ext.push(CM.codeFolding({
+            placeholderDOM: foldPlaceholderDOM,
+            preparePlaceholder: function(state, range) { return range.from; }
+        }));
         if (CM.foldKeymap && !(st.facet(CM.keymap) || []).some(function(k) {
             return k && k['Shift-Ctrl-['];
         })) {
@@ -312,6 +321,29 @@
             console.warn('WBFold: install failed', e);
         }
         return false;
+    }
+
+    // Replaces the range a fold hides with the remainder of the opener line
+    // (from the fold start to the end of that line) plus an ellipsis, so a
+    // folded HitBasic block reads e.g. "SUB GREET(NAME) …END SUB" rather than
+    // "SUB …END SUB". Falls back to the plain ellipsis when no opener text is
+    // left (brace blocks, folds that start at a line start).
+    function foldPlaceholderDOM(view, onClick, pos) {
+        var span = document.createElement('span');
+        span.className = 'cm-foldPlaceholder';
+        var label = '…';
+        if (pos != null) {
+            try {
+                var line = view.state.doc.lineAt(pos);
+                var rest = line.text.slice(pos - line.from).trim();
+                if (rest) label = rest + ' …';
+            } catch (e) {}
+        }
+        span.textContent = label;
+        span.setAttribute('aria-label', 'folded code');
+        span.title = 'unfold';
+        span.onclick = onClick;
+        return span;
     }
 
     function currentView() {

@@ -436,6 +436,49 @@ async def fold_keyword_c(page, msgs):
     assert msgs == []
 
 
+async def fold_name_placeholder(page, msgs):
+    # Folded HitBasic blocks keep the opener's detail in the placeholder
+    # (SUB name, IF test condition) instead of a bare ellipsis, the way C
+    # shows the function signature before its folded body.
+    await h.new_file(page, 2)
+    await h.active_cm(page).click()
+    await page.keyboard.type(
+        'SUB GREET(NAME)\nPRINT NAME\nEND SUB\n'
+        'IF X > 2 THEN\nPRINT "big"\nEND IF')
+    await page.wait_for_timeout(400)
+
+    async def fold_placeholder():
+        await page.keyboard.press('Control+Shift+[')
+        await page.wait_for_function("""() =>
+            document.querySelectorAll(
+                '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement' +
+                ':not([style*="visibility"]) span[title="Unfold line"]').length >= 1""")
+        return (await page.locator(
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldPlaceholder').first.text_content()).strip()
+
+    async def unfold():
+        await page.keyboard.press('Control+Shift+]')
+        await page.wait_for_function("""() =>
+            document.querySelectorAll(
+                '.wb-editor-slot:not(.wb-editor-hidden) .cm-foldGutter .cm-gutterElement' +
+                ':not([style*="visibility"]) span[title="Unfold line"]').length === 0""")
+
+    # Fold the SUB block from its opener line; the placeholder keeps the name.
+    await page.keyboard.press('Control+Home')
+    sub_ph = await fold_placeholder()
+    assert 'GREET' in sub_ph, sub_ph
+    await unfold()
+
+    # Fold the IF block from its opener line; the placeholder keeps the test.
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowDown')
+    if_ph = await fold_placeholder()
+    assert 'X > 2' in if_ph, if_ph
+    assert msgs == []
+
+
 async def lang_combo_tracks_active_file(page, msgs):
     # The LANG combo box must mirror the language of the currently visible
     # file (STARTUP.txt is plain text).
@@ -787,6 +830,7 @@ SMOKE_SUITES = [
     ('smoke/ligatures-toggle', ligatures_toggle),
     ('smoke/fold-keyword-basic', fold_keyword_basic),
     ('smoke/fold-keyword-c', fold_keyword_c),
+    ('smoke/fold-name-placeholder', fold_name_placeholder),
     ('smoke/lang-combo-tracks-file', lang_combo_tracks_active_file),
     ('smoke/lang-combo-locked-readonly', lang_combo_locked_for_readonly),
     ('smoke/lang-clash-prompts-rename', lang_clash_prompts_rename),
