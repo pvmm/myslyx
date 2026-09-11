@@ -100,7 +100,10 @@
                 if (data && data.length && data[0] != null) name = data[0];
             } catch (e) {}
         }
-        if (!name && window.__wbCurrentLang) name = window.__wbCurrentLang;
+        // No global-language fallback here: window.__wbCurrentLang is updated
+        // by the server after the editor language actually changes, so relying
+        // on it during a gutter rebuild would classify the new (plain text)
+        // language as the stale previous one, leaving misleading markers.
         name = String(name).toLowerCase();
         if (name.indexOf('hitbasic') >= 0 || name.indexOf('basic') >= 0 || name === 'vbscript') return 'hitbasic';
         if (name.indexOf('pascal') >= 0) return 'pascal';

@@ -410,6 +410,34 @@ async def fold_keyword_c(page, msgs):
     assert msgs == []
 
 
+async def lang_combo_tracks_active_file(page, msgs):
+    # The LANG combo box must mirror the language of the currently visible
+    # file (STARTUP.txt is plain text).
+    async def combo_shows(label):
+        await page.wait_for_function(
+            """label => {
+            const el = document.getElementById('wb-lang-select');
+            if (!el) return false;
+            const t = el.querySelector('.ellipsis');
+            return (t || el).textContent.trim() === label;
+        }""", arg=label)
+
+    await combo_shows('Text')
+    # Importing a HitBasic file activates it -> the combo flips to HitBasic.
+    await page.evaluate("""() => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['PRINT 42'], 'demo.bas', {type: 'text/plain'}));
+        const ev = new Event('drop', {bubbles: true, cancelable: true});
+        try { Object.defineProperty(ev, 'dataTransfer', {value: dt}); } catch(e) { ev.dataTransfer = dt; }
+        document.dispatchEvent(ev);
+    }""")
+    await combo_shows('HitBasic')
+    # Switching back to STARTUP (plain text) restores 'Text'.
+    await h.go(page, 'STARTUP')
+    await combo_shows('Text')
+    assert msgs == []
+
+
 SMOKE_SUITES = [
     ('smoke/wrap-on-preserves', wrap_toggle_preserves_content),
     ('smoke/wrap-toggle-twice', wrap_off_preserves_content),
@@ -424,4 +452,5 @@ SMOKE_SUITES = [
     ('smoke/ligatures-toggle', ligatures_toggle),
     ('smoke/fold-keyword-basic', fold_keyword_basic),
     ('smoke/fold-keyword-c', fold_keyword_c),
+    ('smoke/lang-combo-tracks-file', lang_combo_tracks_active_file),
 ]

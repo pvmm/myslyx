@@ -22,6 +22,11 @@ LANGUAGES: dict[str, str] = {
     'Text': 'Text',
 }
 
+# Default language for newly created files. The LANG combo box mirrors the
+# language of the currently visible file (see _load_file_into_editor), so
+# new files keep this fixed default instead of inheriting the active file's.
+DEFAULT_LANG = 'HitBasic'
+
 # Stored language ids that once existed in LANGUAGES but are no longer
 # offered by the combo box. Files saved with such an id keep working: they
 # resolve to the current id instead of falling back to plain text.
@@ -147,10 +152,11 @@ def editor_page() -> None:
                 lang_select = (
                     ui.select(
                         LANGUAGES,
-                        value='HitBasic',
+                        value=DEFAULT_LANG,
                         on_change=lambda e: _on_language_change(e.value),
                     )
                     .classes('wb-select')
+                    .props('id=wb-lang-select')
                 )
 
             # FONT: label stacked above the combo box
@@ -361,7 +367,7 @@ def editor_page() -> None:
     def _new_file() -> None:
         import random
         fid = f'file_{random.randint(100000, 999999)}'
-        lang = lang_select.value or 'Text'
+        lang = DEFAULT_LANG
         new = {
             'id': fid,
             'name': f'untitled_{len(client_state["files"]) + 1}.{_ext_for_lang(lang)}',
@@ -548,6 +554,9 @@ def editor_page() -> None:
             ed.set_language(None)
         else:
             ed.set_language(cm_lang)
+        # Keep the toolbar LANG combo in sync with the file being shown. The
+        # value matches the file's language, so _on_language_change no-ops.
+        lang_select.set_value(cm_lang)
         f.setdefault('export_symbols', True)
         ui.run_javascript(f"window.__wbCurrentLang = '{cm_lang}';")
         ui.run_javascript(
@@ -665,12 +674,17 @@ def editor_page() -> None:
         fid = client_state['active_id']
         if not fid:
             return
-        for f in client_state['files']:
-            if f['id'] == fid:
-                f['language'] = language
-                f['name'] = _base_name(f['name']) + '.' + _ext_for_lang(language)
-                file_name_label.set_text(f['name'] + (' 🔒' if f.get('readonly') else ''))
-                break
+        target = next((f for f in client_state['files'] if f['id'] == fid), None)
+        if target is None:
+            return
+        # The LANG combo is synced programmatically whenever a file is
+        # activated; if it already matches this file, the on_change is a
+        # no-op so we do not rename/reconfigure a file just for showing it.
+        if target['language'] == language:
+            return
+        target['language'] = language
+        target['name'] = _base_name(target['name']) + '.' + _ext_for_lang(language)
+        file_name_label.set_text(target['name'] + (' 🔒' if target.get('readonly') else ''))
         ed = editors.get(fid)
         if ed is not None:
             if language == 'Text':
