@@ -154,11 +154,6 @@
                 submenu.style.display = 'none';
                 menu.appendChild(submenu);
 
-                var hint = document.createElement('div');
-                hint.className = 'wb-plugins-hint';
-                hint.textContent = 'changes reload the editor on close';
-                submenu.appendChild(hint);
-
                 function rebuildPlugins() {
                     submenu.querySelectorAll('.wb-plugin-row').forEach(function(r) { r.remove(); });
                     var defs = window.WBPlugins.list();
