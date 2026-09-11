@@ -903,6 +903,17 @@ html, body {
 /* Keyboard Shortcuts window: 50% wider than the standard dialog. */
 .wb-dialog.wb-shortcut-dialog {
     max-width: 750px;
+    max-height: calc(100vh - 24px);
+    display: flex;
+    flex-direction: column;
+}
+
+/* The shortcut table scrolls vertically so the close button always fits
+   on screen. */
+.wb-dialog.wb-shortcut-dialog .wb-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .wb-dialog .wb-title-bar {

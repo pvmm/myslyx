@@ -265,6 +265,20 @@ async def f1_shortcuts_window(page, msgs):
         const th = document.querySelector('.wb-shortcuts-table thead th:first-child');
         return !!th && getComputedStyle(th).borderRightWidth === '1px';
     }""")
+    # The window must never outgrow the viewport: the table area scrolls
+    # vertically and the Close button stays on screen.
+    await page.wait_for_function("""() => {
+        const d = document.querySelector('.wb-dialog.wb-shortcut-dialog');
+        const body = d && d.querySelector('.wb-dialog-body');
+        if (!body) return false;
+        return body.clientHeight < body.scrollHeight &&
+               getComputedStyle(body).overflowY === 'auto';
+    }""", timeout=10000)
+    await page.wait_for_function("""() => {
+        const d = document.querySelector('.wb-dialog.wb-shortcut-dialog');
+        const b = d && d.querySelector('.wb-dialog-buttons button');
+        return !!b && Math.round(b.getBoundingClientRect().bottom) <= window.innerHeight;
+    }""", timeout=10000)
     await page.keyboard.press('Escape')
     await page.wait_for_function("""() => {
         const t = document.querySelector('.wb-dialog .title-text');
