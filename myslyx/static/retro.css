@@ -718,9 +718,29 @@ html, body {
     box-shadow:
         inset 1px 1px 0 var(--wb-border-dark);
     font-family: var(--wb-font);
-    font-size: 8px;
+    font-size: 7px;
     line-height: 1.8;
     color: var(--wb-text);
+}
+
+/* Tip page title: small like the body text but distinct (scales with the
+   font-size slider because sizes below use em of the panel font). */
+.wb-hints-sidebar .hint-title {
+    color: var(--wb-blue);
+    font-weight: bold;
+    font-size: 1.1em;
+    margin-bottom: 6px;
+}
+
+/* Keep markdown headings inside the HINTS panel small. Without this, marked's
+   `<h1>` renders at the browser default 2em and dwarfs the hint text. */
+.wb-hints-sidebar .hints-content h1,
+.wb-hints-sidebar .hints-content h2,
+.wb-hints-sidebar .hints-content h3,
+.wb-hints-sidebar .hints-content h4 {
+    font-size: 1.1em;
+    line-height: 1.5;
+    margin: 8px 0 4px;
 }
 
 /* ===== App Header ===== */

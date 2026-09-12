@@ -43,7 +43,7 @@
         if (!header) return false;
 
         // Font-size slider for the hint text, persisted in the Myslyx config.
-        var DEFAULT_FONT_SIZE = 8;
+        var DEFAULT_FONT_SIZE = 7;
         var slider = document.createElement('input');
         slider.className = 'wb-hints-size';
         slider.type = 'range';

@@ -763,11 +763,11 @@ async def hints_font_size_slider(page, msgs):
     # the chosen size is persisted in the Myslyx config (restored on reload).
     await h.new_file(page, 2)
     await page.locator('.wb-hints-size').wait_for(state='attached', timeout=10000)
-    assert await page.input_value('.wb-hints-size') == '8', 'slider must default to 8px'
+    assert await page.input_value('.wb-hints-size') == '7', 'slider must default to 7px'
     initial = await page.evaluate("""() =>
         document.getElementById('hints-content')
             ? getComputedStyle(document.getElementById('hints-content')).fontSize : null""")
-    assert initial == '8px', f'hints content must start at 8px, got {initial!r}'
+    assert initial == '7px', f'hints content must start at 7px, got {initial!r}'
     await page.evaluate("""() => {
         const s = document.querySelector('.wb-hints-size');
         s.value = '14';
