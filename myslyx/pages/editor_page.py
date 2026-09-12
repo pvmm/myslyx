@@ -18,6 +18,9 @@ LANGUAGES: dict[str, str] = {
     'HitBasic': 'HitBasic',
     'Pascal': 'Pascal',
     'C': 'C',
+    # C with the MSXgl engine API (SDCC/ZX81-style fixed-width types). Shares
+    # the CodeMirror 'C' mode; only the hints (static/hints/msxgl.json) differ.
+    'C MSXgl': 'C+MSXgl',
     'Z80': 'Z80 Assembly',
     'Text': 'Text',
 }
@@ -33,6 +36,17 @@ DEFAULT_LANG = 'HitBasic'
 LEGACY_LANGUAGES: dict[str, str] = {
     'VBScript': 'HitBasic',
 }
+
+
+def _cm_mode(lang: str) -> str:
+    """Map a stored language value to the CodeMirror mode to use.
+
+    MSXgl is a C framework, so 'C MSXgl' keeps the 'C' syntax highlighting.
+    Any other stored value is already a valid CodeMirror mode name.
+    """
+    if lang == 'C MSXgl':
+        return 'C'
+    return lang
 
 
 def _canonical_lang(lang: str | None) -> str | None:
@@ -112,6 +126,7 @@ HINT_KEYS: dict[str, str] = {
     'HitBasic': 'hitbasic',
     'Pascal': 'pascal',
     'C': 'c',
+    'C MSXgl': 'msxgl',
     'Z80': 'plaintext',
     'Text': 'plaintext',
 }
@@ -362,7 +377,7 @@ def editor_page() -> None:
         return {
             'hitbasic': 'bas', 'HitBasic': 'bas', 'vbscript': 'bas', 'VBScript': 'bas',
             'pascal': 'pas', 'Pascal': 'pas',
-            'c': 'c', 'C': 'c',
+            'c': 'c', 'C': 'c', 'C MSXgl': 'c',
             'z80': 'asm', 'Z80': 'asm',
             'plaintext': 'txt', 'Text': 'txt',
         }.get(lang, 'txt')
@@ -386,7 +401,7 @@ def editor_page() -> None:
         return {
             'hitbasic': 'BAS', 'HitBasic': 'BAS', 'vbscript': 'BAS', 'VBScript': 'BAS',
             'pascal': 'PAS', 'Pascal': 'PAS',
-            'c': 'C', 'C': 'C',
+            'c': 'C', 'C': 'C', 'C MSXgl': 'C',
             'z80': 'ASM', 'Z80': 'ASM',
             'plaintext': 'TXT', 'Text': 'TXT',
         }.get(language, '??')
@@ -536,7 +551,7 @@ def editor_page() -> None:
                 ed = (
                     ui.codemirror(
                         value=f.get('content', ''),
-                        language=cm_lang,
+                        language=_cm_mode(cm_lang),
                         theme='basicDark',
                         on_change=lambda e, fid=fid: _on_editor_change(fid, e.value),
                     )
@@ -545,7 +560,7 @@ def editor_page() -> None:
         if cm_lang == 'Text':
             ed.set_language(None)
         else:
-            ed.set_language(cm_lang)
+            ed.set_language(_cm_mode(cm_lang))
         editors[fid] = ed
         editor_slots[fid] = slot
         ui.run_javascript(f'window.__wbEditorIds[{json.dumps(fid)}] = {json.dumps(ed.id)};')
@@ -624,7 +639,7 @@ def editor_page() -> None:
             # name 'Text' (which CodeMirror does not know) to set_language.
             ed.set_language(None)
         else:
-            ed.set_language(cm_lang)
+            ed.set_language(_cm_mode(cm_lang))
         # Keep the toolbar LANG combo in sync with the file being shown. The
         # value matches the file's language, so _on_language_change no-ops.
         lang_select.set_value(cm_lang)
@@ -769,7 +784,7 @@ def editor_page() -> None:
             if language == 'Text':
                 ed.set_language(None)
             else:
-                ed.set_language(language)
+                ed.set_language(_cm_mode(language))
         ui.run_javascript(f'window.__wbHintKey = {json.dumps(HINT_KEYS.get(language, "plaintext"))};')
         ui.run_javascript(f'window.__wbCurrentLang = {json.dumps(language)};')
         status_lang.set_text(LANGUAGES.get(language, language))

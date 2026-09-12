@@ -193,7 +193,7 @@
     function getScannerKey() {
         var lang = (window.__wbCurrentLang || '').toUpperCase();
         if (lang === 'PASCAL') return 'pascal';
-        if (lang === 'C') return 'c';
+        if (lang === 'C' || lang === 'C MSXGL') return 'c';
         if (lang === 'Z80') return 'asm';
         return 'basic';
     }
@@ -237,7 +237,16 @@
             }
         } else if (key === 'c') {
             // C: type name(args) {  (function/definition, not prototype/control keywords)
-            var reC = /(?:^|[^A-Za-z0-9_])(?:(?:const|static|inline|extern|volatile|unsigned|signed|long|short|register)\s+)*(?:void|int|char|float|double|bool|size_t)\s+[*\s]*([A-Za-z_][A-Za-z0-9_]*)\s*\([^;{}]*\)\s*\{/g;
+            // Return types include the plain C set plus MSXgl fixed-width types
+            // (u8/u16/..., s8/..., f16/f32, fix16/fix32) so MSXgl-style helpers
+            // defined in the open file are discovered too.
+            var TYPES = '(?:void|int|char|float|double|bool|size_t|'
+                     + 'u8|u16|u32|u64|s8|s16|s32|s64|f16|f32|'
+                     + 'fix16|fix16_16|fix32|f16_16|f32_32)';
+            var reC = new RegExp(
+                '(?:^|[^A-Za-z0-9_])'
+                + '(?:(?:const|static|inline|extern|volatile|unsigned|signed|long|short|register)\\s+)*'
+                + TYPES + '\\s+[*\\s]*([A-Za-z_][A-Za-z0-9_]*)\\s*\\([^;{}]*\\)\\s*\\{', 'g');
             while ((m = reC.exec(text)) !== null) {
                 add(m[1], 'function', m.index + m[0].indexOf(m[1]));
             }

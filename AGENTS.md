@@ -19,6 +19,7 @@ Key files
 - `myslyx/pages/editor_page.py` — main NiceGUI page for the editor and toolbar.
 - `myslyx/static/retro.js` — client-side helpers and storage (`WBStorage`, `WBHints`).
 - `myslyx/static/hints/` — language hint dictionaries (JSON). To add/change keyword or builtin help texts, see `myslyx/static/hints/README.md`.
+- `tools/gen_msxgl_hints.py` — generates `static/hints/msxgl.json` (`C MSXgl` hints) from the MSXgl engine sources; re-run it after an MSXgl upgrade. `msxgl.json` is never hand-edited.
 - `myslyx/static/hints.js` — hints sidebar, autocomplete popup and user-symbol scanner.
 - `myslyx/static/retro.css` — theme and editor gutter alignment.
 

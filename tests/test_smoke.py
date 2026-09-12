@@ -707,6 +707,57 @@ async def hint_link_jumps_to_tip(page, msgs):
     assert msgs == []
 
 
+async def hints_msxgl_root_and_builtins(page, msgs):
+    # The C+MSXgl language maps to static/hints/msxgl.json: its root page must
+    # group the engine functions by module (collapsible <details>) and functions
+    # must be autocomplete builtins with full tips.
+    await h.new_file(page, 2)
+    await h.set_language(page, 'C+MSXgl')
+    # Root page: MSXgl reference mentioning SDCC, module sections, function links.
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
+    }""", timeout=15000)
+    body = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text').textContent || ''""")
+    assert 'SDCC' in body, 'root page must mention the SDCC compiler'
+    assert 'psg.h' in body, 'root page must list a PSG module section'
+    assert body.count('(') > 10, 'root page must list per-module function counts'
+    # A hint: link jumps to the function's tip (expand the PSG module first).
+    await page.evaluate("""() => {
+        const d = Array.from(document.querySelectorAll('#hints-content details'))
+            .find(d => d.querySelector('summary').textContent.includes('psg.h'));
+        if (d) d.open = true;
+    }""")
+    await page.click('#hints-content .hint-text a[href="hint:PSG_SETREGISTER"]')
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'PSG_SETREGISTER'""")
+    tip = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text')?.textContent || ''""")
+    assert 'Set the value of a given register' in tip, \
+        f'PSG_SetRegister tip must include the description, got {tip!r}'
+    assert 'Parameters:' in tip, 'tip must render the Parameters section'
+    assert 'reg' in tip and 'value' in tip, 'tip must list the parameters'
+    # F2 restores the module index root page.
+    await page.keyboard.press('F2')
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
+    }""", timeout=15000)
+    # MSXgl functions are autocomplete builtins.
+    await h.active_cm(page).click()
+    await page.keyboard.type('PSG_Set')
+    await page.wait_for_selector('.wb-autocomplete-popup', timeout=15000)
+    popup = await page.evaluate("""() =>
+        Array.from(document.querySelectorAll('.wb-autocomplete-popup div'))
+            .map(el => el.textContent.trim()).filter(Boolean)""")
+    assert any('PSG_SetRegister' in t for t in popup), \
+        f'autocomplete must offer PSG_SetRegister, got {popup!r}'
+    assert any('builtin' in t for t in popup), \
+        f'completions must be tagged builtin, got {popup!r}'
+    assert msgs == []
+
+
 async def hints_font_size_slider(page, msgs):
     # The HINTS header has a font-size slider; it rescales the hint text and
     # the chosen size is persisted in the Myslyx config (restored on reload).
@@ -1018,6 +1069,7 @@ SMOKE_SUITES = [
     ('smoke/lang-clash-prompts-rename', lang_clash_prompts_rename),
     ('smoke/hints-c-pascal-root', hints_c_pascal_root_pages),
     ('smoke/hint-link-jumps-to-tip', hint_link_jumps_to_tip),
+    ('smoke/hints-msxgl-root-builtins', hints_msxgl_root_and_builtins),
     ('smoke/hints-font-size-slider', hints_font_size_slider),
     ('smoke/storage-pool-hardened', storage_pool_hardened),
     ('smoke/js-interpolation-quoting', js_interpolation_quoting),

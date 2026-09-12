@@ -13,10 +13,25 @@ in `static/retro.js` and rendered by `static/hints.js` (markdown via
 |-------------------|-----------------------|
 | `HitBasic`        | `hitbasic.json`       |
 | `C`               | `c.json`              |
+| `C MSXgl`         | `msxgl.json`          |
 | `Pascal`          | `pascal.json`         |
 | `Text`            | `plaintext.json`      |
 
 Any unrecognized language (`Z80`, etc.) falls back to `plaintext`.
+
+## `msxgl.json` is generated
+
+`msxgl.json` is **not hand-edited**: it is generated from the MSXgl engine
+sources by `tools/gen_msxgl_hints.py` (which parses the Natural Docs
+`// Function:` comments in `engine/src/**/*.h`). Its `root` page groups every
+MSXgl function by module in collapsible sections; each function becomes an
+autocomplete builtin with a full tip (signature, description, parameters,
+return). To regenerate after an MSXgl upgrade:
+
+```bash
+.venv/bin/python tools/gen_msxgl_hints.py \
+    --src <path to msxgl/engine/src> --out myslyx/static/hints/msxgl.json
+```
 
 ## Schema
 
