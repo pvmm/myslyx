@@ -780,6 +780,8 @@ async def hints_msxgl_root_and_builtins(page, msgs):
             .map(el => el.textContent.trim()).filter(Boolean)""")
     assert any('VDP_MODE' in t for t in popup), \
         f'autocomplete must offer VDP_MODE, got {popup!r}'
+    assert any('VDP_MODE_GRAPHIC4' in t for t in popup), \
+        f'autocomplete must offer the enum constant VDP_MODE_GRAPHIC4, got {popup!r}'
     assert any('type' in t for t in popup), \
         f'type completions must be tagged "type", got {popup!r}'
     assert msgs == []

@@ -5,7 +5,8 @@ Reads every MSXgl header (engine/src/**/*.h) and turns the Natural Docs style
 function comments into a Myslyx hint dictionary:
 
   * `builtins`    - all MSXgl function names (drives autocomplete)
-  * `types`       - the documented enum and struct names (also autocomplete)
+  * `types`       - the documented enum and struct names plus their enum
+                    constant names (drives type autocomplete)
   * `tips`        - per-function markdown (description, C signature, params,
                     return value), keyed by the UPPER-CASE function name
   * `root`        - the HINTS panel root page: one collapsible <details>
@@ -726,6 +727,17 @@ def main():
     all_doc_structs = sorted(n for n, t in all_types.items()
                              if t["kind"] == "struct" and n in all_doc_types)
 
+    # Enum constant names are globally-scoped values; they must autocomplete
+    # alongside the type names that own them.
+    enum_const_names = set()
+    for tn in all_doc_types:
+        t = all_types[tn]
+        if t["kind"] == "enum":
+            for m in t.get("members") or []:
+                if m[0]:
+                    enum_const_names.add(m[0])
+    all_symbol_names = sorted(all_doc_types | enum_const_names)
+
     # Per-function: which types does each signature reference?
     fn_type_map = {}
     for name, doc in all_names.items():
@@ -755,7 +767,7 @@ def main():
         "root": root_markdown(modules, all_doc_enums, all_doc_structs) or "# MSXgl",
         "keywords": C_KEYWORDS,
         "builtins": list(all_names.keys()),
-        "types": sorted(all_doc_types),
+        "types": all_symbol_names,
         "tips": tips,
         "patterns": [],
     }
