@@ -723,6 +723,20 @@ async def hints_msxgl_root_and_builtins(page, msgs):
     assert 'SDCC' in body, 'root page must mention the SDCC compiler'
     assert 'psg.h' in body, 'root page must list a PSG module section'
     assert body.count('(') > 10, 'root page must list per-module function counts'
+    # Module sections are ordered alphabetically by header name (ignoring the
+    # directory they live in), so tool/kanji.h comes before vdp.h.
+    sections = await page.evaluate("""() =>
+        Array.from(document.querySelectorAll('#hints-content details summary'))
+            .map(s => s.textContent).filter(t => t.includes('.h'))""")
+    def section_key(t):
+        return t.split(' - ')[-1].split('/')[-1].lower()
+    bases = [section_key(t) for t in sections]
+    assert bases == sorted(bases), \
+        f'root module sections must be alphabetical by header name, got {sections!r}'
+    assert any('kanji.h' in t for t in sections) and any('vdp.h' in t for t in sections)
+    assert section_key([t for t in sections if 'kanji.h' in t][0]) < \
+        section_key([t for t in sections if 'vdp.h' in t][0]), \
+        f'tool/kanji.h must sort before vdp.h, got {sections!r}'
     # A hint: link jumps to the function's tip (expand the PSG module first).
     await page.evaluate("""() => {
         const d = Array.from(document.querySelectorAll('#hints-content details'))

@@ -567,7 +567,7 @@ def split_modules(parsed, all_names):
             by_path.setdefault(rel, OrderedDict())[name] = doc
 
     def key(p):
-        return (os.sep in p, p.lower())
+        return (os.path.basename(p).lower(), p.lower())
 
     modules = []
     for rel in sorted(by_path, key=key):
