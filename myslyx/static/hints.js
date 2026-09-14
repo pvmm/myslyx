@@ -181,7 +181,8 @@
             }
             var known = hints && (
                 (hints.keywords || []).some(function(k) { return k.toUpperCase() === upper; }) ||
-                (hints.builtins || []).some(function(b) { return b.toUpperCase() === upper; }));
+                (hints.builtins || []).some(function(b) { return b.toUpperCase() === upper; }) ||
+                (hints.types || []).some(function(t) { return t.toUpperCase() === upper; }));
             if (known) {
                 showHintPage(
                     '<div class="hint-title">' + upper + '</div>' +
@@ -430,6 +431,13 @@
                 '<div class="hint-text">' + upper + ' is a builtin function/object.</div>');
             return;
         }
+        var type = (hints.types || []).some(function(t) { return t.toUpperCase() === upper; });
+        if (type) {
+            showHintPage(
+                '<div class="hint-title">' + upper + '</div>' +
+                '<div class="hint-text">' + upper + ' is a type.</div>');
+            return;
+        }
 
         // 5. No hint found — keep the last displayed hint unchanged.
     }
@@ -539,6 +547,7 @@
         }
         (hints.keywords || []).forEach(function(k) { push(k, 'keyword'); });
         (hints.builtins || []).forEach(function(b) { push(b, 'builtin'); });
+        (hints.types || []).forEach(function(t) { push(t, 'type'); });
         getAllSymbols().forEach(function(s) { push(s.name, s.kind); });
         return out.filter(function(m) {
             return m.label.toLowerCase().indexOf(lower) === 0;

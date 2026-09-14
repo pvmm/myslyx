@@ -769,6 +769,19 @@ async def hints_msxgl_root_and_builtins(page, msgs):
         f'autocomplete must offer PSG_SetRegister, got {popup!r}'
     assert any('builtin' in t for t in popup), \
         f'completions must be tagged builtin, got {popup!r}'
+    # MSXgl types autocomplete too, tagged "type".
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Control+a')
+    await page.keyboard.press('Backspace')
+    await page.keyboard.type('VDP_MO')
+    await page.wait_for_selector('.wb-autocomplete-popup', timeout=15000)
+    popup = await page.evaluate("""() =>
+        Array.from(document.querySelectorAll('.wb-autocomplete-popup div'))
+            .map(el => el.textContent.trim()).filter(Boolean)""")
+    assert any('VDP_MODE' in t for t in popup), \
+        f'autocomplete must offer VDP_MODE, got {popup!r}'
+    assert any('type' in t for t in popup), \
+        f'type completions must be tagged "type", got {popup!r}'
     assert msgs == []
 
 

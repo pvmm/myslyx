@@ -5,6 +5,7 @@ Reads every MSXgl header (engine/src/**/*.h) and turns the Natural Docs style
 function comments into a Myslyx hint dictionary:
 
   * `builtins`    - all MSXgl function names (drives autocomplete)
+  * `types`       - the documented enum and struct names (also autocomplete)
   * `tips`        - per-function markdown (description, C signature, params,
                     return value), keyed by the UPPER-CASE function name
   * `root`        - the HINTS panel root page: one collapsible <details>
@@ -754,6 +755,7 @@ def main():
         "root": root_markdown(modules, all_doc_enums, all_doc_structs) or "# MSXgl",
         "keywords": C_KEYWORDS,
         "builtins": list(all_names.keys()),
+        "types": sorted(all_doc_types),
         "tips": tips,
         "patterns": [],
     }
