@@ -116,10 +116,12 @@ def parse_file(path):
         desc = []
         params = []
         ret = []
+        notes = []
         section = None
+        sig = None
         j = i + 1
-        while j < n and lines[j].startswith("//"):
-            text = lines[j][2:].strip()
+        while j < n and lines[j].lstrip().startswith("//"):
+            text = lines[j].lstrip().lstrip("/").strip()
             if text.startswith("Function:"):
                 break
             low = text.lower()
@@ -131,19 +133,32 @@ def parse_file(path):
                 section = "ret"
                 j += 1
                 continue
+            if low in ("notes:", "note:"):
+                section = "notes"
+                j += 1
+                continue
+            # A commented-out declaration inside the doc block
+            # (`// inline void Foo(...) { ... }`) is used as the signature.
+            if "(" in text and text.endswith("}") and not text.startswith("-"):
+                sig = text.split("{", 1)[0].rstrip() + ";"
+                j += 1
+                continue
             if section == "params":
                 params.append(text)
             elif section == "ret":
                 ret.append(text)
+            elif section == "notes":
+                notes.append(text)
             elif text:
                 desc.append(text)
             j += 1
 
-        signature = _find_signature(lines, j)
+        signature = sig or _find_signature(lines, j)
         docs[name] = {
             "desc": desc,
             "params": parse_params(params),
             "ret": [t.strip(" \t-") for t in ret if t.strip(" \t-")],
+            "notes": [t.strip(" \t-*") for t in notes if t.strip(" \t-*")],
             "signature": signature,
         }
         i = j
@@ -151,28 +166,51 @@ def parse_file(path):
 
 
 def _find_signature(lines, start):
-    """Best effort: the single-line C declaration following a doc block."""
+    """Best effort: the C declaration or macro that follows a doc block.
+
+    Handles single-line prototypes (`u8 Foo(u8 a);`), single-line inline
+    bodies (`inline void Foo() { g = 1; }`), multi-line declarations
+    (`u16 Foo(\n  u8 a) { ... }`) and `#define` macros (`#define FOO()`).
+    Returns the signature with the body stripped, or None.
+    """
     n = len(lines)
-    for k in range(start, min(start + 4, n)):
+    k = start
+    buf = []
+    while k < min(start + 12, n):
         ln = lines[k]
         if ln.startswith("//"):
+            k += 1
             continue
         if not ln.strip():
+            k += 1
             continue
         s = ln.strip()
-        if s.startswith("#"):
-            continue
+        # #define macros — capture as-is (including line continuations).
+        if not buf and s.startswith("#define"):
+            define = s
+            while define.endswith("\\") and k + 1 < n:
+                define = define[:-1].rstrip() + " " + lines[k + 1].strip()
+                k += 1
+            return define if len(define) < 200 else define[:200]
+        if ln.lstrip().startswith("#"):
+            return None
         if s.startswith(_NOT_DECL):
             return None
-        if (
-            len(s) < 140
-            and "(" in s
-            and (s.endswith(";") or s.endswith("{"))
-        ):
-            if s.endswith("{"):
-                s = s.split("{", 1)[0].rstrip() + ";"
-            return s
-        return None
+        if not buf and "(" not in s:
+            return None  # first meaningful line is not a declaration
+        buf.append(s)
+        merged = " ".join(buf)
+        if merged.endswith(";"):
+            return merged
+        if merged.endswith("{"):
+            return merged[:-1].rstrip() + ";"
+        if merged.endswith("}"):
+            if "{" not in merged:
+                return None
+            return merged.split("{", 1)[0].rstrip() + ";"
+        if len(merged) > 200:
+            return None
+        k += 1
     return None
 
 
@@ -234,6 +272,8 @@ def tip_markdown(doc):
         parts.append("\n".join(lines))
     if doc["ret"]:
         parts.append("**Return:**\n" + "\n".join("- %s" % r for r in doc["ret"]))
+    if doc["notes"]:
+        parts.append("**Notes:**\n" + "\n".join("- %s" % r for r in doc["notes"]))
     return "\n\n".join(parts)
 
 
@@ -241,12 +281,12 @@ def root_markdown(modules):
     """Render the root page: one collapsible details section per module."""
     out = [
         "# MSXgl (C + engine)\n",
-        "MSXgl engine API reference for MSX MSX1/MSX2/MSX2+, compiled with",
-        "the **SDCC** C compiler (Small Device C Compiler). Functions are",
-        "grouped by module - expand a module to browse its functions and click",
+        "MSXgl engine API reference for MSX MSX1/MSX2/MSX2+, compiled with "
+        "the **SDCC** C compiler (Small Device C Compiler). Functions are "
+        "grouped by module - expand a module to browse its functions and click "
         "a function to open its documentation. Press **F2** to return here.",
         "",
-        "> Plain **C** language help (printf/scanf, stdlib, ...) stays",
+        "> Plain **C** language help (printf/scanf, stdlib, ...) stays "
         "> available by switching LANG to **C**.",
         "",
     ]
