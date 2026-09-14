@@ -9,12 +9,39 @@
 
     // ===== Markdown rendering =====
 
+    // Real HTML tags the hints render on purpose (root <details> sections, ...).
+    // The browser swallows other angle-bracket tokens like <VDP_MODE> as if they
+    // were element names, so they must be escaped to &lt;...&gt; before parsing.
+    var HINTS_HTML_TAGS = /^(details|summary|b|code|i|em|strong|u|h[1-6]|p|br|hr|a|ul|ol|li|dl|dt|dd|pre|blockquote|span|div|sup|sub|table|thead|tbody|tr|td|th|img)$/i;
+
+    // Code spans/fences are replaced with placeholders before escaping so their
+    // literal text is left untouched (marked already escapes code content).
+    function stashCodeSpans(text) {
+        var stash = [];
+        function save(m) { stash.push(m); return '\u0000' + (stash.length - 1) + '\u0000'; }
+        text = text.replace(/`[^`\n]+`/g, save);
+        text = text.replace(/```[\s\S]*?```/g, save);
+        return { text: text, stash: stash };
+    }
+
+    function restoreCodeSpans(text, stash) {
+        return text.replace(/\u0000(\d+)\u0000/g, function(m, i) { return stash[Number(i)]; });
+    }
+
+    function escapeLiteralHtml(text) {
+        return text.replace(/<(\/?)([a-zA-Z][\w.-]*)([^>]*)>/g, function(m, close, name, attrs) {
+            return HINTS_HTML_TAGS.test(name) ? m : '&lt;' + close + name + '&gt;';
+        });
+    }
+
     function renderMarkdown(text) {
         if (!text) return '';
         try {
             // breaks:true keeps the previous single-newline -> line-break look
             // when migrating the plain-text tips that used '\n'.
-            return window.marked.parse(text, { breaks: true });
+            var stashed = stashCodeSpans(text);
+            var safe = restoreCodeSpans(escapeLiteralHtml(stashed.text), stashed.stash);
+            return window.marked.parse(safe, { breaks: true });
         } catch(e) {
             return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                        .replace(/\n/g, '<br>');

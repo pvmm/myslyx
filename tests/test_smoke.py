@@ -850,6 +850,62 @@ async def hints_msxgl_types_section(page, msgs):
     assert msgs == []
 
 
+async def hints_msxgl_angle_brackets(page, msgs):
+    # MSXgl descriptions reference other API items with angle brackets (see
+    # <VDP_MODE>). The browser would swallow those as HTML element names, so
+    # renderMarkdown must escape them; the literal text must be visible.
+    await h.new_file(page, 2)
+    await h.set_language(page, 'C+MSXgl')
+    # Expand the psg.h... actually vdp.h module and open VDP_SetMode.
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
+    }""", timeout=15000)
+    await page.evaluate("""() => {
+        const d = Array.from(document.querySelectorAll('#hints-content details'))
+            .find(d => d.querySelector('summary').textContent.includes('vdp.h'));
+        if (d) d.open = true;
+    }""")
+    await page.click('#hints-content .hint-text a[href="hint:VDP_SETMODE"]')
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'VDP_SETMODE'""")
+    tip = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text')?.textContent || ''""")
+    assert '<VDP_MODE>' in tip, \
+        f'VDP_SetMode tip must show <VDP_MODE> literally, got {tip!r}'
+    # No stray empty element: the enumeration text must follow immediately.
+    assert '(see <VDP_MODE> enumeration)' in ' '.join(tip.split()), \
+        f'VDP_SetMode doc must keep the (see <VDP_MODE> enumeration) sentence, got {tip!r}'
+    # Same fix on a struct field comment (<SEQ_CURSOR>).
+    await page.keyboard.press('F2')
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
+    }""", timeout=15000)
+    await page.evaluate("""() => {
+        const d = Array.from(document.querySelectorAll('#hints-content details'))
+            .find(d => d.querySelector('summary').textContent.includes('Types'));
+        if (d) d.open = true;
+    }""")
+    await page.click('#hints-content .hint-text a[href="hint:SEQACTION"]')
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'SEQACTION'""")
+    tip = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text')?.textContent || ''""")
+    assert '<SEQ_CURSOR>' in tip, \
+        f'SeqAction tip must show <SEQ_CURSOR> literally, got {tip!r}'
+    # The real HTML tags used by the root page still work.
+    await page.keyboard.press('F2')
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
+    }""", timeout=15000)
+    details = await page.evaluate("""() =>
+        document.querySelectorAll('#hints-content details').length""")
+    assert details > 80, f'root must still render the module <details> sections, got {details}'
+    assert msgs == []
+
+
 async def hints_font_size_slider(page, msgs):
     # The HINTS header has a font-size slider; it rescales the hint text and
     # the chosen size is persisted in the Myslyx config (restored on reload).
@@ -1163,6 +1219,7 @@ SMOKE_SUITES = [
     ('smoke/hint-link-jumps-to-tip', hint_link_jumps_to_tip),
     ('smoke/hints-msxgl-root-builtins', hints_msxgl_root_and_builtins),
     ('smoke/hints-msxgl-types', hints_msxgl_types_section),
+    ('smoke/hints-msxgl-angle-brackets', hints_msxgl_angle_brackets),
     ('smoke/hints-font-size-slider', hints_font_size_slider),
     ('smoke/storage-pool-hardened', storage_pool_hardened),
     ('smoke/js-interpolation-quoting', js_interpolation_quoting),
