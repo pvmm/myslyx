@@ -758,6 +758,98 @@ async def hints_msxgl_root_and_builtins(page, msgs):
     assert msgs == []
 
 
+async def hints_msxgl_types_section(page, msgs):
+    # The C+MSXgl root page has a separate Types section listing the enums and
+    # structs used by function signatures; clicking one opens its doc page and
+    # functions whose signature uses a type cross-link to it.
+    await h.new_file(page, 2)
+    await h.set_language(page, 'C+MSXgl')
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
+    }""", timeout=15000)
+    # The Types section is separate from the function module sections.
+    bodies = await page.evaluate("""() =>
+        Array.from(document.querySelectorAll('#hints-content details'))
+            .map(d => d.querySelector('summary')?.textContent || '')""")
+    assert any('Types' in s for s in bodies), \
+        f'root page must have a Types section, summaries: {bodies!r}'
+    await page.evaluate("""() => {
+        const d = Array.from(document.querySelectorAll('#hints-content details'))
+            .find(d => d.querySelector('summary').textContent.includes('Types'));
+        if (d) d.open = true;
+    }""")
+    body = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text').textContent || ''""")
+    h3s = await page.evaluate("""() =>
+        Array.from(document.querySelectorAll('#hints-content .hint-text h3'))
+            .map(el => el.textContent.trim())""")
+    assert 'Enums' in h3s, \
+        f'Types section must list Enums as a heading, headings: {h3s!r}'
+    assert 'Structs' in h3s, \
+        f'Types section must list Structs as a heading, headings: {h3s!r}'
+    assert 'INPUT_PORT' in body and 'QRCODE_ECC' in body, \
+        'Types section must list the referenced enums'
+    assert 'BIOS_SpriteAttributes' in body and 'VDP_Command36' in body and 'Pawn' in body, \
+        'Types section must list the referenced structs'
+    # Clicking an enum link opens its documentation.
+    await page.click('#hints-content .hint-text a[href="hint:INPUT_PORT"]')
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'INPUT_PORT'""")
+    tip = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text')?.textContent || ''""")
+    assert 'enum INPUT_PORT' in tip, \
+        f'INPUT_PORT tip must render the enum, got {tip!r}'
+    assert 'INPUT_PORT1' in tip, \
+        f'INPUT_PORT tip must list its constants, got {tip!r}'
+    # A struct doc tip renders fields.
+    await page.keyboard.press('F2')
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
+    }""", timeout=15000)
+    await page.evaluate("""() => {
+        const d = Array.from(document.querySelectorAll('#hints-content details'))
+            .find(d => d.querySelector('summary').textContent.includes('Types'));
+        if (d) d.open = true;
+    }""")
+    await page.click('#hints-content .hint-text a[href="hint:VDP_COMMAND36"]')
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'VDP_COMMAND36'""")
+    tip = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text')?.textContent || ''""")
+    assert 'typedef struct VDP_Command36' in tip, \
+        f'VDP_Command36 tip must render the typedef, got {tip!r}'
+    assert 'Fields:' in tip and 'u16 DX' in tip, \
+        f'VDP_Command36 tip must render Fields, got {tip!r}'
+    # A function whose signature uses a struct cross-links to it.
+    await page.keyboard.press('F2')
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
+    }""", timeout=15000)
+    await page.evaluate("""() => {
+        const d = Array.from(document.querySelectorAll('#hints-content details'))
+            .find(d => d.querySelector('summary').textContent.includes('bios.h'));
+        if (d) d.open = true;
+    }""")
+    await page.click('#hints-content .hint-text a[href="hint:BIOS_SETSPRITEDATA"]')
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'BIOS_SETSPRITEDATA'""")
+    tip = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text')?.textContent || ''""")
+    assert 'Types:' in tip and 'BIOS_SpriteAttributes' in tip, \
+        f'BIOS_SetSpriteData tip must cross-link its struct type, got {tip!r}'
+    await page.click('#hints-content .hint-text a[href="hint:BIOS_SPRITEATTRIBUTES"]')
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'BIOS_SPRITEATTRIBUTES'""")
+    tip2 = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text')?.textContent || ''""")
+    assert 'typedef struct BIOS_SpriteAttributes' in tip2, \
+        f'struct link must open the struct doc, got {tip2!r}'
+    assert msgs == []
+
+
 async def hints_font_size_slider(page, msgs):
     # The HINTS header has a font-size slider; it rescales the hint text and
     # the chosen size is persisted in the Myslyx config (restored on reload).
@@ -1070,6 +1162,7 @@ SMOKE_SUITES = [
     ('smoke/hints-c-pascal-root', hints_c_pascal_root_pages),
     ('smoke/hint-link-jumps-to-tip', hint_link_jumps_to_tip),
     ('smoke/hints-msxgl-root-builtins', hints_msxgl_root_and_builtins),
+    ('smoke/hints-msxgl-types', hints_msxgl_types_section),
     ('smoke/hints-font-size-slider', hints_font_size_slider),
     ('smoke/storage-pool-hardened', storage_pool_hardened),
     ('smoke/js-interpolation-quoting', js_interpolation_quoting),

@@ -9,7 +9,12 @@ function comments into a Myslyx hint dictionary:
                     return value), keyed by the UPPER-CASE function name
   * `root`        - the HINTS panel root page: one collapsible <details>
                     section per module (header file), each listing its
-                    functions as hint: cross-links
+                    functions as hint: cross-links, followed by a separate
+                    <details> section for the enums and structs that are
+                    referenced by function signatures
+
+The tip for every function whose signature uses an enum or struct also lists
+that type as a hint: cross-link to its own documentation page.
 
 It is deterministic and re-runnable, so it can be re-run whenever the MSXgl
 sources are upgraded (independent of MSXgl's own Natural Docs build).
@@ -64,8 +69,13 @@ MODULE_LABELS = {
 }
 
 _FUNC_RE = re.compile(r"^\s*//\s*Function:\s*(\w+)")
-_DECL_OK = re.compile(r"^[^#].*\(")
 _NOT_DECL = ("typedef", "enum", "struct", "union", "register", "define", "static assert")
+_ENUM_DOC_RE = re.compile(r"^\s*//\s*Enum:\s*(\w+)")
+_ENUM_HEAD_RE = re.compile(r"^(?://\s*)?enum\s+(\w+)\s*\{?$")
+_STRUCT_DEF_RE = re.compile(r"^\s*typedef\s+struct\s+(\w+)\s*$")
+_STRUCT_ANON_DEF_RE = re.compile(r"^\s*typedef\s+struct\s*\{")
+_STRUCT_CLOSE_RE = re.compile(r"^\s*}\s*(\w+)\s*;")
+_STRUCT_FIELD_RE = re.compile(r"^([^/;{}]+?)\s+(\w+(?:\s*\[[^\]]*\])?(?:\s*:\s*\d+)?)\s*;(.*)")
 
 
 def scandir_files(src):
@@ -214,6 +224,321 @@ def _find_signature(lines, start):
     return None
 
 
+# ---------------------------------------------------------------------------
+# Enum / struct parsing
+# ---------------------------------------------------------------------------
+
+def _strip_comment(s):
+    """Remove trailing C-style comment from a source line."""
+    i = s.find("//")
+    if i >= 0:
+        s = s[:i]
+    return s.rstrip()
+
+
+def parse_types_from_file(path):
+    """Extract enum and struct definitions from one header file.
+
+    Returns list of dicts:
+        { kind, name, desc, members, srcfile }
+    where
+        kind    'enum' or 'struct'
+        name    the typedef/tag name (e.g. 'VDP_MODE', 'PSG_Data')
+        desc    list of description strings (from doc comments)
+        members for enums:  [(const_name, value_str, comment), ...]
+                for structs: [(field_type, field_name, comment), ...]
+        srcfile the relative header path
+    """
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        lines = fh.read().splitlines()
+
+    types = []
+    n = len(lines)
+    rel = os.path.basename(path)
+
+    i = 0
+    while i < n:
+        s = lines[i]
+
+        # --- Enum with doc comment: // Enum: NAME ----------------------------------
+        em = _ENUM_DOC_RE.match(s)
+        if em:
+            name = em.group(1)
+            desc = []
+            i += 1
+            # grab description lines until the enum block starts
+            while i < n:
+                ln = lines[i].strip()
+                if _ENUM_HEAD_RE.match(ln):
+                    break
+                if ln.startswith("//"):
+                    text = ln.lstrip("/").strip()
+                    if text:
+                        desc.append(text)
+                elif ln:
+                    break
+                i += 1
+            members, end = _parse_enum(lines, i)
+            types.append({"kind": "enum", "name": name, "desc": desc,
+                          "members": members, "srcfile": rel})
+            i = end
+            continue
+
+        # --- Plain enum (no doc comment): enum NAME { … } --------------------------
+        em2 = _ENUM_HEAD_RE.match(s)
+        if em2:
+            name = em2.group(1)
+            members, end = _parse_enum(lines, i)
+            types.append({"kind": "enum", "name": name, "desc": [],
+                          "members": members, "srcfile": rel})
+            i = end
+            continue
+
+        # --- typedef struct NAME { … } NAME; ---------------------------------------
+        sm = _STRUCT_DEF_RE.match(s)
+        if sm:
+            name = sm.group(1)
+            desc = _struct_desc_above(lines, i)
+            members, end = _parse_struct_body(lines, i + 1)
+            types.append({"kind": "struct", "name": name, "desc": desc,
+                          "members": members, "srcfile": rel})
+            i = end
+            continue
+
+        # --- typedef struct { … } Name;  (anonymous) -------------------------------
+        sm2 = _STRUCT_ANON_DEF_RE.match(s)
+        if sm2:
+            desc = _struct_desc_above(lines, i)
+            members, end = _parse_struct_body(lines, i + 1)
+            # the typedef name is after the closing }
+            if end - 1 < n:
+                cm = _STRUCT_CLOSE_RE.match(lines[end - 1])
+                if cm:
+                    tname = cm.group(1)
+                    types.append({"kind": "struct", "name": tname, "desc": desc,
+                                  "members": members, "srcfile": rel})
+            i = end
+            continue
+
+        i += 1
+
+    return types
+
+
+def _struct_desc_above(lines, brace_line):
+    """Collect doc comment lines immediately above a struct definition."""
+    desc = []
+    j = brace_line - 1
+    while j >= 0:
+        ln = lines[j].strip()
+        if ln.startswith("//"):
+            text = ln.lstrip("/").strip()
+            if text and not text.startswith("=") and len(text) > 1:
+                desc.insert(0, text)
+            j -= 1
+        elif not ln:
+            j -= 1
+        else:
+            break
+    return desc
+
+
+def _parse_enum(lines, start):
+    """Parse an enum body starting at its definition line.
+
+    Supports real C bodies (`enum NAME { ... };`) and bodies that are
+    commented out inside a doc block (`// enum NAME`, `// {`, `// X,`).
+    Returns (members, index_after_closing_semicolon).
+    """
+    n = len(lines)
+    commented = lines[start].lstrip().startswith("//")
+
+    # Locate the opening brace line.
+    open_idx = None
+    j = start
+    while j < n:
+        ln = lines[j]
+        if commented:
+            ln = ln.lstrip().lstrip("/")
+        if "{" in ln:
+            open_idx = j
+            break
+        j += 1
+    if open_idx is None:
+        return [], start + 1
+
+    members = []
+    depth = 0
+    k = open_idx
+    while k < n:
+        ln = lines[k]
+        if commented:
+            ln = ln.lstrip().lstrip("/")
+        depth += ln.count("{") - ln.count("}")
+        if depth <= 0:
+            break  # this is the closing brace line
+        code, _, cmt = ln.partition("//")
+        cmt = cmt.strip()
+        text = code.strip().rstrip(",").strip()
+        if not text or text in ("}", "};"):
+            k += 1
+            continue
+        for part in text.split(","):
+            part = part.strip()
+            if not part or part in ("}", "};"):
+                continue
+            cm = re.match(r"^(\w+)(?:\s*=\s*(.*))?$", part)
+            if cm:
+                cname = cm.group(1)
+                cval = cm.group(2).strip() if cm.group(2) else ""
+                members.append((cname, cval, cmt))
+        k += 1
+
+    # Scan past the closing `};` (real or commented).
+    while k < n:
+        ln = lines[k]
+        if commented:
+            ln = ln.lstrip().lstrip("/")
+        if re.match(r"^\s*}\s*;", ln):
+            return members, k + 1
+        k += 1
+    return members, k
+
+
+def _parse_struct_body(lines, start):
+    """Parse struct fields starting at the `typedef struct NAME` line.
+
+    Locates the opening brace line first (it may be on the same line or the
+    next one) so brace depth starts at zero. Stops at the matching closing
+    `}` and returns (members, index_after_closing_semicolon_line).
+    """
+    n = len(lines)
+    open_idx = None
+    j = start
+    while j < n:
+        if "{" in lines[j]:
+            open_idx = j
+            break
+        j += 1
+    if open_idx is None:
+        return [], start + 1
+
+    members = []
+    depth = 0
+    i = open_idx
+    while i < n:
+        ln = lines[i]
+        depth += ln.count("{") - ln.count("}")
+        if depth <= 0:
+            break
+        stripped = ln.strip()
+        if not stripped or stripped.startswith("#") or stripped.startswith("//") or stripped.startswith("/*") or stripped.startswith("*"):
+            i += 1
+            continue
+        # Skip extern declarations and function pointers that are global variables.
+        code, _, cmt = ln.partition("//")
+        cmt = cmt.strip().lstrip("/").strip()
+        # Try to match: TYPE FIELDNAME; or TYPE FIELDNAME[...]; or TYPE FIELDNAME : bits;
+        clean = _strip_comment(stripped).rstrip()
+        if not clean or clean in ("{", "};"):
+            i += 1
+            continue
+        # Remove trailing ;
+        if clean.endswith(";"):
+            clean = clean[:-1].rstrip()
+        fm = _STRUCT_FIELD_RE.match(clean + ";")
+        if fm:
+            ftype = fm.group(1).strip()
+            fname_raw = fm.group(2).strip()
+            # Skip extern declarations and function pointer typedefs.
+            if ftype.startswith("extern") or "(" in fname_raw:
+                i += 1
+                continue
+            members.append((ftype, fname_raw, cmt))
+        i += 1
+
+    # find the closing } NAME; line
+    for j in range(open_idx, min(open_idx + 500, n)):
+        cm = _STRUCT_CLOSE_RE.match(lines[j])
+        if cm:
+            return members, j + 1
+    return members, i + 1
+
+
+def collect_types(src):
+    """Walk all headers under src and return a dict name -> type info."""
+    all_types = OrderedDict()
+    for rel in scandir_files(src):
+        path = os.path.join(src, rel)
+        for t in parse_types_from_file(path):
+            if t["name"] not in all_types:
+                all_types[t["name"]] = t
+    return all_types
+
+
+def find_used_types(all_docs, all_type_names):
+    """Return set of type names that appear in at least one function signature."""
+    used = set()
+    pattern_cache = {}
+    for tname in all_type_names:
+        pattern_cache[tname] = re.compile(r"\b" + re.escape(tname) + r"\b")
+    for doc in all_docs.values():
+        sig = doc.get("signature") or ""
+        if not sig:
+            continue
+        for tname, pat in pattern_cache.items():
+            if pat.search(sig):
+                used.add(tname)
+    return used
+
+
+def type_tip_markdown(t):
+    """Render a type's tip (enum or struct)."""
+    parts = []
+    if t["kind"] == "enum":
+        parts.append("```c\nenum %s {\n%s\n};\n```" % (
+            t["name"],
+            "\n".join("    %s%s%s" % (
+                m[0],
+                (" = " + m[1]) if m[1] else "",
+                (",  // " + m[2]) if m[2] else ",")
+                for m in t["members"]) if t["members"] else "    /* ... */"))
+    else:
+        fields = t["members"]
+        body = "\n".join("    %s %s;" % (m[0], m[1]) for m in fields) if fields else "    /* ... */"
+        parts.append("```c\ntypedef struct %s {\n%s\n} %s;\n```" % (t["name"], body, t["name"]))
+    if t["desc"]:
+        parts.append("\n".join(t["desc"]))
+    # members with comments (only if at least one has a comment)
+    if t["kind"] == "enum" and any(m[2] for m in t["members"]):
+        lines = ["**Constants:**"]
+        for m in t["members"]:
+            val = " = %s" % m[1] if m[1] else ""
+            cmt = " — %s" % m[2] if m[2] else ""
+            lines.append("- `%s%s`%s" % (m[0], val, cmt))
+        parts.append("\n".join(lines))
+    elif t["kind"] == "struct" and any(m[2] for m in t["members"]):
+        lines = ["**Fields:**"]
+        for m in t["members"]:
+            cmt = " — %s" % m[2] if m[2] else ""
+            lines.append("- `%s %s`%s" % (m[0], m[1], cmt))
+        parts.append("\n".join(lines))
+    src = t.get("srcfile", "")
+    if src:
+        parts.append("*Defined in* `%s`." % src)
+    return "\n\n".join(parts)
+
+
+def render_type_links(type_names):
+    """Render a markdown line of links to referenced types, or '' if none."""
+    if not type_names:
+        return ""
+    parts = []
+    for tn in sorted(type_names):
+        parts.append("[`%s`](hint:%s)" % (tn, tn.upper()))
+    return "**Types:** " + "  ".join(parts)
+
+
 def merge(parsed, module_priority):
     """Merge per-file docs into a single OrderedDict, dropping duplicates.
 
@@ -253,7 +578,7 @@ def split_modules(parsed, all_names):
     return modules
 
 
-def tip_markdown(doc):
+def tip_markdown(doc, referenced_types=None):
     """Render one function's tip (shown in the HINTS panel)."""
     parts = []
     desc = "\n".join(doc["desc"]).strip()
@@ -274,17 +599,21 @@ def tip_markdown(doc):
         parts.append("**Return:**\n" + "\n".join("- %s" % r for r in doc["ret"]))
     if doc["notes"]:
         parts.append("**Notes:**\n" + "\n".join("- %s" % r for r in doc["notes"]))
+    if referenced_types:
+        parts.append(render_type_links(referenced_types))
     return "\n\n".join(parts)
 
 
-def root_markdown(modules):
-    """Render the root page: one collapsible details section per module."""
+def root_markdown(modules, used_enums=None, used_structs=None):
+    """Render the root page: module sections followed by a Types section."""
     out = [
         "# MSXgl (C + engine)\n",
         "MSXgl engine API reference for MSX MSX1/MSX2/MSX2+, compiled with "
         "the **SDCC** C compiler (Small Device C Compiler). Functions are "
         "grouped by module - expand a module to browse its functions and click "
-        "a function to open its documentation. Press **F2** to return here.",
+        "a function to open its documentation. The **Types** section lists the "
+        "enums and structs used by function signatures. Press **F2** to return "
+        "here.",
         "",
         "> Plain **C** language help (printf/scanf, stdlib, ...) stays "
         "> available by switching LANG to **C**.",
@@ -298,6 +627,26 @@ def root_markdown(modules):
         for name, doc in funcs:
             out.append("- [`%s`](hint:%s)" % (name, name.upper()))
         out.append("")
+        out.append("</details>")
+    # Types section (enums and structs used by function signatures)
+    enum_list = sorted(used_enums or [])
+    struct_list = sorted(used_structs or [])
+    if enum_list or struct_list:
+        total = len(enum_list) + len(struct_list)
+        out.append("<details><summary><b>Types</b> - enums &amp; structs (%d)</summary>" % total)
+        out.append("")
+        if enum_list:
+            out.append("### Enums")
+            out.append("")
+            for name in enum_list:
+                out.append("- [`%s`](hint:%s)" % (name, name.upper()))
+            out.append("")
+        if struct_list:
+            out.append("### Structs")
+            out.append("")
+            for name in struct_list:
+                out.append("- [`%s`](hint:%s)" % (name, name.upper()))
+            out.append("")
         out.append("</details>")
     return "\n".join(out)
 
@@ -324,11 +673,36 @@ def main():
     all_names = merge(parsed, None)
     modules = split_modules(parsed, all_names)
 
-    tips = OrderedDict((name.upper(), tip_markdown(doc))
-                       for name, doc in all_names.items())
+    # --- Types (enums + structs used by function signatures) --------------------
+    all_types = collect_types(src)
+    used_type_names = find_used_types(all_names, set(all_types.keys()))
+    used_enums = sorted(n for n, t in all_types.items()
+                        if t["kind"] == "enum" and n in used_type_names)
+    used_structs = sorted(n for n, t in all_types.items()
+                          if t["kind"] == "struct" and n in used_type_names)
+
+    # Per-function: which types does each signature reference?
+    fn_type_map = {}
+    for name, doc in all_names.items():
+        sig = doc.get("signature") or ""
+        if not sig:
+            continue
+        refs = set()
+        for tn in used_type_names:
+            if re.search(r"\b" + re.escape(tn) + r"\b", sig):
+                refs.add(tn)
+        if refs:
+            fn_type_map[name] = sorted(refs)
+
+    # --- Tips (functions + types) ---------------------------------------------
+    tips = OrderedDict()
+    for name, doc in all_names.items():
+        tips[name.upper()] = tip_markdown(doc, fn_type_map.get(name))
+    for tn in used_type_names:
+        tips[tn.upper()] = type_tip_markdown(all_types[tn])
 
     data = {
-        "root": root_markdown(modules) or "# MSXgl",
+        "root": root_markdown(modules, used_enums, used_structs) or "# MSXgl",
         "keywords": C_KEYWORDS,
         "builtins": list(all_names.keys()),
         "tips": tips,
@@ -341,7 +715,10 @@ def main():
         fh.write("\n")
 
     print("wrote %s" % args.out)
-    print("  functions: %d builtins, %d tips" % (len(data["builtins"]), len(tips)))
+    print("  functions: %d builtins, %d tips" % (len(data["builtins"]),
+                                                  len(all_names)))
+    print("  types: %d enums, %d structs (%d total)" % (
+        len(used_enums), len(used_structs), len(used_type_names)))
     print("  modules: %d (root page)" % len(modules))
 
 
