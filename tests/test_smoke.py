@@ -184,6 +184,63 @@ async def hints_nav_browse(page, msgs):
     assert msgs == []
 
 
+async def hints_back_restores_state(page, msgs):
+    # The ◀ button returns to the previous hint page exactly as it was left:
+    # same scroll offset and the same <details> sections open. ▶ restores the
+    # page the user navigated away from.
+    await h.new_file(page, 2)
+    await h.set_language(page, 'C+MSXgl')
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
+    }""", timeout=15000)
+    # Open the vdp.h module section and scroll the panel down.
+    await page.evaluate("""() => {
+        const d = Array.from(document.querySelectorAll('#hints-content details'))
+            .find(d => d.querySelector('summary').textContent.includes('vdp.h'));
+        if (d) d.open = true;
+    }""")
+    await page.evaluate("""() => {
+        const el = document.getElementById('hints-content');
+        el.scrollTop = el.scrollHeight;  // scroll to the bottom
+    }""")
+    scroll_saved = await page.evaluate("""() =>
+        document.getElementById('hints-content').scrollTop""")
+    assert scroll_saved > 0, f'panel must be scrollable, got scrollTop={scroll_saved}'
+    # Jump into a tip (navigates away from the root page). A real click is not
+    # used: Playwright scrolls the target into view before mousedown, which
+    # changes the panel's scroll before the jump. element.click() only fires
+    # the click handler, mirroring what a user does on an already-visible link.
+    await page.evaluate("""() => {
+        document.querySelector('#hints-content .hint-text a[href="hint:VDP_SETMODE"]')
+            .click();
+    }""")
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'VDP_SETMODE'""")
+    # Back: the root page must come back scrolled, with vdp.h still open.
+    nav = page.locator('.wb-hints-nav-btn')
+    await nav.nth(0).click()
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
+    }""", timeout=15000)
+    restored_scroll = await page.evaluate("""() =>
+        document.getElementById('hints-content').scrollTop""")
+    assert restored_scroll == scroll_saved, \
+        f'back must restore scroll {scroll_saved}, got {restored_scroll}'
+    vdp_open = await page.evaluate("""() => {
+        const d = Array.from(document.querySelectorAll('#hints-content details'))
+            .find(d => d.querySelector('summary').textContent.includes('vdp.h'));
+        return !!d && d.open;
+    }""")
+    assert vdp_open, 'back must restore the open vdp.h section'
+    # Forward: returns to the VDP_SetMode tip.
+    await nav.nth(1).click()
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'VDP_SETMODE'""")
+    assert msgs == []
+
+
 async def hints_root_page(page, msgs):
     # A new file opens its language's root page in the HINTS panel.
     await h.new_file(page, 2)
@@ -1237,6 +1294,7 @@ SMOKE_SUITES = [
     ('smoke/export-language-switch', export_disabled_on_language_switch),
     ('smoke/file-stats-counts', file_stats_counts),
     ('smoke/hints-nav-browse', hints_nav_browse),
+    ('smoke/hints-back-restores-state', hints_back_restores_state),
     ('smoke/hints-root-page', hints_root_page),
     ('smoke/settings-menu-keyboard', settings_menu_keyboard),
     ('smoke/f1-shortcuts-window', f1_shortcuts_window),

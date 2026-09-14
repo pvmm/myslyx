@@ -138,15 +138,51 @@
         var hintsEl = document.getElementById(HINTS_CONTENT_ID);
         if (!hintsEl) return;
         ensureNavButtons();
+        // Capture the state of the page we are leaving (scroll + open <details>)
+        // into its history entry, so going back later restores it exactly.
+        if (hintIndex >= 0) {
+            hintHistory[hintIndex].state = capturePageState(hintsEl);
+        }
         // Repeated (identical) renders of the same hint do not create entries;
         // a fresh page truncates any forward history and appends itself.
-        if (hintIndex < 0 || hintHistory[hintIndex] !== html) {
+        if (hintIndex < 0 || hintHistory[hintIndex].html !== html) {
             hintHistory = hintHistory.slice(0, hintIndex + 1);
-            hintHistory.push(html);
+            hintHistory.push({ html: html, state: { scroll: 0, openKeys: [] } });
             hintIndex = hintHistory.length - 1;
         }
         hintsEl.innerHTML = html;
         updateNavButtons();
+    }
+
+    function capturePageState(el) {
+        var openKeys = [];
+        var details = el.querySelectorAll('details');
+        for (var i = 0; i < details.length; i++) {
+            if (details[i].open) {
+                var s = details[i].querySelector(':scope > summary');
+                if (s) openKeys.push((s.textContent || '').trim());
+            }
+        }
+        return { scroll: el.scrollTop, openKeys: openKeys };
+    }
+
+    function renderPageState(el, entry) {
+        el.innerHTML = entry.html;
+        var st = entry.state || { scroll: 0, openKeys: [] };
+        // Re-open the <details> sections first: closed sections make the page
+        // shorter and would clamp the restored scroll offset.
+        if (st.openKeys && st.openKeys.length) {
+            var details = el.querySelectorAll('details');
+            for (var i = 0; i < details.length; i++) {
+                var s = details[i].querySelector(':scope > summary');
+                if (s && st.openKeys.indexOf((s.textContent || '').trim()) !== -1) {
+                    details[i].open = true;
+                }
+            }
+        }
+        // Defer the scroll restore to the next frame so the layout fully
+        // accounts for the just-opened <details> sections.
+        requestAnimationFrame(function() { el.scrollTop = st.scroll; });
     }
 
     // ===== Root page per language (shown for new files, F2 reloads it) =====
@@ -193,17 +229,25 @@
 
     function historyBack() {
         if (hintIndex <= 0) return;
-        hintIndex--;
         var hintsEl = document.getElementById(HINTS_CONTENT_ID);
-        if (hintsEl) hintsEl.innerHTML = hintHistory[hintIndex];
+        // Save the page we are leaving (forward should restore it too).
+        if (hintsEl && hintIndex >= 0) {
+            hintHistory[hintIndex].state = capturePageState(hintsEl);
+        }
+        hintIndex--;
+        if (hintsEl) renderPageState(hintsEl, hintHistory[hintIndex]);
         updateNavButtons();
     }
 
     function historyForward() {
         if (hintIndex === -1 || hintIndex >= hintHistory.length - 1) return;
-        hintIndex++;
         var hintsEl = document.getElementById(HINTS_CONTENT_ID);
-        if (hintsEl) hintsEl.innerHTML = hintHistory[hintIndex];
+        // Save the page we are leaving (back should restore it too).
+        if (hintsEl && hintIndex >= 0) {
+            hintHistory[hintIndex].state = capturePageState(hintsEl);
+        }
+        hintIndex++;
+        if (hintsEl) renderPageState(hintsEl, hintHistory[hintIndex]);
         updateNavButtons();
     }
 
@@ -671,6 +715,13 @@
 
     // Clicking a "hint:KEY" cross-link (rendered by any markdown source) shows
     // that hint's page instead of letting the browser follow the custom scheme.
+    // The mousedown default is suppressed too: focusing the link would make the
+    // browser scroll it into view, moving the panel away from the position the
+    // user is about to navigate away from.
+    document.addEventListener('mousedown', function(e) {
+        var a = e.target && e.target.closest ? e.target.closest('a[href^="hint:"]') : null;
+        if (a) e.preventDefault();
+    });
     document.addEventListener('click', function(e) {
         var a = e.target && e.target.closest ? e.target.closest('a[href^="hint:"]') : null;
         if (!a) return;
