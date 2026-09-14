@@ -885,11 +885,15 @@ async def hints_msxgl_angle_brackets(page, msgs):
         document.querySelector('#hints-content .hint-title')?.textContent === 'VDP_SETMODE'""")
     tip = await page.evaluate("""() =>
         document.querySelector('#hints-content .hint-text')?.textContent || ''""")
-    assert '<VDP_MODE>' in tip, \
-        f'VDP_SetMode tip must show <VDP_MODE> literally, got {tip!r}'
-    # No stray empty element: the enumeration text must follow immediately.
-    assert '(see <VDP_MODE> enumeration)' in ' '.join(tip.split()), \
-        f'VDP_SetMode doc must keep the (see <VDP_MODE> enumeration) sentence, got {tip!r}'
+    assert 'VDP_MODE' in tip, \
+        f'VDP_SetMode tip must mention VDP_MODE, got {tip!r}'
+    assert '<VDP_MODE>' not in tip, \
+        f'VDP_MODE must appear as a link, not bare angle brackets, got {tip!r}'
+    link = await page.query_selector('#hints-content .hint-text a[href="hint:VDP_MODE"]')
+    assert link is not None, \
+        'VDP_SetMode tip must contain a link to the VDP_MODE enum doc'
+    assert '(see VDP_MODE enumeration)' in ' '.join(tip.split()), \
+        f'VDP_SetMode doc must keep the (see VDP_MODE enumeration) sentence, got {tip!r}'
     # Same fix on a struct field comment (<SEQ_CURSOR>).
     await page.keyboard.press('F2')
     await page.wait_for_function("""() => {

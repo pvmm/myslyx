@@ -14,7 +14,9 @@ function comments into a Myslyx hint dictionary:
                     referenced by function signatures
 
 The tip for every function whose signature uses an enum or struct also lists
-that type as a hint: cross-link to its own documentation page.
+that type as a hint: cross-link to its own documentation page.  Additionally,
+angle-bracket references like <VDP_MODE> in descriptions are automatically
+converted to hint: links whenever the referenced symbol is documented.
 
 It is deterministic and re-runnable, so it can be re-run whenever the MSXgl
 sources are upgraded (independent of MSXgl's own Natural Docs build).
@@ -539,6 +541,22 @@ def render_type_links(type_names):
     return "**Types:** " + "  ".join(parts)
 
 
+_ANGLE_TOKEN_RE = re.compile(r"<([A-Za-z_]\w*)>")
+
+
+def _link_angle_refs(text, all_tip_keys):
+    """Convert <NAME> tokens to hint: links when NAME is a documented symbol."""
+    parts = re.split(r"(```[\s\S]*?```|`[^`]+`)", text)
+    for i, seg in enumerate(parts):
+        if i % 2 == 0:
+            parts[i] = _ANGLE_TOKEN_RE.sub(
+                lambda m: ("[`%s`](hint:%s)" % (m.group(1), m.group(1).upper()))
+                if m.group(1).upper() in all_tip_keys
+                else m.group(0),
+                seg)
+    return "".join(parts)
+
+
 def merge(parsed, module_priority):
     """Merge per-file docs into a single OrderedDict, dropping duplicates.
 
@@ -604,7 +622,7 @@ def tip_markdown(doc, referenced_types=None):
     return "\n\n".join(parts)
 
 
-def root_markdown(modules, used_enums=None, used_structs=None):
+def root_markdown(modules, all_doc_enums=None, all_doc_structs=None):
     """Render the root page: module sections followed by a Types section."""
     out = [
         "# MSXgl (C + engine)\n",
@@ -612,8 +630,8 @@ def root_markdown(modules, used_enums=None, used_structs=None):
         "the **SDCC** C compiler (Small Device C Compiler). Functions are "
         "grouped by module - expand a module to browse its functions and click "
         "a function to open its documentation. The **Types** section lists the "
-        "enums and structs used by function signatures. Press **F2** to return "
-        "here.",
+        "enums and structs referenced in the documentation. Press **F2** to "
+        "return here.",
         "",
         "> Plain **C** language help (printf/scanf, stdlib, ...) stays "
         "> available by switching LANG to **C**.",
@@ -629,8 +647,8 @@ def root_markdown(modules, used_enums=None, used_structs=None):
         out.append("")
         out.append("</details>")
     # Types section (enums and structs used by function signatures)
-    enum_list = sorted(used_enums or [])
-    struct_list = sorted(used_structs or [])
+    enum_list = sorted(all_doc_enums or [])
+    struct_list = sorted(all_doc_structs or [])
     if enum_list or struct_list:
         total = len(enum_list) + len(struct_list)
         out.append("<details><summary><b>Types</b> - enums &amp; structs (%d)</summary>" % total)
@@ -673,13 +691,39 @@ def main():
     all_names = merge(parsed, None)
     modules = split_modules(parsed, all_names)
 
-    # --- Types (enums + structs used by function signatures) --------------------
+    # --- Types (enums + structs) -----------------------------------------------
     all_types = collect_types(src)
-    used_type_names = find_used_types(all_names, set(all_types.keys()))
-    used_enums = sorted(n for n, t in all_types.items()
-                        if t["kind"] == "enum" and n in used_type_names)
-    used_structs = sorted(n for n, t in all_types.items()
-                          if t["kind"] == "struct" and n in used_type_names)
+    type_name_set = set(all_types.keys())
+    used_type_names = find_used_types(all_names, type_name_set)
+
+    # Find types referenced via <NAME> tokens in descriptions, param comments,
+    # notes, signatures and struct/enum member comments.
+    referenced_type_names = set()
+    for doc in all_names.values():
+        for field in ("desc", "ret", "notes"):
+            for item in doc.get(field) or []:
+                for m in _ANGLE_TOKEN_RE.finditer(item):
+                    if m.group(1) in type_name_set:
+                        referenced_type_names.add(m.group(1))
+        for _pname, pdesc in doc.get("params") or []:
+            for m in _ANGLE_TOKEN_RE.finditer(pdesc):
+                if m.group(1) in type_name_set:
+                    referenced_type_names.add(m.group(1))
+        sig = doc.get("signature") or ""
+        for m in _ANGLE_TOKEN_RE.finditer(sig):
+            if m.group(1) in type_name_set:
+                referenced_type_names.add(m.group(1))
+    for _tn, t in all_types.items():
+        for member in t.get("members") or []:
+            for m in _ANGLE_TOKEN_RE.finditer(member[2]):
+                if m.group(1) in type_name_set:
+                    referenced_type_names.add(m.group(1))
+
+    all_doc_types = used_type_names | referenced_type_names
+    all_doc_enums = sorted(n for n, t in all_types.items()
+                           if t["kind"] == "enum" and n in all_doc_types)
+    all_doc_structs = sorted(n for n, t in all_types.items()
+                             if t["kind"] == "struct" and n in all_doc_types)
 
     # Per-function: which types does each signature reference?
     fn_type_map = {}
@@ -688,7 +732,7 @@ def main():
         if not sig:
             continue
         refs = set()
-        for tn in used_type_names:
+        for tn in all_doc_types:
             if re.search(r"\b" + re.escape(tn) + r"\b", sig):
                 refs.add(tn)
         if refs:
@@ -698,11 +742,16 @@ def main():
     tips = OrderedDict()
     for name, doc in all_names.items():
         tips[name.upper()] = tip_markdown(doc, fn_type_map.get(name))
-    for tn in used_type_names:
+    for tn in all_doc_types:
         tips[tn.upper()] = type_tip_markdown(all_types[tn])
 
+    # Convert <NAME> tokens to hint: links for every documented symbol.
+    all_tip_keys = set(tips.keys())
+    for key in list(tips.keys()):
+        tips[key] = _link_angle_refs(tips[key], all_tip_keys)
+
     data = {
-        "root": root_markdown(modules, used_enums, used_structs) or "# MSXgl",
+        "root": root_markdown(modules, all_doc_enums, all_doc_structs) or "# MSXgl",
         "keywords": C_KEYWORDS,
         "builtins": list(all_names.keys()),
         "tips": tips,
@@ -718,7 +767,7 @@ def main():
     print("  functions: %d builtins, %d tips" % (len(data["builtins"]),
                                                   len(all_names)))
     print("  types: %d enums, %d structs (%d total)" % (
-        len(used_enums), len(used_structs), len(used_type_names)))
+        len(all_doc_enums), len(all_doc_structs), len(all_doc_types)))
     print("  modules: %d (root page)" % len(modules))
 
 
