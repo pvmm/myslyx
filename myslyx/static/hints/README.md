@@ -56,6 +56,15 @@ after an MSXgl upgrade:
 `root` is the language's **root page** (markdown). It is shown in the HINTS panel
 when a new file in that language is created, and **F2** reloads it at any time.
 
+## `types` (autocomplete symbol names)
+
+Optional. The list of names offered by autocomplete as *type* suggestions
+(labelled `type` in the popup). For `msxgl.json` this is generated from the
+engine headers: **every** enum, struct and union declared in `engine/src/**/*.h`
+is included, plus the member names of every enum (they are globally-scoped
+constants). A type does not need to be referenced by any documented function or
+macro to autocomplete.
+
 ## `structs` (framework structs)
 
 Optional. Maps a struct name to an array of `[type, field, comment]` triples,
@@ -63,8 +72,9 @@ described in Natural Docs style like any hint (the third element may be empty).
 Autocomplete consumers like the bundled `c-struct-complete` plugin resolve a
 variable's type against these entries, so `BIOS_SpriteAttributes attr; attr.`
 offers `y`, `x` and `pattern`. The key is the struct name as written after the
-`typedef` (e.g. `BIOS_SpriteAttributes`); `msxgl.json` carries them for all
-documented MSXgl structs.
+`typedef` (e.g. `BIOS_SpriteAttributes`); the MSXgl generator emits them for
+every struct and union declared in the headers (documented or not), so union
+members autocomplete after `.`/`->` too.
 
 ## Cross-links between pages (`hint:` scheme)
 

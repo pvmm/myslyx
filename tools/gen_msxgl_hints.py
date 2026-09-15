@@ -5,15 +5,16 @@ Reads every MSXgl header (engine/src/**/*.h) and turns the Natural Docs style
 function comments into a Myslyx hint dictionary:
 
   * `builtins`    - all MSXgl function names (drives autocomplete)
-  * `types`       - the documented enum and struct names plus their enum
-                    constant names (drives type autocomplete)
+  * `types`       - every enum, struct and union declared in the headers
+                    (documented or not) plus their enum constant names
+                    (drives type autocomplete)
   * `tips`        - per-function markdown (description, C signature, params,
                     return value), keyed by the UPPER-CASE function name
   * `root`        - the HINTS panel root page: one collapsible <details>
                     section per module (header file), each listing its
                     functions as hint: cross-links, followed by a separate
-                    <details> section for the enums and structs that are
-                    referenced by function signatures
+                    <details> section for the enums, structs and unions
+                    declared by the engine
 
 The tip for every function whose signature uses an enum or struct also lists
 that type as a hint: cross-link to its own documentation page.  Additionally,
@@ -76,9 +77,11 @@ _FUNC_RE = re.compile(r"^\s*//\s*Function:\s*(\w+)")
 _NOT_DECL = ("typedef", "enum", "struct", "union", "register", "define", "static assert")
 _ENUM_DOC_RE = re.compile(r"^\s*//\s*Enum:\s*(\w+)")
 _ENUM_HEAD_RE = re.compile(r"^(?://\s*)?enum\s+(\w+)\s*\{?$")
-_STRUCT_DEF_RE = re.compile(r"^\s*typedef\s+struct\s+(\w+)\s*$")
-_STRUCT_ANON_DEF_RE = re.compile(r"^\s*typedef\s+struct\s*\{")
+_TYPEDEF_AGG_RE = re.compile(r"^\s*typedef\s+(struct|union)\s*(.*)$")
+_STRUCT_HEAD_RE = re.compile(r"^\s*struct\s+(\w+)\s*\{?$")
+_UNION_HEAD_RE = re.compile(r"^\s*union\s+(\w+)\s*\{?$")
 _STRUCT_CLOSE_RE = re.compile(r"^\s*}\s*(\w+)\s*;")
+_STRUCT_BARE_CLOSE_RE = re.compile(r"^\s*}\s*;")
 _STRUCT_FIELD_RE = re.compile(r"^([^/;{}]+?)\s+(\w+(?:\s*\[[^\]]*\])?(?:\s*:\s*\d+)?)\s*;(.*)")
 
 
@@ -298,29 +301,46 @@ def parse_types_from_file(path):
             i = end
             continue
 
-        # --- typedef struct NAME { … } NAME; ---------------------------------------
-        sm = _STRUCT_DEF_RE.match(s)
-        if sm:
-            name = sm.group(1)
+        # --- typedef (struct|union) NAME { … } NAME;  or  { … } Name; -----------------
+        am = _TYPEDEF_AGG_RE.match(s)
+        if am:
+            kind = am.group(1)
+            rest = am.group(2).rstrip()
             desc = _struct_desc_above(lines, i)
-            members, end = _parse_struct_body(lines, i + 1)
+            named = re.match(r"^([A-Za-z_]\w*)\s*\{?\s*$", rest)
+            anonymous = (not rest) or rest.lstrip().startswith("{")
+            if named or anonymous:
+                members, end, tname = _parse_struct_body(lines, i)
+                if members is not None:
+                    if named:
+                        tname = named.group(1)
+                    if tname:
+                        types.append({"kind": kind, "name": tname, "desc": desc,
+                                      "members": members, "srcfile": rel})
+                i = end
+            else:
+                i += 1
+            continue
+
+        # --- struct NAME { … };  (plain tag, no typedef) ----------------------------
+        shm = _STRUCT_HEAD_RE.match(s)
+        if shm:
+            name = shm.group(1)
+            desc = _struct_desc_above(lines, i)
+            members, end, _alias = _parse_struct_body(lines, i)
             types.append({"kind": "struct", "name": name, "desc": desc,
                           "members": members, "srcfile": rel})
             i = end
             continue
 
-        # --- typedef struct { … } Name;  (anonymous) -------------------------------
-        sm2 = _STRUCT_ANON_DEF_RE.match(s)
-        if sm2:
+        # --- union NAME { … };  (plain tag, no typedef) -----------------------------
+        uhm = _UNION_HEAD_RE.match(s)
+        if uhm:
+            name = uhm.group(1)
             desc = _struct_desc_above(lines, i)
-            members, end = _parse_struct_body(lines, i + 1)
-            # the typedef name is after the closing }
-            if end - 1 < n:
-                cm = _STRUCT_CLOSE_RE.match(lines[end - 1])
-                if cm:
-                    tname = cm.group(1)
-                    types.append({"kind": "struct", "name": tname, "desc": desc,
-                                  "members": members, "srcfile": rel})
+            members, end, _alias = _parse_struct_body(lines, i)
+            types.append({"kind": "union", "name": name, "desc": desc,
+                          "members": members, "srcfile": rel})
             i = end
             continue
 
@@ -410,11 +430,13 @@ def _parse_enum(lines, start):
 
 
 def _parse_struct_body(lines, start):
-    """Parse struct fields starting at the `typedef struct NAME` line.
+    """Parse struct (or union) fields starting at the `typedef struct NAME` line.
 
     Locates the opening brace line first (it may be on the same line or the
     next one) so brace depth starts at zero. Stops at the matching closing
-    `}` and returns (members, index_after_closing_semicolon_line).
+    `}` and returns (members, index_after_closing_semicolon_line, alias)
+    where alias is the typedef name written after the closing `}`, or None
+    when the block ends with a bare `};` (plain tag, no typedef).
     """
     n = len(lines)
     open_idx = None
@@ -425,7 +447,7 @@ def _parse_struct_body(lines, start):
             break
         j += 1
     if open_idx is None:
-        return [], start + 1
+        return None, start + 1, None
 
     members = []
     depth = 0
@@ -461,12 +483,14 @@ def _parse_struct_body(lines, start):
             members.append((ftype, fname_raw, cmt))
         i += 1
 
-    # find the closing } NAME; line
+    # find the closing } NAME; line (or a bare }; for plain tags)
     for j in range(open_idx, min(open_idx + 500, n)):
         cm = _STRUCT_CLOSE_RE.match(lines[j])
         if cm:
-            return members, j + 1
-    return members, i + 1
+            return members, j + 1, cm.group(1)
+        if _STRUCT_BARE_CLOSE_RE.match(lines[j]):
+            return members, j + 1, None
+    return members, i + 1, None
 
 
 def collect_types(src):
@@ -478,22 +502,6 @@ def collect_types(src):
             if t["name"] not in all_types:
                 all_types[t["name"]] = t
     return all_types
-
-
-def find_used_types(all_docs, all_type_names):
-    """Return set of type names that appear in at least one function signature."""
-    used = set()
-    pattern_cache = {}
-    for tname in all_type_names:
-        pattern_cache[tname] = re.compile(r"\b" + re.escape(tname) + r"\b")
-    for doc in all_docs.values():
-        sig = doc.get("signature") or ""
-        if not sig:
-            continue
-        for tname, pat in pattern_cache.items():
-            if pat.search(sig):
-                used.add(tname)
-    return used
 
 
 def type_tip_markdown(t):
@@ -510,7 +518,9 @@ def type_tip_markdown(t):
     else:
         fields = t["members"]
         body = "\n".join("    %s %s;" % (m[0], m[1]) for m in fields) if fields else "    /* ... */"
-        parts.append("```c\ntypedef struct %s {\n%s\n} %s;\n```" % (t["name"], body, t["name"]))
+        keyword = "union" if t["kind"] == "union" else "struct"
+        parts.append("```c\ntypedef %s %s {\n%s\n} %s;\n```" %
+                     (keyword, t["name"], body, t["name"]))
     if t["desc"]:
         parts.append("\n".join(t["desc"]))
     # members with comments (only if at least one has a comment)
@@ -521,7 +531,7 @@ def type_tip_markdown(t):
             cmt = " — %s" % m[2] if m[2] else ""
             lines.append("- `%s%s`%s" % (m[0], val, cmt))
         parts.append("\n".join(lines))
-    elif t["kind"] == "struct" and any(m[2] for m in t["members"]):
+    elif t["kind"] in ("struct", "union") and any(m[2] for m in t["members"]):
         lines = ["**Fields:**"]
         for m in t["members"]:
             cmt = " — %s" % m[2] if m[2] else ""
@@ -624,7 +634,8 @@ def tip_markdown(doc, referenced_types=None):
     return "\n\n".join(parts)
 
 
-def root_markdown(modules, all_doc_enums=None, all_doc_structs=None):
+def root_markdown(modules, all_doc_enums=None, all_doc_structs=None,
+                  all_doc_unions=None):
     """Render the root page: module sections followed by a Types section."""
     out = [
         "# MSXgl (C + engine)\n",
@@ -632,7 +643,7 @@ def root_markdown(modules, all_doc_enums=None, all_doc_structs=None):
         "the **SDCC** C compiler (Small Device C Compiler). Functions are "
         "grouped by module - expand a module to browse its functions and click "
         "a function to open its documentation. The **Types** section lists the "
-        "enums and structs referenced in the documentation. Press **F2** to "
+        "enums, structs and unions declared by the engine. Press **F2** to "
         "return here.",
         "",
         "> Plain **C** language help (printf/scanf, stdlib, ...) stays "
@@ -648,12 +659,14 @@ def root_markdown(modules, all_doc_enums=None, all_doc_structs=None):
             out.append("- [`%s`](hint:%s)" % (name, name.upper()))
         out.append("")
         out.append("</details>")
-    # Types section (enums and structs used by function signatures)
+    # Types section (every type declared by the engine)
     enum_list = sorted(all_doc_enums or [])
     struct_list = sorted(all_doc_structs or [])
-    if enum_list or struct_list:
-        total = len(enum_list) + len(struct_list)
-        out.append("<details><summary><b>Types</b> - enums &amp; structs (%d)</summary>" % total)
+    union_list = sorted(all_doc_unions or [])
+    if enum_list or struct_list or union_list:
+        total = len(enum_list) + len(struct_list) + len(union_list)
+        out.append("<details><summary><b>Types</b> - enums, structs &amp; "
+                   "unions (%d)</summary>" % total)
         out.append("")
         if enum_list:
             out.append("### Enums")
@@ -665,6 +678,12 @@ def root_markdown(modules, all_doc_enums=None, all_doc_structs=None):
             out.append("### Structs")
             out.append("")
             for name in struct_list:
+                out.append("- [`%s`](hint:%s)" % (name, name.upper()))
+            out.append("")
+        if union_list:
+            out.append("### Unions")
+            out.append("")
+            for name in union_list:
                 out.append("- [`%s`](hint:%s)" % (name, name.upper()))
             out.append("")
         out.append("</details>")
@@ -693,45 +712,22 @@ def main():
     all_names = merge(parsed, None)
     modules = split_modules(parsed, all_names)
 
-    # --- Types (enums + structs) -----------------------------------------------
+    # --- Types (enums + structs + unions) ---------------------------------------
+    # Every type declared in the headers is available to the autocomplete
+    # system, whether or not it appears in a documented function or macro.
     all_types = collect_types(src)
-    type_name_set = set(all_types.keys())
-    used_type_names = find_used_types(all_names, type_name_set)
-
-    # Find types referenced via <NAME> tokens in descriptions, param comments,
-    # notes, signatures and struct/enum member comments.
-    referenced_type_names = set()
-    for doc in all_names.values():
-        for field in ("desc", "ret", "notes"):
-            for item in doc.get(field) or []:
-                for m in _ANGLE_TOKEN_RE.finditer(item):
-                    if m.group(1) in type_name_set:
-                        referenced_type_names.add(m.group(1))
-        for _pname, pdesc in doc.get("params") or []:
-            for m in _ANGLE_TOKEN_RE.finditer(pdesc):
-                if m.group(1) in type_name_set:
-                    referenced_type_names.add(m.group(1))
-        sig = doc.get("signature") or ""
-        for m in _ANGLE_TOKEN_RE.finditer(sig):
-            if m.group(1) in type_name_set:
-                referenced_type_names.add(m.group(1))
-    for _tn, t in all_types.items():
-        for member in t.get("members") or []:
-            for m in _ANGLE_TOKEN_RE.finditer(member[2]):
-                if m.group(1) in type_name_set:
-                    referenced_type_names.add(m.group(1))
-
-    all_doc_types = used_type_names | referenced_type_names
+    all_doc_types = set(all_types.keys())
     all_doc_enums = sorted(n for n, t in all_types.items()
-                           if t["kind"] == "enum" and n in all_doc_types)
+                           if t["kind"] == "enum")
     all_doc_structs = sorted(n for n, t in all_types.items()
-                             if t["kind"] == "struct" and n in all_doc_types)
+                             if t["kind"] == "struct")
+    all_doc_unions = sorted(n for n, t in all_types.items()
+                            if t["kind"] == "union")
 
     # Enum constant names are globally-scoped values; they must autocomplete
     # alongside the type names that own them.
     enum_const_names = set()
-    for tn in all_doc_types:
-        t = all_types[tn]
+    for t in all_types.values():
         if t["kind"] == "enum":
             for m in t.get("members") or []:
                 if m[0]:
@@ -763,17 +759,18 @@ def main():
     for key in list(tips.keys()):
         tips[key] = _link_angle_refs(tips[key], all_tip_keys)
 
-    # Base structs map: every parsed struct (documented or not) with its
-    # members as [type, field, comment] triples. Drives the c-struct-complete
-    # plugin's ". / ->" member autocomplete; keeping undocumented structs lets
+    # Base structs map: every parsed struct and union (documented or not) with
+    # its members as [type, field, comment] triples. Drives the c-struct-complete
+    # plugin's ". / ->" member autocomplete; keeping undocumented types lets
     # nested member resolution (a.b.c) work even for internal-only types.
     structs = {
         n: [[ftype, fname, cmt] for (ftype, fname, cmt) in (t.get("members") or [])]
-        for n, t in all_types.items() if t["kind"] == "struct"
+        for n, t in all_types.items() if t["kind"] in ("struct", "union")
     }
 
     data = {
-        "root": root_markdown(modules, all_doc_enums, all_doc_structs) or "# MSXgl",
+        "root": root_markdown(modules, all_doc_enums, all_doc_structs,
+                              all_doc_unions) or "# MSXgl",
         "keywords": C_KEYWORDS,
         "builtins": list(all_names.keys()),
         "types": all_symbol_names,
@@ -790,8 +787,9 @@ def main():
     print("wrote %s" % args.out)
     print("  functions: %d builtins, %d tips" % (len(data["builtins"]),
                                                   len(all_names)))
-    print("  types: %d enums, %d structs (%d total)" % (
-        len(all_doc_enums), len(all_doc_structs), len(all_doc_types)))
+    print("  types: %d enums, %d structs, %d unions (%d total)" % (
+        len(all_doc_enums), len(all_doc_structs), len(all_doc_unions),
+        len(all_doc_types)))
     print("  modules: %d (root page)" % len(modules))
 
 
