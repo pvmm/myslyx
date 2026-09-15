@@ -26,7 +26,8 @@ sources by `tools/gen_msxgl_hints.py` (which parses the Natural Docs
 `// Function:` comments in `engine/src/**/*.h`). Its `root` page groups every
 MSXgl function by module in collapsible sections; each function becomes an
 autocomplete builtin with a full tip (signature, description, parameters,
-return). To regenerate after an MSXgl upgrade:
+return). The generator also emits the `structs` map (see below). To regenerate
+after an MSXgl upgrade:
 
 ```bash
 .venv/bin/python tools/gen_msxgl_hints.py \
@@ -45,12 +46,25 @@ return). To regenerate after an MSXgl upgrade:
   },
   "patterns": [
     { "re": "GOTO\\s+\\d+", "tip": "Prefer loops over GOTO line numbers." }
-  ]
+  ],
+  "structs": {
+    "BIOS_SpriteAttributes": [["u8", "y", ""], ["u8", "x", ""], ["u8", "pattern", ""]]
+  }
 }
 ```
 
 `root` is the language's **root page** (markdown). It is shown in the HINTS panel
 when a new file in that language is created, and **F2** reloads it at any time.
+
+## `structs` (framework structs)
+
+Optional. Maps a struct name to an array of `[type, field, comment]` triples,
+described in Natural Docs style like any hint (the third element may be empty).
+Autocomplete consumers like the bundled `c-struct-complete` plugin resolve a
+variable's type against these entries, so `BIOS_SpriteAttributes attr; attr.`
+offers `y`, `x` and `pattern`. The key is the struct name as written after the
+`typedef` (e.g. `BIOS_SpriteAttributes`); `msxgl.json` carries them for all
+documented MSXgl structs.
 
 ## Cross-links between pages (`hint:` scheme)
 

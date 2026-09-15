@@ -95,7 +95,15 @@ async def plugin_toggle_preserves_file_pool(page, msgs):
         return !!m && m.style.display === 'block';
     }""", timeout=10000)
     # Toggle the first plugin row: config is persisted but the page must NOT
-    # reload yet (the refresh happens when the menu is closed).
+    # reload yet (the refresh happens when the menu is closed). Capture the
+    # row's plugin name and previous state so this suite can restore them:
+    # nobody else resets plugin config, and a flipped flag persisted here
+    # would leak into every later suite on the same origin.
+    prev_state = await page.evaluate("""() => {
+        const cb = document.querySelector('.wb-plugin-check');
+        const name = document.querySelector('.wb-plugin-name');
+        return { name: name ? name.textContent : '', prev: cb.checked };
+    }""")
     await page.evaluate("""() => {
         const cb = document.querySelector('.wb-plugin-check');
         cb.checked = !cb.checked;
@@ -117,6 +125,15 @@ async def plugin_toggle_preserves_file_pool(page, msgs):
     tabs = await page.evaluate("""() => Array.from(
         document.querySelectorAll('.wb-file-tab .file-name')).map(n => n.textContent)""")
     assert name in tabs, f'created file vanished after plugin toggle: {tabs}'
+    # Restore the flipped plugin flag so later suites on this origin are not
+    # affected (config changes apply on the next page load, which already
+    # happened for this test's reload).
+    await page.evaluate("""({ name, prev }) => {
+        const cfg = window.WBStorage.loadConfig();
+        cfg.plugins = cfg.plugins || {};
+        if (prev) cfg.plugins[name] = true; else delete cfg.plugins[name];
+        window.WBStorage.saveConfig(cfg);
+    }""", prev_state)
     assert msgs == []
 
 

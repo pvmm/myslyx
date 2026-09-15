@@ -37,7 +37,11 @@ directories and binds each module to the editor through the runtime in
 2. (Optional) Add `static/plugins/<name>/plugin.json` to override defaults:
 
    ```json
-   { "languages": ["HitBasic"], "enabledByDefault": false }
+   {
+     "languages": ["C MSXgl"],
+     "baseLang": ["c"],
+     "enabledByDefault": false
+   }
    ```
 
    Defaults: `languages: ["*"]` (all languages), `enabledByDefault: true`.
@@ -53,10 +57,25 @@ directories and binds each module to the editor through the runtime in
 3. Hard-refresh the page. The plugin appears in Settings > PLUGINS and its
    extensions are appended the next time the editor view is created.
 
-> Language ids: a file's stored language is one of the `LANGUAGES` keys in
-> `pages/editor_page.py` (`HitBasic`, `Pascal`, `C`, `Z80`, `Text`). For
-> compatibility, a plugin whose `languages` says `"VBScript"` (the pre-rename
-> id for BASIC) also runs on `HitBasic` files.
+### Language scoping
+
+A plugin declares which languages it cares about on two orthogonal axes:
+
+- `languages` scopes to the exact stored language ids — the `LANGUAGES` keys in
+  `pages/editor_page.py` (`HitBasic`, `Pascal`, `C`, `C MSXgl`, `Z80`,
+  `Text`). A stored id that matches is enough on its own.
+- `baseLang` scopes to a *base* language family shared by several ids. The
+  runtime publishes `window.__wbBaseLang` (HitBasic -> `basic`, Pascal ->
+  `pascal`, C and C MSXgl -> `c`, Z80 -> `asm`, Text -> `text`), so a generic
+  plugin declares `"baseLang": ["c"]` and automatically lights up for plain C,
+  the C MSXgl framework, and any future C-derived language — no per-language
+  manifest updates.
+- `"*"` (default) matches everything. When both filters are declared, they
+  both must pass (AND). An absent filter always passes.
+
+The check lives in `static/plugins.js` (`_langOk`); `lifecycle.js` forwards
+`baseLang` from the manifest. For compatibility, a plugin whose `languages`
+says `"VBScript"` (the pre-rename BASIC id) also runs on `HitBasic` files.
 
 ### User plugins directory
 
@@ -153,6 +172,34 @@ runtime toggle yet.
   existed, the factory also re-applies the language to the active editor.
   Disabling this plugin removes HitBasic from the catalog (no highlighting,
   no Ctrl-/ toggle).
+- `static/plugins/c-struct-complete/` — autocompletes C `struct` member names
+  after `.` / `->` (a Boot plugin, `baseLang: ["c"]`). It parses struct
+  declarations and typed variables from the document, merges in framework
+  structs shipped with the active hints JSON (see
+  `static/hints/README.md`, the `structs` key), and feeds the editor's
+  autocomplete popup through a completion provider registered with
+  `WBHintCompletions` (see `static/hints.js`). With no Python changes it
+  covers plain C, the C MSXgl framework, and any future base-`c` language.
+
+### Completions providers
+
+Autocomplete is normally driven by keyword/builtin data from the hints JSON.
+Plugins can contribute their own suggestions by registering a provider:
+
+```js
+window.WBHintCompletions.register('my-completions', function(ctx) {
+    // ctx: { view, word, line, col, start }
+    //  - return null to let the default keyword/builtin path handle it;
+    //  - return [] to show nothing;
+    //  - return [{ label, detail, apply }] to show a popup.
+});
+```
+
+`static/hints.js` runs the providers first; the first non-null result wins.
+`apply` is optional (a string replaces the typed word). Because hints data can
+arrive asynchronously, a provider may load it and then dispatch
+`wb-hints-ready` on `window`; hints.js re-runs the completion check for you.
+See `c-struct-complete` for the full pattern.
 
 ## Validation
 

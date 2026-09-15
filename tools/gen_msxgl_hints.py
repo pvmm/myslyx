@@ -763,6 +763,15 @@ def main():
     for key in list(tips.keys()):
         tips[key] = _link_angle_refs(tips[key], all_tip_keys)
 
+    # Base structs map: every parsed struct (documented or not) with its
+    # members as [type, field, comment] triples. Drives the c-struct-complete
+    # plugin's ". / ->" member autocomplete; keeping undocumented structs lets
+    # nested member resolution (a.b.c) work even for internal-only types.
+    structs = {
+        n: [[ftype, fname, cmt] for (ftype, fname, cmt) in (t.get("members") or [])]
+        for n, t in all_types.items() if t["kind"] == "struct"
+    }
+
     data = {
         "root": root_markdown(modules, all_doc_enums, all_doc_structs) or "# MSXgl",
         "keywords": C_KEYWORDS,
@@ -770,6 +779,7 @@ def main():
         "types": all_symbol_names,
         "tips": tips,
         "patterns": [],
+        "structs": structs,
     }
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)

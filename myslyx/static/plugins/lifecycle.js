@@ -20,6 +20,7 @@
         var plugin = {
             name: def.name,
             languages: def.languages || ['*'],
+            baseLang: def.baseLang ? (Array.isArray(def.baseLang) ? def.baseLang : [def.baseLang]) : null,
             enabledByDefault: def.enabledByDefault !== false,
             extensions: function(view, CM, ctx) {
                 return import(url).then(function(mod) {

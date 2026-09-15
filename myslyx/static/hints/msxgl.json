@@ -2703,54 +2703,2885 @@
   "WYZ_DECODE": "```c\nvoid WYZ_Decode();\n```\n\nProcess the next step in the song sequence",
   "WYZ_PLAY": "```c\nvoid WYZ_Play(u8 music) __NAKED;\n```\n\nStart music playback\n\n**Parameters:**\n- `music` - Music number",
   "WYZ_STOP": "```c\nvoid WYZ_Stop();\n```\n\nStop song playback",
-  "AYFX_MODE": "```c\nenum AYFX_MODE {\n    AYFX_MODE_FIXED = 0,  // All sounds are played in the same channel\n    AYFX_MODE_FSWITCH = 1,  // Frame Switch: Channel is switched each frame during FX playback (should less affected the playing music)\n    AYFX_MODE_PSWITCH = 2,  // Play Switch: Channel is switched each time a play occured\n};\n```\n\n**Constants:**\n- `AYFX_MODE_FIXED = 0` — All sounds are played in the same channel\n- `AYFX_MODE_FSWITCH = 1` — Frame Switch: Channel is switched each frame during FX playback (should less affected the playing music)\n- `AYFX_MODE_PSWITCH = 2` — Play Switch: Channel is switched each time a play occured\n\n*Defined in* `ayfx_player.h`.",
-  "DOS_TIME": "```c\ntypedef struct DOS_Time {\n    u16 Year;\n    u8 Date;\n    u8 Month;\n    u8 Day;\n    u8 Minute;\n    u8 Hour;\n    u8 Second;\n} DOS_Time;\n```\n\nMSX-DOS 2 time structure\n\n**Fields:**\n- `u16 Year` — +0 (note: order is important for fast update)\n- `u8 Date` — +2\n- `u8 Month` — +3\n- `u8 Day` — +4\n- `u8 Minute` — +5\n- `u8 Hour` — +6\n- `u8 Second` — +7\n\n*Defined in* `dos.h`.",
-  "TCL_DATA": "```c\ntypedef struct TCL_Data {\n    c8* Output;\n    u16 OutputSize;\n    c8* Input;\n    u16 InputMax;\n    u16 InputSize;\n    i8 Status;\n} TCL_Data;\n```\n\nDEFINES\nData to send to tcl_bridge\n\n**Fields:**\n- `c8* Output` — offset + 0\n- `u16 OutputSize` — offset + 2\n- `c8* Input` — offset + 4\n- `u16 InputMax` — offset + 6\n- `u16 InputSize` — offset + 8\n- `i8 Status` — offset + 10\n\n*Defined in* `tcl.h`.",
+  "SEQACTION": "```c\ntypedef struct SeqAction {\n    u8 Event;\n    u8 Cursor;\n    SeqCondCB Condition;\n    SeqTransition Trans;\n    u8 FrameMin;\n    u8 FrameMax;\n    SeqActionArea Areas[];\n} SeqAction;\n```\n\nSequence action structure\n\n**Fields:**\n- `u8 Event` — Action ID sent to the callback\n- `u8 Cursor` — Cursor type (see <SEQ_CURSOR>)\n- `SeqCondCB Condition` — Condition check callback\n- `SeqTransition Trans` — Sequence to auto-start when action triggered (if Trans.Seq is not NULL)\n- `u8 FrameMin` — Minimum frame to trigger the action\n- `u8 FrameMax` — Maximum frame to trigger the action\n- `SeqActionArea Areas[]` — Action area\n\n*Defined in* `sequence.h`.",
+  "BIOS_SPRITEATTRIBUTES": "```c\ntypedef struct BIOS_SpriteAttributes {\n    u8 y;\n    u8 x;\n    u8 pattern;\n    u8 color;\n} BIOS_SpriteAttributes;\n```\n\n*Defined in* `bios.h`.",
   "MOUSE_STATE": "```c\ntypedef struct Mouse_State {\n    u8 Buttons;\n    i8 dX;\n    i8 dY;\n    u8 PrevButtons;\n} Mouse_State;\n```\n\nMouse state structure (don't change parameter order)\n\n*Defined in* `mouse.h`.",
-  "FSM_STATE": "```c\ntypedef struct FSM_State {\n    u8 Flag;\n    callback Begin;\n    callback Update;\n    callback End;\n} FSM_State;\n```\n\nDEFINES\n\n**Fields:**\n- `u8 Flag` — State behavior flag (reserved)\n- `callback Begin` — Function to be called when state begin (can be NULL)\n- `callback Update` — Function to be called at each update tick\n- `callback End` — Function to be called when state end (can be NULL)\n\n*Defined in* `fsm.h`.",
-  "INPUT_PORT": "```c\nenum INPUT_PORT {\n    INPUT_PORT1 = INPUT_PORT1_HIGH,\n    INPUT_PORT2 = INPUT_PORT2_HIGH,\n};\n```\n\n*Defined in* `input.h`.",
-  "MGLV_HEADER_MODE": "```c\nenum MGLV_HEADER_MODE {\n    MGLV_HEADER_NONE = 0,\n    MGLV_HEADER_SHORT,\n    MGLV_HEADER_FULL,\n};\n```\n\n*Defined in* `mglv_player.h`.",
-  "VDP_VERSION": "```c\nenum VDP_VERSION {\n    VDP_VERSION_TMS9918A = 0,  // MSX1 VDP (no ID from hardware)\n    VDP_VERSION_V9938,  // MSX2 VDP (ID from hardware is 0)\n    VDP_VERSION_V9958,  // MSX2+ & MSX turbo R VDP\n    VDP_VERSION_V9968,  // MSX2++ VDP\n    VDP_VERSION_V9978,  // MSX2 turbo R+ VDP (V9968+V9990)\n};\n```\n\nVDP version enumaration\n\n**Constants:**\n- `VDP_VERSION_TMS9918A = 0` — MSX1 VDP (no ID from hardware)\n- `VDP_VERSION_V9938` — MSX2 VDP (ID from hardware is 0)\n- `VDP_VERSION_V9958` — MSX2+ & MSX turbo R VDP\n- `VDP_VERSION_V9968` — MSX2++ VDP\n- `VDP_VERSION_V9978` — MSX2 turbo R+ VDP (V9968+V9990)\n\n*Defined in* `vdp.h`.",
+  "AYFX_ERROR": "```c\nenum AYFX_ERROR {\n    AYFX_ERROR_NONE = 0,  // No errors, the new sample has been correctly initialized\n    AYFX_ERROR_PRIO = 1,  // Priority error, there's a sample with higher priority being played\n    AYFX_ERROR_INDEX = 2,  // Index error, the current bank don't have a sample with such index\n};\n```\n\n**Constants:**\n- `AYFX_ERROR_NONE = 0` — No errors, the new sample has been correctly initialized\n- `AYFX_ERROR_PRIO = 1` — Priority error, there's a sample with higher priority being played\n- `AYFX_ERROR_INDEX = 2` — Index error, the current bank don't have a sample with such index\n\n*Defined in* `ayfx_player.h`.",
+  "V9_COLOR_MODE": "```c\nenum V9_COLOR_MODE {\n    V9_COLOR_BP2,  // 0    0    0\tColor palette (4 colors out of 32768 colors)\n    V9_COLOR_BP4,  // 1    0    0\tColor palette (16 colors out of 32768 colors)\n    V9_COLOR_BP6,  // 2    0    0\tColor palette (64 colors out of 32768 colors)\n    V9_COLOR_BD8,  // 2    1    0\tDirect RGB [G:3|R:3|B:2] (256 colors)\n    V9_COLOR_BYJK,  // 2    2    0\tYJK Decoder (19268 colors)\n    V9_COLOR_BYJKP,  // 2    2    1\tYJK Decoder + Color palette (12599 colors + 16 colors out of 32768 colors)\n    V9_COLOR_BYUV,  // 2    3    0\tYUV Decoder (19268 colors)\n    V9_COLOR_BYUVP,  // 2    3    1\tYUV Decoder + Color palette (12599 colors + 16 colors out of 32768 colors)\n    V9_COLOR_BD16,  // 3    0    0\tDirect RGB [YS|G:5|R:2][R:3|B:5] (32768 colors)\n    V9_COLOR_BMP_MAX,\n    V9_COLOR_PP,  // Display type when the display mode is P1 or P2 (16/32 colors out of 32768 colors)\n    V9_COLOR_MAX,\n};\n```\n\n**Constants:**\n- `V9_COLOR_BP2` — 0    0    0\tColor palette (4 colors out of 32768 colors)\n- `V9_COLOR_BP4` — 1    0    0\tColor palette (16 colors out of 32768 colors)\n- `V9_COLOR_BP6` — 2    0    0\tColor palette (64 colors out of 32768 colors)\n- `V9_COLOR_BD8` — 2    1    0\tDirect RGB [G:3|R:3|B:2] (256 colors)\n- `V9_COLOR_BYJK` — 2    2    0\tYJK Decoder (19268 colors)\n- `V9_COLOR_BYJKP` — 2    2    1\tYJK Decoder + Color palette (12599 colors + 16 colors out of 32768 colors)\n- `V9_COLOR_BYUV` — 2    3    0\tYUV Decoder (19268 colors)\n- `V9_COLOR_BYUVP` — 2    3    1\tYUV Decoder + Color palette (12599 colors + 16 colors out of 32768 colors)\n- `V9_COLOR_BD16` — 3    0    0\tDirect RGB [YS|G:5|R:2][R:3|B:5] (32768 colors)\n- `V9_COLOR_BMP_MAX`\n- `V9_COLOR_PP` — Display type when the display mode is P1 or P2 (16/32 colors out of 32768 colors)\n- `V9_COLOR_MAX`\n\n*Defined in* `v9990.h`.",
+  "IPM_CONFIG": "```c\ntypedef struct IPM_Config {\n    u8 DeviceSupport[IPM_DEVICE_MAX];\n    u8 HoldTimer;\n    u8 DoubleClickTimer;\n    IPM_KeySet KeySet[2];\n} IPM_Config;\n```\n\nIPM configuration structure\n\n*Defined in* `input_manager.h`.",
+  "VDP_COMMAND36": "```c\ntypedef struct VDP_Command36 {\n    u16 DX;\n    u16 DY;\n    u16 NX;\n    u16 NY;\n    u8 CLR;\n    u8 ARG;\n    u8 CMD;\n} VDP_Command36;\n```\n\nStructure used to store register data for VDP command\n\n**Fields:**\n- `u16 DX` — 36-37\n- `u16 DY` — 38-39\n- `u16 NX` — 40-41\n- `u16 NY` — 42-43\n- `u8 CLR` — 44\n- `u8 ARG` — 45\n- `u8 CMD` — 46\n\n*Defined in* `vdp.h`.",
+  "VDP_MODE": "```c\nenum VDP_MODE {\n    VDP_MODE_MSX1 = 0,  // TMS 9918A video modes\n    VDP_MODE_TEXT1 = VDP_MODE_MSX1,  // 00 001\tTEXT\t40 characters per line of text, one colour for each characte\n    VDP_MODE_MULTICOLOR,  // 00 010\tTILES\tpseudo-graphic, one character divided into four block\n    VDP_MODE_GRAPHIC1,  // 00 000\tTILES\t32 characters per one line of text, the COLOURed character available\n    VDP_MODE_GRAPHIC2,  // 00 100\tTILES\t256 x 192, the colour is specififed for each 8 dots\n    VDP_MODE_MSX2,  // V9938 video modes\n    VDP_MODE_TEXT2 = VDP_MODE_MSX2,  // 01 001\tTEXT\t80 characters per line of text, character blinkable selection\n    VDP_MODE_GRAPHIC3,  // 01 000\tTILES\tGRAPHIC 2 which can use sprite mode 2\n    VDP_MODE_GRAPHIC4,  // 01 100\tBITMAP\t256 x 212; 16 colours are available for each dot\n    VDP_MODE_GRAPHIC5,  // 10 000\tBITMAP\t512 x 212; 4 colours are available for each dot\n    VDP_MODE_GRAPHIC6,  // 10 100\tBITMAP\t512 x 212; 16 colours are available for each dot\n    VDP_MODE_GRAPHIC7,  // 11 100\tBITMAP\t256 x 212; 256 colours are available for each dot\n    VDP_MODE_SCREEN0 = VDP_MODE_TEXT1,\n    VDP_MODE_SCREEN0_W40 = VDP_MODE_SCREEN0,\n    VDP_MODE_SCREEN1 = VDP_MODE_GRAPHIC1,\n    VDP_MODE_SCREEN2 = VDP_MODE_GRAPHIC2,\n    VDP_MODE_SCREEN3 = VDP_MODE_MULTICOLOR,\n    VDP_MODE_SCREEN0_W80 = VDP_MODE_TEXT2,\n    VDP_MODE_SCREEN4 = VDP_MODE_GRAPHIC3,\n    VDP_MODE_SCREEN5 = VDP_MODE_GRAPHIC4,\n    VDP_MODE_SCREEN6 = VDP_MODE_GRAPHIC5,\n    VDP_MODE_SCREEN7 = VDP_MODE_GRAPHIC6,\n    VDP_MODE_SCREEN8 = VDP_MODE_GRAPHIC7,\n    VDP_MODE_SCREEN9,\n    VDP_MODE_SCREEN9_40 = VDP_MODE_SCREEN9,\n    VDP_MODE_SCREEN9_80,\n    VDP_MODE_MSX2P,  // V9958 video modes\n    VDP_MODE_SCREEN10 = VDP_MODE_MSX2P,\n    VDP_MODE_SCREEN11,\n    VDP_MODE_SCREEN12,\n    VDP_MODE_UNDOC,  // Undocumented video modes. Only available on TMS 9918A\n    VDP_MODE_UNDOC_0_2 = VDP_MODE_UNDOC,  // 00 101\n    VDP_MODE_UNDOC_1_2,  // 00 100\n    VDP_MODE_UNDOC_3_2,  // 00 110\n    VDP_MODE_GRAPHIC3_MIRROR_0,  // Bank 0 on all strips                    | 0 0 0 0 |\n    VDP_MODE_GRAPHIC3_MIRROR_01,  // Bank 0 and 1 alternated                 | 0 1 0 1 |\n    VDP_MODE_GRAPHIC3_MIRROR_02,  // Bank 0 twice then bank 2 twice          | 0 0 2 2 |\n    VDP_MODE_GRAPHIC3_MIRROR = VDP_MODE_GRAPHIC3_MIRROR_0,\n    VDP_MODE_MAX,\n};\n```\n\nVDP display modes\n\n**Constants:**\n- `VDP_MODE_MSX1 = 0` — TMS 9918A video modes\n- `VDP_MODE_TEXT1 = VDP_MODE_MSX1` — 00 001\tTEXT\t40 characters per line of text, one colour for each characte\n- `VDP_MODE_MULTICOLOR` — 00 010\tTILES\tpseudo-graphic, one character divided into four block\n- `VDP_MODE_GRAPHIC1` — 00 000\tTILES\t32 characters per one line of text, the COLOURed character available\n- `VDP_MODE_GRAPHIC2` — 00 100\tTILES\t256 x 192, the colour is specififed for each 8 dots\n- `VDP_MODE_MSX2` — V9938 video modes\n- `VDP_MODE_TEXT2 = VDP_MODE_MSX2` — 01 001\tTEXT\t80 characters per line of text, character blinkable selection\n- `VDP_MODE_GRAPHIC3` — 01 000\tTILES\tGRAPHIC 2 which can use sprite mode 2\n- `VDP_MODE_GRAPHIC4` — 01 100\tBITMAP\t256 x 212; 16 colours are available for each dot\n- `VDP_MODE_GRAPHIC5` — 10 000\tBITMAP\t512 x 212; 4 colours are available for each dot\n- `VDP_MODE_GRAPHIC6` — 10 100\tBITMAP\t512 x 212; 16 colours are available for each dot\n- `VDP_MODE_GRAPHIC7` — 11 100\tBITMAP\t256 x 212; 256 colours are available for each dot\n- `VDP_MODE_SCREEN0 = VDP_MODE_TEXT1`\n- `VDP_MODE_SCREEN0_W40 = VDP_MODE_SCREEN0`\n- `VDP_MODE_SCREEN1 = VDP_MODE_GRAPHIC1`\n- `VDP_MODE_SCREEN2 = VDP_MODE_GRAPHIC2`\n- `VDP_MODE_SCREEN3 = VDP_MODE_MULTICOLOR`\n- `VDP_MODE_SCREEN0_W80 = VDP_MODE_TEXT2`\n- `VDP_MODE_SCREEN4 = VDP_MODE_GRAPHIC3`\n- `VDP_MODE_SCREEN5 = VDP_MODE_GRAPHIC4`\n- `VDP_MODE_SCREEN6 = VDP_MODE_GRAPHIC5`\n- `VDP_MODE_SCREEN7 = VDP_MODE_GRAPHIC6`\n- `VDP_MODE_SCREEN8 = VDP_MODE_GRAPHIC7`\n- `VDP_MODE_SCREEN9`\n- `VDP_MODE_SCREEN9_40 = VDP_MODE_SCREEN9`\n- `VDP_MODE_SCREEN9_80`\n- `VDP_MODE_MSX2P` — V9958 video modes\n- `VDP_MODE_SCREEN10 = VDP_MODE_MSX2P`\n- `VDP_MODE_SCREEN11`\n- `VDP_MODE_SCREEN12`\n- `VDP_MODE_UNDOC` — Undocumented video modes. Only available on TMS 9918A\n- `VDP_MODE_UNDOC_0_2 = VDP_MODE_UNDOC` — 00 101\n- `VDP_MODE_UNDOC_1_2` — 00 100\n- `VDP_MODE_UNDOC_3_2` — 00 110\n- `VDP_MODE_GRAPHIC3_MIRROR_0` — Bank 0 on all strips                    | 0 0 0 0 |\n- `VDP_MODE_GRAPHIC3_MIRROR_01` — Bank 0 and 1 alternated                 | 0 1 0 1 |\n- `VDP_MODE_GRAPHIC3_MIRROR_02` — Bank 0 twice then bank 2 twice          | 0 0 2 2 |\n- `VDP_MODE_GRAPHIC3_MIRROR = VDP_MODE_GRAPHIC3_MIRROR_0`\n- `VDP_MODE_MAX`\n\n*Defined in* `vdp.h`.",
   "DOS_FIB": "```c\ntypedef struct DOS_FIB {\n    u8 Ident;\n    u8 Filename[13];\n    u8 Attribute;\n    u16 Time;\n    u16 Date;\n    u16 Cluster;\n    u32 Size;\n    u8 Drive;\n    u8 Reserved[38];\n} DOS_FIB;\n```\n\nFile info block\n\n**Fields:**\n- `u8 Ident` — 0 - Always 0FFh\n- `u8 Filename[13]` — 1..13 - Filename as an ASCIIZ string\n- `u8 Attribute` — 14 - File attributes byte\n- `u16 Time` — 15..16 - Time of last modification\n- `u16 Date` — 17..18 - Date of last modification\n- `u16 Cluster` — 19..20 - Start cluster\n- `u32 Size` — 21..24 - File size\n- `u8 Drive` — 25 - Logical drive\n- `u8 Reserved[38]` — 26..63 - Internal information, must not be modified\n\n*Defined in* `dos.h`.",
   "LVGM_OPTION": "```c\nenum LVGM_OPTION {\n    LVGM_OPTION_FREQ = 0b00000001,  // Frequency\n    LVGM_OPTION_60HZ = 0b00000000,  // Frequency (0: 60 Hz)\n    LVGM_OPTION_50HZ = 0b00000001,  // Frequency (1: 50 Hz)\n    LVGM_OPTION_LOOP = 0b00000010,  // Loop data included\n    LVGM_OPTION_DEVICE = 0b00000100,  // Devices list\n    LVGM_OPTION_FORMAT = 0b11110000,  // File format version (0)\n};\n```\n\n**Constants:**\n- `LVGM_OPTION_FREQ = 0b00000001` — Frequency\n- `LVGM_OPTION_60HZ = 0b00000000` — Frequency (0: 60 Hz)\n- `LVGM_OPTION_50HZ = 0b00000001` — Frequency (1: 50 Hz)\n- `LVGM_OPTION_LOOP = 0b00000010` — Loop data included\n- `LVGM_OPTION_DEVICE = 0b00000100` — Devices list\n- `LVGM_OPTION_FORMAT = 0b11110000` — File format version (0)\n\n*Defined in* `lvgm_player.h`.",
-  "DOS_VERSION": "```c\ntypedef struct DOS_Version {\n    u16 Kernel;\n    u16 System;\n} DOS_Version;\n```\n\nMSX-DOS version structure\n\n*Defined in* `dos.h`.",
-  "PRINT_DATA": "```c\ntypedef struct Print_Data {\n    u8 PatternX;\n    u8 PatternY;\n    u8 UnitX;\n    u8 UnitY;\n    u8 TabSize;\n    UX CursorX;\n    UY CursorY;\n    u8 TextColor;\n    u8 TextColor[PRINT_COLOR_NUM];\n    u8 BGColor;\n    u8 CharFirst;\n    u8 CharLast;\n    u8 CharCount;\n    print_drawchar DrawChar;\n    u8 SourceMode       : 4;\n    u16 ScreenWidth;\n    const u8* FontPatterns;\n    const u8* FontAddr;\n    UY FontVRAMY;\n    u8 CharPerLine;\n    u8 SpritePattern;\n    u8 SpriteID;\n    u8 PatternOffset;\n    u8 FX;\n    u8 ShadowOffsetX\t: 3;\n    u8 ShadowOffsetY\t: 3;\n    u8 ShadowColor;\n    u8 OutlineColor;\n    u8 Buffer[16];\n    i8 Direction;\n} Print_Data;\n```\n\n-----------------------------------------------------------------------------\nSTRUCTURES\n-----------------------------------------------------------------------------\nPrint module configuration structure\n\n**Fields:**\n- `u8 PatternX` — < X size of a character in screen unit (0-15)\n- `u8 PatternY` — < Y size of a character in screen unit (0-15)\n- `u8 UnitX` — < X size of a character in screen unit (0-15)\n- `u8 UnitY` — < Y size of a character in screen unit (0-15)\n- `u8 TabSize` — < Tabulation size in pixel (must be a power of 2 like 16, 32, 64, ...)\n- `UX CursorX` — < Current X position (screen coordinate)\n- `UY CursorY` — < Current Y position (screen coordinate)\n- `u8 TextColor` — < Text color\n- `u8 TextColor[PRINT_COLOR_NUM]` — < Text colors (1 per line)\n- `u8 BGColor` — < Background color\n- `u8 CharFirst` — < ASCII code of the first character of the current font\n- `u8 CharLast` — < ASCII code of the last character of the current font\n- `u8 CharCount` — < Characters count (/!\\ max is 255)\n- `print_drawchar DrawChar` — < Default function to draw a character (depend of the current mode)\n- `u8 SourceMode       : 4` — < Character display mode : RAM, VRAM or Sprite (@see PRINT_MODE)\n- `u16 ScreenWidth` — < Screen width\n- `const u8* FontPatterns` — < Forms of the font\n- `const u8* FontAddr` — < Address of the virtual index 0 character (used to quick drawing in DrawChar_GX functions)\n- `UY FontVRAMY` — < Y position of the font in VRAM\n- `u8 CharPerLine`\n- `u8 SpritePattern` — < Pattern index of the 1st sprite character\n- `u8 SpriteID` — < Index of the current sprite\n- `u8 PatternOffset`\n- `u8 FX`\n- `u8 ShadowOffsetX\t: 3` — < Shadow X offset (0:7 => -3:+4)\n- `u8 ShadowOffsetY\t: 3` — < Shadow Y offset (0:7 => -3:+4)\n- `u8 ShadowColor` — < Shadow color\n- `u8 OutlineColor` — < Outline color\n- `u8 Buffer[16]` — < Mode specifique buffer (used to pre-compute color combinations)\n- `i8 Direction` — <\n\n*Defined in* `print.h`.",
-  "MENU_ITEM_TYPE": "```c\nenum MENU_ITEM_TYPE {\n    MENU_ITEM_ACTION = 0,  // Execute callback function defined in Action\n    MENU_ITEM_GOTO,  // Change page to the one defined in Value\n    MENU_ITEM_BACK,  // Return to the previous page\n    MENU_ITEM_INT,  // Handle pointer to 8-bits integer defined in Action\n    MENU_ITEM_BOOL,  // Handle pointer to boolean defined in Action\n    MENU_ITEM_TEXT,  // Handle pointer to zero-terminated string\n    MENU_ITEM_EMPTY,  // Empty entry\n    MENU_ITEM_UPDATE,\n    MENU_ITEM_MAX,\n    MENU_ITEM_MASK = 0x0F,\n    MENU_ITEM_ALIGN_DEFAULT = 0x00,\n    MENU_ITEM_ALIGN_LEFT = 0x10,\n    MENU_ITEM_ALIGN_CENTER = 0x20,\n    MENU_ITEM_ALIGN_RIGHT = 0x30,\n    MENU_ITEM_ALIGN_MASK = 0x30,\n    MENU_ITEM_DISABLE = 0x80,  // Item is disabled\n};\n```\n\nMenu item types\n\n**Constants:**\n- `MENU_ITEM_ACTION = 0` — Execute callback function defined in Action\n- `MENU_ITEM_GOTO` — Change page to the one defined in Value\n- `MENU_ITEM_BACK` — Return to the previous page\n- `MENU_ITEM_INT` — Handle pointer to 8-bits integer defined in Action\n- `MENU_ITEM_BOOL` — Handle pointer to boolean defined in Action\n- `MENU_ITEM_TEXT` — Handle pointer to zero-terminated string\n- `MENU_ITEM_EMPTY` — Empty entry\n- `MENU_ITEM_UPDATE`\n- `MENU_ITEM_MAX`\n- `MENU_ITEM_MASK = 0x0F`\n- `MENU_ITEM_ALIGN_DEFAULT = 0x00`\n- `MENU_ITEM_ALIGN_LEFT = 0x10`\n- `MENU_ITEM_ALIGN_CENTER = 0x20`\n- `MENU_ITEM_ALIGN_RIGHT = 0x30`\n- `MENU_ITEM_ALIGN_MASK = 0x30`\n- `MENU_ITEM_DISABLE = 0x80` — Item is disabled\n\n*Defined in* `menu.h`.",
-  "SEQUENCE": "```c\ntypedef struct Sequence {\n    u16 ID;\n    u8 Mode;\n    u8 FirstFrame;\n    u8 LastFrame;\n    u8 StartEvent;\n    u8 EndEvent;\n    SeqNext Next;\n    const SeqAction* const Actions[];\n} Sequence;\n```\n\nSequence structure\n\n**Fields:**\n- `u16 ID` — Sequence ID\n- `u8 Mode` — Playback mode (see <SEQ_MODE>)\n- `u8 FirstFrame` — First frame of the sequence (or table index for timelined sequence)\n- `u8 LastFrame` — Last frame of the sequence (or number of entries for timelined sequence)\n- `u8 StartEvent` — Event triggered when sequence starts\n- `u8 EndEvent` — Event triggered when sequence ends or loops\n- `SeqNext Next` — Sequence to be played after this one (if Next.Seq is not NULL)\n- `const SeqAction* const Actions[]` — NULL-terminated list of actions\n\n*Defined in* `sequence.h`.",
-  "PAWN_ACTION": "```c\ntypedef struct Pawn_Action {\n    const Pawn_Frame* FrameList;\n    u8 FrameNum;\n    u8 Loop;\n    u8 Interrupt;\n} Pawn_Action;\n```\n\nAnimation action structure\n\n**Fields:**\n- `const Pawn_Frame* FrameList` — Animation frames data\n- `u8 FrameNum` — Animation frames data count\n- `u8 Loop` — Is action looping?\n- `u8 Interrupt` — Is action interruptable?\n\n*Defined in* `pawn.h`.",
-  "SEQKEY": "```c\ntypedef struct SeqKey {\n    u8 Time;\n    u8 Frame;\n    u8 Event;\n} SeqKey;\n```\n\nSequence timeline entry\n\n**Fields:**\n- `u8 Time` — Duration of the frame (in sequencer unit)\n- `u8 Frame` — Frame number (relative to start)\n- `u8 Event` — Event to be triggered at the begining of each step\n\n*Defined in* `sequence.h`.",
+  "INPUT_PORT": "```c\nenum INPUT_PORT {\n    INPUT_PORT1 = INPUT_PORT1_HIGH,\n    INPUT_PORT2 = INPUT_PORT2_HIGH,\n};\n```\n\n*Defined in* `input.h`.",
+  "VDP_VERSION": "```c\nenum VDP_VERSION {\n    VDP_VERSION_TMS9918A = 0,  // MSX1 VDP (no ID from hardware)\n    VDP_VERSION_V9938,  // MSX2 VDP (ID from hardware is 0)\n    VDP_VERSION_V9958,  // MSX2+ & MSX turbo R VDP\n    VDP_VERSION_V9968,  // MSX2++ VDP\n    VDP_VERSION_V9978,  // MSX2 turbo R+ VDP (V9968+V9990)\n};\n```\n\nVDP version enumaration\n\n**Constants:**\n- `VDP_VERSION_TMS9918A = 0` — MSX1 VDP (no ID from hardware)\n- `VDP_VERSION_V9938` — MSX2 VDP (ID from hardware is 0)\n- `VDP_VERSION_V9958` — MSX2+ & MSX turbo R VDP\n- `VDP_VERSION_V9968` — MSX2++ VDP\n- `VDP_VERSION_V9978` — MSX2 turbo R+ VDP (V9968+V9990)\n\n*Defined in* `vdp.h`.",
+  "AYFX_MODE": "```c\nenum AYFX_MODE {\n    AYFX_MODE_FIXED = 0,  // All sounds are played in the same channel\n    AYFX_MODE_FSWITCH = 1,  // Frame Switch: Channel is switched each frame during FX playback (should less affected the playing music)\n    AYFX_MODE_PSWITCH = 2,  // Play Switch: Channel is switched each time a play occured\n};\n```\n\n**Constants:**\n- `AYFX_MODE_FIXED = 0` — All sounds are played in the same channel\n- `AYFX_MODE_FSWITCH = 1` — Frame Switch: Channel is switched each frame during FX playback (should less affected the playing music)\n- `AYFX_MODE_PSWITCH = 2` — Play Switch: Channel is switched each time a play occured\n\n*Defined in* `ayfx_player.h`.",
   "V9_SCREEN_MODE": "```c\nenum V9_SCREEN_MODE {\n    V9_MODE_P1,  // Pattern mode 0 256x212\n    V9_MODE_P2,  // Pattern mode 1 512x212\n    V9_MODE_B0,  // Bitmap mode 1 192x240 (Undocumented v9990 mode)\n    V9_MODE_B1,  // Bitmap mode 1 256x212\n    V9_MODE_B2,  // Bitmap mode 2 384x240\n    V9_MODE_B3,  // Bitmap mode 3 512x212\n    V9_MODE_B4,  // Bitmap mode 4 768x240\n    V9_MODE_B5,  // Bitmap mode 5 640x400 (VGA)\n    V9_MODE_B6,  // Bitmap mode 6 640x480 (VGA)\n    V9_MODE_B7,  // Bitmap mode 7 1024x212 (Undocumented v9990 mode)\n    V9_MODE_MAX,\n};\n```\n\n**Constants:**\n- `V9_MODE_P1` — Pattern mode 0 256x212\n- `V9_MODE_P2` — Pattern mode 1 512x212\n- `V9_MODE_B0` — Bitmap mode 1 192x240 (Undocumented v9990 mode)\n- `V9_MODE_B1` — Bitmap mode 1 256x212\n- `V9_MODE_B2` — Bitmap mode 2 384x240\n- `V9_MODE_B3` — Bitmap mode 3 512x212\n- `V9_MODE_B4` — Bitmap mode 4 768x240\n- `V9_MODE_B5` — Bitmap mode 5 640x400 (VGA)\n- `V9_MODE_B6` — Bitmap mode 6 640x480 (VGA)\n- `V9_MODE_B7` — Bitmap mode 7 1024x212 (Undocumented v9990 mode)\n- `V9_MODE_MAX`\n\n*Defined in* `v9990.h`.",
-  "DOS_FCB": "```c\ntypedef struct DOS_FCB {\n    u8 Drive;\n    c8 Name[11];\n    u16 CurrentBlock;\n    u16 RecordSize;\n    u32 Size;\n    u16 Date;\n    u16 Time;\n    u8 DeviceID;\n    u8 Directory;\n    u16 TopCluster;\n    u16 LastCluster;\n    u16 RelativeLoc;\n    u8 CurrentRecord;\n    u32 RandomRecord;\n} DOS_FCB;\n```\n\nFile Control Block structure\n\n**Fields:**\n- `u8 Drive` — Drive number containing the file. (0 for Default drive, 1 for A, 2 for B, ..., 8 for H)\n- `c8 Name[11]` — Filename (format: 8.3)\n- `u16 CurrentBlock` — Number of blocks from the top of the file to the current block\n- `u16 RecordSize`\n- `u32 Size`\n- `u16 Date` — The two bytes format for DATE are [YYYYYYYM|MMMDDDDD].\n- `u16 Time`\n- `u8 DeviceID`\n- `u8 Directory`\n- `u16 TopCluster` — Top cluster number of the file\n- `u16 LastCluster` — Last cluster number accessed\n- `u16 RelativeLoc` — Relative location from top cluster of the file\n- `u8 CurrentRecord`\n- `u32 RandomRecord` — Record order from the top of the file\n\n*Defined in* `dos.h`.",
-  "VDP_COMMAND36": "```c\ntypedef struct VDP_Command36 {\n    u16 DX;\n    u16 DY;\n    u16 NX;\n    u16 NY;\n    u8 CLR;\n    u8 ARG;\n    u8 CMD;\n} VDP_Command36;\n```\n\nStructure used to store register data for VDP command\n\n**Fields:**\n- `u16 DX` — 36-37\n- `u16 DY` — 38-39\n- `u16 NX` — 40-41\n- `u16 NY` — 42-43\n- `u8 CLR` — 44\n- `u8 ARG` — 45\n- `u8 CMD` — 46\n\n*Defined in* `vdp.h`.",
-  "ONET_PACKETINFO": "```c\ntypedef struct ONET_PacketInfo {\n    u16 Size;\n    u16 Head;\n} ONET_PacketInfo;\n```\n\n*Defined in* `obsonet.h`.",
-  "QRCODE_SEGMENT": "```c\ntypedef struct QRCode_Segment {\n    enum QRCODE_MODE mode;\n    i16 numChars;\n    i16 bitLength;\n} QRCode_Segment;\n```\n\nA segment of character/binary/control data in a QR Code symbol.\nThe mid-level way to create a segment is to take the payload data and call a factory function such as QRCode_MakeNumeric().\nThe low-level way to create a segment is to custom-make the bit buffer and initialize a QRCode_Segment struct with appropriate values.\nEven in the most favorable conditions, a QR Code can only hold 7089 characters of data.\nAny segment longer than this is meaningless for the purpose of generating QR Codes.\nMoreover, the maximum allowed bit length is 32767 because the largest QR Code (version 40) has 31329 modules.\n\n*Defined in* `qrcode.h`.",
-  "REGISTERS": "```c\ntypedef struct Registers {\n    u16 IX;\n    u16 IY;\n    u16 HL;\n    u16 DE;\n    u16 BC;\n    u8 A;\n} Registers;\n```\n\nDEFINES\nz80 registers starage structure\n\n*Defined in* `reg.h`.",
-  "VDP_YJK": "```c\nenum VDP_YJK {\n    VDP_YJK_OFF = 0,  // Use classic 8-bits RGB mode\n    VDP_YJK_ON = R25_YJK,  // Use YJK mode (5-bits for lightness)\n    VDP_YJK_YAE = (R25_YJK|R25_YAE),  // Use YJK mode (4-bits for lightness) + 16 colors palette\n};\n```\n\nYJK modes\n\n**Constants:**\n- `VDP_YJK_OFF = 0` — Use classic 8-bits RGB mode\n- `VDP_YJK_ON = R25_YJK` — Use YJK mode (5-bits for lightness)\n- `VDP_YJK_YAE = (R25_YJK|R25_YAE)` — Use YJK mode (4-bits for lightness) + 16 colors palette\n\n*Defined in* `vdp.h`.",
-  "IPM_CONFIG": "```c\ntypedef struct IPM_Config {\n    u8 DeviceSupport[IPM_DEVICE_MAX];\n    u8 HoldTimer;\n    u8 DoubleClickTimer;\n    IPM_KeySet KeySet[2];\n} IPM_Config;\n```\n\nIPM configuration structure\n\n*Defined in* `input_manager.h`.",
   "LVGM_CHIP": "```c\nenum LVGM_CHIP {\n    LVGM_CHIP_NONE = 0,\n    LVGM_CHIP_PSG = 0b00000001,  // Include PSG data (AY-3-8910)\n    LVGM_CHIP_MSXMUSIC = 0b00000010,  // Include MSX-MUSIC data (YM2413/OPLL)\n    LVGM_CHIP_MSXAUDIO = 0b00000100,  // Include MSX-AUDIO data (Y8950/OPL1 + ADPCM)\n    LVGM_CHIP_SCC = 0b00001000,  // Include SCC data (K051649)\n    LVGM_CHIP_SCCI = 0b00010000,  // Include SCC+ data (K052539)\n    LVGM_CHIP_PSG2 = 0b00100000,  // Include secondary PSG data\n    LVGM_CHIP_7 = 0b01000000,\n    LVGM_CHIP_MOONSOUND = 0b10000000,  // Include Moonsound data (YMF278/OPL4)\n    LVGM_CHIP_AY8910 = LVGM_CHIP_PSG,\n    LVGM_CHIP_YM2413 = LVGM_CHIP_MSXMUSIC,\n    LVGM_CHIP_OPLL = LVGM_CHIP_MSXMUSIC,\n    LVGM_CHIP_Y8950 = LVGM_CHIP_MSXAUDIO,\n    LVGM_CHIP_OPL1 = LVGM_CHIP_MSXAUDIO,\n    LVGM_CHIP_K051649 = LVGM_CHIP_SCC,\n    LVGM_CHIP_K052539 = LVGM_CHIP_SCCI,\n    LVGM_CHIP_YMF278 = LVGM_CHIP_MOONSOUND,\n    LVGM_CHIP_OPL4 = LVGM_CHIP_MOONSOUND,\n};\n```\n\n**Constants:**\n- `LVGM_CHIP_NONE = 0`\n- `LVGM_CHIP_PSG = 0b00000001` — Include PSG data (AY-3-8910)\n- `LVGM_CHIP_MSXMUSIC = 0b00000010` — Include MSX-MUSIC data (YM2413/OPLL)\n- `LVGM_CHIP_MSXAUDIO = 0b00000100` — Include MSX-AUDIO data (Y8950/OPL1 + ADPCM)\n- `LVGM_CHIP_SCC = 0b00001000` — Include SCC data (K051649)\n- `LVGM_CHIP_SCCI = 0b00010000` — Include SCC+ data (K052539)\n- `LVGM_CHIP_PSG2 = 0b00100000` — Include secondary PSG data\n- `LVGM_CHIP_7 = 0b01000000`\n- `LVGM_CHIP_MOONSOUND = 0b10000000` — Include Moonsound data (YMF278/OPL4)\n- `LVGM_CHIP_AY8910 = LVGM_CHIP_PSG`\n- `LVGM_CHIP_YM2413 = LVGM_CHIP_MSXMUSIC`\n- `LVGM_CHIP_OPLL = LVGM_CHIP_MSXMUSIC`\n- `LVGM_CHIP_Y8950 = LVGM_CHIP_MSXAUDIO`\n- `LVGM_CHIP_OPL1 = LVGM_CHIP_MSXAUDIO`\n- `LVGM_CHIP_K051649 = LVGM_CHIP_SCC`\n- `LVGM_CHIP_K052539 = LVGM_CHIP_SCCI`\n- `LVGM_CHIP_YMF278 = LVGM_CHIP_MOONSOUND`\n- `LVGM_CHIP_OPL4 = LVGM_CHIP_MOONSOUND`\n\n*Defined in* `lvgm_player.h`.",
   "GAME_SPRITE": "```c\ntypedef struct Game_Sprite {\n    u8 SpriteID;\n    i8 OffsetX;\n    i8 OffsetY;\n    u8 DataOffset;\n    u8 Color;\n    u8 Flag;\n} Game_Sprite;\n```\n\nPawn structure\n\n**Fields:**\n- `u8 SpriteID` — Sprite ID\n- `i8 OffsetX` — Layer position offset...\n- `i8 OffsetY` — ...can be positive or negative\n- `u8 DataOffset` — Data index offset\n- `u8 Color` — Sprite color\n- `u8 Flag` — Sprite flag\n\n*Defined in* `game_pawn.h`.",
-  "PAWN_SPRITE": "```c\ntypedef struct Pawn_Sprite {\n    u8 SpriteID;\n    i8 OffsetX;\n    i8 OffsetY;\n    u8 DataOffset;\n    u8 Color;\n    u8 Flag;\n} Pawn_Sprite;\n```\n\nPawn structure\n\n**Fields:**\n- `u8 SpriteID` — Sprite ID\n- `i8 OffsetX` — Layer position offset...\n- `i8 OffsetY` — ...can be positive or negative\n- `u8 DataOffset` — Data index offset\n- `u8 Color` — Sprite color\n- `u8 Flag` — Sprite flag\n\n*Defined in* `pawn.h`.",
-  "VDP_BLINK_TIME": "```c\nenum VDP_BLINK_TIME {\n    VDP_BLINK_TIME_0 = 0,\n    VDP_BLINK_TIME_167MS,\n    VDP_BLINK_TIME_334MS,\n    VDP_BLINK_TIME_501MS,\n    VDP_BLINK_TIME_667MS,\n    VDP_BLINK_TIME_834MS,\n    VDP_BLINK_TIME_1001MS,\n    VDP_BLINK_TIME_1168MS,\n    VDP_BLINK_TIME_1335MS,\n    VDP_BLINK_TIME_1510MS,\n    VDP_BLINK_TIME_1669MS,\n    VDP_BLINK_TIME_1836MS,\n    VDP_BLINK_TIME_2003MS,\n    VDP_BLINK_TIME_2169MS,\n    VDP_BLINK_TIME_2336MS,\n    VDP_BLINK_TIME_2503MS,\n    VDP_BLINK_TIME_500MS = VDP_BLINK_TIME_501MS,\n    VDP_BLINK_TIME_1000MS = VDP_BLINK_TIME_1001MS,\n    VDP_BLINK_TIME_1500MS = VDP_BLINK_TIME_1510MS,\n    VDP_BLINK_TIME_2000MS = VDP_BLINK_TIME_2003MS,\n    VDP_BLINK_TIME_2500MS = VDP_BLINK_TIME_2503MS,\n};\n```\n\nBlink time enumaration\n\n*Defined in* `vdp.h`.",
-  "MENUITEM": "```c\ntypedef struct MenuItem {\n    const c8* Text;\n    u8 Type;\n    void* Action;\n    i16 Value;\n} MenuItem;\n```\n\nMenu item parameters\n\n**Fields:**\n- `const c8* Text` — Name of the item\n- `u8 Type` — Type of the item (see [`MENU_ITEM_TYPE`](hint:MENU_ITEM_TYPE))\n- `void* Action` — Action associated to the item (depends on item type)\n- `i16 Value` — Value associated to the item (depends on item type)\n\n*Defined in* `menu.h`.",
-  "PAWN": "```c\ntypedef struct Pawn {\n    const Pawn_Sprite* SpriteList;\n    u8 SpriteNum;\n    u8 SpriteID;\n    const Pawn_Action* ActionList;\n    PAWN_POS PositionX;\n    PAWN_POS PositionY;\n    u8 ActionId;\n    u8 AnimFrame;\n    u8 AnimStep;\n    u8 AnimTimer;\n    u8 Update;\n    u8 Counter;\n    const void* PatternAddr;\n    u8 SpriteFX;\n    i8 MoveX;\n    i8 MoveY;\n    u8 BoundX;\n    u8 BoundY;\n    u8 PhysicsState;\n    Pawn_PhysicsCB PhysicsCB;\n    Pawn_CollisionCB CollisionCB;\n} Pawn;\n```\n\nPawn structure\n\n**Fields:**\n- `const Pawn_Sprite* SpriteList` — List of sprite layers\n- `u8 SpriteNum` — Number of sprite layers\n- `u8 SpriteID` — Sprite ID of the first layer (0~31)\n- `const Pawn_Action* ActionList` — List of actions\n- `PAWN_POS PositionX` — Pawn screen position\n- `PAWN_POS PositionY`\n- `u8 ActionId` — Current action id\n- `u8 AnimFrame` — Current animation frame id\n- `u8 AnimStep` — Current step into the animation\n- `u8 AnimTimer` — Animation timer (into the current step)\n- `u8 Update` — Pawn update flags\n- `u8 Counter` — Global update counter\n- `const void* PatternAddr` — Pattern base address\n- `u8 SpriteFX` — Sprite effect\n- `i8 MoveX` — Pawn movement offset\n- `i8 MoveY`\n- `u8 BoundX` — Pawn collision bound\n- `u8 BoundY`\n- `u8 PhysicsState`\n- `Pawn_PhysicsCB PhysicsCB`\n- `Pawn_CollisionCB CollisionCB`\n\n*Defined in* `pawn.h`.",
-  "VDP_COMMAND": "```c\ntypedef struct VDP_Command {\n    u16 SX;\n    u16 SY;\n    u16 DX;\n    u16 DY;\n    u16 NX;\n    u16 NY;\n    u8 CLR;\n    u8 ARG;\n    u8 CMD;\n} VDP_Command;\n```\n\nStructure used to store register data for VDP command\n\n**Fields:**\n- `u16 SX` — 32-33\n- `u16 SY` — 34-35\n- `u16 DX` — 36-37\n- `u16 DY` — 38-39\n- `u16 NX` — 40-41\n- `u16 NY` — 42-43\n- `u8 CLR` — 44\n- `u8 ARG` — 45\n- `u8 CMD` — 46\n\n*Defined in* `vdp.h`.",
-  "DOS_DISKINFO": "```c\ntypedef struct DOS_DiskInfo {\n    u8 SectorPerCluster;\n    u16 SectorSize;\n    u16 TotalClusters;\n    u16 FreeClusters;\n} DOS_DiskInfo;\n```\n\nMSX-DOS disk information structure\n\n**Fields:**\n- `u8 SectorPerCluster` — Sectors per cluster\n- `u16 SectorSize` — Sector size (always 512)\n- `u16 TotalClusters` — Total clusters on disk\n- `u16 FreeClusters` — Free clusters on disk\n\n*Defined in* `dos.h`.",
-  "VDP_MODE": "```c\nenum VDP_MODE {\n    VDP_MODE_MSX1 = 0,  // TMS 9918A video modes\n    VDP_MODE_TEXT1 = VDP_MODE_MSX1,  // 00 001\tTEXT\t40 characters per line of text, one colour for each characte\n    VDP_MODE_MULTICOLOR,  // 00 010\tTILES\tpseudo-graphic, one character divided into four block\n    VDP_MODE_GRAPHIC1,  // 00 000\tTILES\t32 characters per one line of text, the COLOURed character available\n    VDP_MODE_GRAPHIC2,  // 00 100\tTILES\t256 x 192, the colour is specififed for each 8 dots\n    VDP_MODE_MSX2,  // V9938 video modes\n    VDP_MODE_TEXT2 = VDP_MODE_MSX2,  // 01 001\tTEXT\t80 characters per line of text, character blinkable selection\n    VDP_MODE_GRAPHIC3,  // 01 000\tTILES\tGRAPHIC 2 which can use sprite mode 2\n    VDP_MODE_GRAPHIC4,  // 01 100\tBITMAP\t256 x 212; 16 colours are available for each dot\n    VDP_MODE_GRAPHIC5,  // 10 000\tBITMAP\t512 x 212; 4 colours are available for each dot\n    VDP_MODE_GRAPHIC6,  // 10 100\tBITMAP\t512 x 212; 16 colours are available for each dot\n    VDP_MODE_GRAPHIC7,  // 11 100\tBITMAP\t256 x 212; 256 colours are available for each dot\n    VDP_MODE_SCREEN0 = VDP_MODE_TEXT1,\n    VDP_MODE_SCREEN0_W40 = VDP_MODE_SCREEN0,\n    VDP_MODE_SCREEN1 = VDP_MODE_GRAPHIC1,\n    VDP_MODE_SCREEN2 = VDP_MODE_GRAPHIC2,\n    VDP_MODE_SCREEN3 = VDP_MODE_MULTICOLOR,\n    VDP_MODE_SCREEN0_W80 = VDP_MODE_TEXT2,\n    VDP_MODE_SCREEN4 = VDP_MODE_GRAPHIC3,\n    VDP_MODE_SCREEN5 = VDP_MODE_GRAPHIC4,\n    VDP_MODE_SCREEN6 = VDP_MODE_GRAPHIC5,\n    VDP_MODE_SCREEN7 = VDP_MODE_GRAPHIC6,\n    VDP_MODE_SCREEN8 = VDP_MODE_GRAPHIC7,\n    VDP_MODE_SCREEN9,\n    VDP_MODE_SCREEN9_40 = VDP_MODE_SCREEN9,\n    VDP_MODE_SCREEN9_80,\n    VDP_MODE_MSX2P,  // V9958 video modes\n    VDP_MODE_SCREEN10 = VDP_MODE_MSX2P,\n    VDP_MODE_SCREEN11,\n    VDP_MODE_SCREEN12,\n    VDP_MODE_UNDOC,  // Undocumented video modes. Only available on TMS 9918A\n    VDP_MODE_UNDOC_0_2 = VDP_MODE_UNDOC,  // 00 101\n    VDP_MODE_UNDOC_1_2,  // 00 100\n    VDP_MODE_UNDOC_3_2,  // 00 110\n    VDP_MODE_GRAPHIC3_MIRROR_0,  // Bank 0 on all strips                    | 0 0 0 0 |\n    VDP_MODE_GRAPHIC3_MIRROR_01,  // Bank 0 and 1 alternated                 | 0 1 0 1 |\n    VDP_MODE_GRAPHIC3_MIRROR_02,  // Bank 0 twice then bank 2 twice          | 0 0 2 2 |\n    VDP_MODE_GRAPHIC3_MIRROR = VDP_MODE_GRAPHIC3_MIRROR_0,\n    VDP_MODE_MAX,\n};\n```\n\nVDP display modes\n\n**Constants:**\n- `VDP_MODE_MSX1 = 0` — TMS 9918A video modes\n- `VDP_MODE_TEXT1 = VDP_MODE_MSX1` — 00 001\tTEXT\t40 characters per line of text, one colour for each characte\n- `VDP_MODE_MULTICOLOR` — 00 010\tTILES\tpseudo-graphic, one character divided into four block\n- `VDP_MODE_GRAPHIC1` — 00 000\tTILES\t32 characters per one line of text, the COLOURed character available\n- `VDP_MODE_GRAPHIC2` — 00 100\tTILES\t256 x 192, the colour is specififed for each 8 dots\n- `VDP_MODE_MSX2` — V9938 video modes\n- `VDP_MODE_TEXT2 = VDP_MODE_MSX2` — 01 001\tTEXT\t80 characters per line of text, character blinkable selection\n- `VDP_MODE_GRAPHIC3` — 01 000\tTILES\tGRAPHIC 2 which can use sprite mode 2\n- `VDP_MODE_GRAPHIC4` — 01 100\tBITMAP\t256 x 212; 16 colours are available for each dot\n- `VDP_MODE_GRAPHIC5` — 10 000\tBITMAP\t512 x 212; 4 colours are available for each dot\n- `VDP_MODE_GRAPHIC6` — 10 100\tBITMAP\t512 x 212; 16 colours are available for each dot\n- `VDP_MODE_GRAPHIC7` — 11 100\tBITMAP\t256 x 212; 256 colours are available for each dot\n- `VDP_MODE_SCREEN0 = VDP_MODE_TEXT1`\n- `VDP_MODE_SCREEN0_W40 = VDP_MODE_SCREEN0`\n- `VDP_MODE_SCREEN1 = VDP_MODE_GRAPHIC1`\n- `VDP_MODE_SCREEN2 = VDP_MODE_GRAPHIC2`\n- `VDP_MODE_SCREEN3 = VDP_MODE_MULTICOLOR`\n- `VDP_MODE_SCREEN0_W80 = VDP_MODE_TEXT2`\n- `VDP_MODE_SCREEN4 = VDP_MODE_GRAPHIC3`\n- `VDP_MODE_SCREEN5 = VDP_MODE_GRAPHIC4`\n- `VDP_MODE_SCREEN6 = VDP_MODE_GRAPHIC5`\n- `VDP_MODE_SCREEN7 = VDP_MODE_GRAPHIC6`\n- `VDP_MODE_SCREEN8 = VDP_MODE_GRAPHIC7`\n- `VDP_MODE_SCREEN9`\n- `VDP_MODE_SCREEN9_40 = VDP_MODE_SCREEN9`\n- `VDP_MODE_SCREEN9_80`\n- `VDP_MODE_MSX2P` — V9958 video modes\n- `VDP_MODE_SCREEN10 = VDP_MODE_MSX2P`\n- `VDP_MODE_SCREEN11`\n- `VDP_MODE_SCREEN12`\n- `VDP_MODE_UNDOC` — Undocumented video modes. Only available on TMS 9918A\n- `VDP_MODE_UNDOC_0_2 = VDP_MODE_UNDOC` — 00 101\n- `VDP_MODE_UNDOC_1_2` — 00 100\n- `VDP_MODE_UNDOC_3_2` — 00 110\n- `VDP_MODE_GRAPHIC3_MIRROR_0` — Bank 0 on all strips                    | 0 0 0 0 |\n- `VDP_MODE_GRAPHIC3_MIRROR_01` — Bank 0 and 1 alternated                 | 0 1 0 1 |\n- `VDP_MODE_GRAPHIC3_MIRROR_02` — Bank 0 twice then bank 2 twice          | 0 0 2 2 |\n- `VDP_MODE_GRAPHIC3_MIRROR = VDP_MODE_GRAPHIC3_MIRROR_0`\n- `VDP_MODE_MAX`\n\n*Defined in* `vdp.h`.",
-  "BIOS_SPRITEATTRIBUTES": "```c\ntypedef struct BIOS_SpriteAttributes {\n    u8 y;\n    u8 x;\n    u8 pattern;\n    u8 color;\n} BIOS_SpriteAttributes;\n```\n\n*Defined in* `bios.h`.",
-  "SEQACTION": "```c\ntypedef struct SeqAction {\n    u8 Event;\n    u8 Cursor;\n    SeqCondCB Condition;\n    SeqTransition Trans;\n    u8 FrameMin;\n    u8 FrameMax;\n    SeqActionArea Areas[];\n} SeqAction;\n```\n\nSequence action structure\n\n**Fields:**\n- `u8 Event` — Action ID sent to the callback\n- `u8 Cursor` — Cursor type (see <SEQ_CURSOR>)\n- `SeqCondCB Condition` — Condition check callback\n- `SeqTransition Trans` — Sequence to auto-start when action triggered (if Trans.Seq is not NULL)\n- `u8 FrameMin` — Minimum frame to trigger the action\n- `u8 FrameMax` — Maximum frame to trigger the action\n- `SeqActionArea Areas[]` — Action area\n\n*Defined in* `sequence.h`.",
-  "MENU": "```c\ntypedef struct Menu {\n    const c8* Title;\n    MenuItem* Items;\n    u8 ItemNum;\n    callback Callback;\n} Menu;\n```\n\nMenu parameters\n\n**Fields:**\n- `const c8* Title` — Title of the page (NULL means no title)\n- `MenuItem* Items` — List of the page's menu entries\n- `u8 ItemNum` — Number of the page's menu entries\n- `callback Callback` — Function to be called when page is opened\n\n*Defined in* `menu.h`.",
-  "QRCODE_MODE": "```c\nenum QRCODE_MODE {\n    QRCODE_MODE_NUMERIC = 0x1,\n    QRCODE_MODE_ALPHANUMERIC = 0x2,\n    QRCODE_MODE_BYTE = 0x4,\n    QRCODE_MODE_KANJI = 0x8,\n    QRCODE_MODE_ECI = 0x7,\n};\n```\n\nDescribes how a segment's data bits are interpreted.\n\n*Defined in* `qrcode.h`.",
-  "DOS_SEGMENT": "```c\ntypedef struct DOS_Segment {\n    u8 Number;\n    u8 Slot;\n} DOS_Segment;\n```\n\nMemory Mappers segment info\n\n**Fields:**\n- `u8 Number` — Segment number\n- `u8 Slot` — Segment's slot\n\n*Defined in* `dos_mapper.h`.",
-  "QRCODE_ECC": "```c\nenum QRCODE_ECC {\n    QRCODE_ECC_LOW = 0,  // The QR Code can tolerate about  7% erroneous codewords\n    QRCODE_ECC_MEDIUM,  // The QR Code can tolerate about 15% erroneous codewords\n    QRCODE_ECC_QUARTILE,  // The QR Code can tolerate about 25% erroneous codewords\n    QRCODE_ECC_HIGH,  // The QR Code can tolerate about 30% erroneous codewords\n    QRCODE_ECC_MAX,\n};\n```\n\nThe error correction level in a QR Code symbol.\n\n**Constants:**\n- `QRCODE_ECC_LOW = 0` — The QR Code can tolerate about  7% erroneous codewords\n- `QRCODE_ECC_MEDIUM` — The QR Code can tolerate about 15% erroneous codewords\n- `QRCODE_ECC_QUARTILE` — The QR Code can tolerate about 25% erroneous codewords\n- `QRCODE_ECC_HIGH` — The QR Code can tolerate about 30% erroneous codewords\n- `QRCODE_ECC_MAX`\n\n*Defined in* `qrcode.h`.",
-  "DOS_DISKPARAM": "```c\ntypedef struct DOS_DiskParam {\n    u8 DriveNum;\n    u16 SectorSize;\n    u8 ClusterSectors;\n    u16 ReservedSectors;\n    u8 FATNum;\n    u16 RootNum;\n    u16 LogicalSectors;\n    u8 Media;\n    u8 FATSectors;\n    u16 RootSector;\n    u16 DataSector;\n    u16 MaxClusters;\n    u8 DirtyFlag;\n    u32 VolumeID;\n    u8 Reserved[8];\n} DOS_DiskParam;\n```\n\nMSX-DOS 2 disk parameters structure\n\n**Fields:**\n- `u8 DriveNum` — Physical drive number (1=A: etc)\n- `u16 SectorSize` — Sector size (always 512 currently)\n- `u8 ClusterSectors` — Sectors per cluster (non-zero power of 2)\n- `u16 ReservedSectors` — Number of reserved sectors (usually 1)\n- `u8 FATNum` — Number of copies of the FAT (usually 2)\n- `u16 RootNum` — Number of root directory entries\n- `u16 LogicalSectors` — Total number of logical sectors\n- `u8 Media` — Media descriptor byte\n- `u8 FATSectors` — Number of sectors per FAT\n- `u16 RootSector` — First root directory sector number\n- `u16 DataSector` — First data sector number\n- `u16 MaxClusters` — Maximum cluster number\n- `u8 DirtyFlag` — Dirty disk flag\n- `u32 VolumeID` — Volume id. (-1 => no volume id.)\n- `u8 Reserved[8]` — Reserved (currently always zero)\n\n*Defined in* `dos.h`.",
-  "GAME_PAWN": "```c\ntypedef struct Game_Pawn {\n    const Game_Sprite* SpriteList;\n    u8 SpriteNum;\n    u8 SpriteID;\n    const Game_Action* ActionList;\n    u8 PositionX;\n    u8 PositionY;\n    u8 ActionId;\n    u8 AnimFrame;\n    u8 AnimStep;\n    u8 AnimTimer;\n    u8 Update;\n    u8 Counter;\n    i8 MoveX;\n    i8 MoveY;\n    u8 BoundX;\n    u8 BoundY;\n    u8 PhysicsState;\n    Game_PhysicsCB PhysicsCB;\n    Game_CollisionCB CollisionCB;\n} Game_Pawn;\n```\n\nPawn structure\n\n**Fields:**\n- `const Game_Sprite* SpriteList` — List of sprite layers\n- `u8 SpriteNum` — Number of sprite layers\n- `u8 SpriteID` — Sprite ID of the first layer (0~31)\n- `const Game_Action* ActionList` — List of actions\n- `u8 PositionX` — Pawn screen position\n- `u8 PositionY`\n- `u8 ActionId` — Current action id\n- `u8 AnimFrame` — Current animation frame id\n- `u8 AnimStep` — Current step into the animation\n- `u8 AnimTimer` — Animation timer (into the current step)\n- `u8 Update` — Pawn update flags\n- `u8 Counter` — Global update counter\n- `i8 MoveX` — Pawn movement offset\n- `i8 MoveY`\n- `u8 BoundX` — Pawn collision bound\n- `u8 BoundY`\n- `u8 PhysicsState`\n- `Game_PhysicsCB PhysicsCB`\n- `Game_CollisionCB CollisionCB`\n\n*Defined in* `game_pawn.h`.",
-  "GAME_ACTION": "```c\ntypedef struct Game_Action {\n    const Game_Frame* FrameList;\n    u8 FrameNum;\n    u8 Loop      : 1;\n    u8 Interrupt : 1;\n} Game_Action;\n```\n\nAnimation action structure\n\n**Fields:**\n- `const Game_Frame* FrameList` — Animation frames data\n- `u8 FrameNum` — Animation frames data count\n- `u8 Loop      : 1` — Is action looping?\n- `u8 Interrupt : 1` — Is action interruptable?\n\n*Defined in* `game_pawn.h`.",
-  "AYFX_ERROR": "```c\nenum AYFX_ERROR {\n    AYFX_ERROR_NONE = 0,  // No errors, the new sample has been correctly initialized\n    AYFX_ERROR_PRIO = 1,  // Priority error, there's a sample with higher priority being played\n    AYFX_ERROR_INDEX = 2,  // Index error, the current bank don't have a sample with such index\n};\n```\n\n**Constants:**\n- `AYFX_ERROR_NONE = 0` — No errors, the new sample has been correctly initialized\n- `AYFX_ERROR_PRIO = 1` — Priority error, there's a sample with higher priority being played\n- `AYFX_ERROR_INDEX = 2` — Index error, the current bank don't have a sample with such index\n\n*Defined in* `ayfx_player.h`.",
-  "SEQACTIONAREA": "```c\ntypedef struct SeqActionArea {\n    u8 StartX;\n    u8 StartY;\n    u8 EndX;\n    u8 EndY;\n} SeqActionArea;\n```\n\nSequence action area coordinate definition\n\n**Fields:**\n- `u8 StartX` — X coordinate of the start of the area\n- `u8 StartY` — Y coordinate of the start of the area\n- `u8 EndX` — X coordinate of the end of the area\n- `u8 EndY` — Y coordinate of the end of the area\n\n*Defined in* `sequence.h`.",
+  "TCL_DATA": "```c\ntypedef struct TCL_Data {\n    c8* Output;\n    u16 OutputSize;\n    c8* Input;\n    u16 InputMax;\n    u16 InputSize;\n    i8 Status;\n} TCL_Data;\n```\n\nDEFINES\nData to send to tcl_bridge\n\n**Fields:**\n- `c8* Output` — offset + 0\n- `u16 OutputSize` — offset + 2\n- `c8* Input` — offset + 4\n- `u16 InputMax` — offset + 6\n- `u16 InputSize` — offset + 8\n- `i8 Status` — offset + 10\n\n*Defined in* `tcl.h`.",
   "V9_SPRITE": "```c\ntypedef struct V9_Sprite {\n    u8 Y;\n    u8 Pattern;\n    u16 X  : 10;\n    u16 _1 : 2;\n    u16 D  : 1;\n    u16 P  : 1;\n    u16 SC : 2;\n} V9_Sprite;\n```\n\n-----------------------------------------------------------------------------\nStructures\n-----------------------------------------------------------------------------\nV9990 sprite structure\n\n**Fields:**\n- `u8 Y` — Sprite Y-coordinate (Actual display position is one line below specified)\n- `u8 Pattern` — Sprite Pattern Number (Pattern Offset is specified in R#25 SGBA)\n- `u16 X  : 10` — Sprite X-coordinate\n- `u16 _1 : 2`\n- `u16 D  : 1` — Sprite is disabled when D=1\n- `u16 P  : 1` — Sprite is in front of the front layer when P=0, sprite is behind the front layer when P=1.\n- `u16 SC : 2` — Palette offset for sprite colors\n\n*Defined in* `v9990.h`.",
+  "DOS_DISKINFO": "```c\ntypedef struct DOS_DiskInfo {\n    u8 SectorPerCluster;\n    u16 SectorSize;\n    u16 TotalClusters;\n    u16 FreeClusters;\n} DOS_DiskInfo;\n```\n\nMSX-DOS disk information structure\n\n**Fields:**\n- `u8 SectorPerCluster` — Sectors per cluster\n- `u16 SectorSize` — Sector size (always 512)\n- `u16 TotalClusters` — Total clusters on disk\n- `u16 FreeClusters` — Free clusters on disk\n\n*Defined in* `dos.h`.",
+  "PAWN_SPRITE": "```c\ntypedef struct Pawn_Sprite {\n    u8 SpriteID;\n    i8 OffsetX;\n    i8 OffsetY;\n    u8 DataOffset;\n    u8 Color;\n    u8 Flag;\n} Pawn_Sprite;\n```\n\nPawn structure\n\n**Fields:**\n- `u8 SpriteID` — Sprite ID\n- `i8 OffsetX` — Layer position offset...\n- `i8 OffsetY` — ...can be positive or negative\n- `u8 DataOffset` — Data index offset\n- `u8 Color` — Sprite color\n- `u8 Flag` — Sprite flag\n\n*Defined in* `pawn.h`.",
+  "DOS_FCB": "```c\ntypedef struct DOS_FCB {\n    u8 Drive;\n    c8 Name[11];\n    u16 CurrentBlock;\n    u16 RecordSize;\n    u32 Size;\n    u16 Date;\n    u16 Time;\n    u8 DeviceID;\n    u8 Directory;\n    u16 TopCluster;\n    u16 LastCluster;\n    u16 RelativeLoc;\n    u8 CurrentRecord;\n    u32 RandomRecord;\n} DOS_FCB;\n```\n\nFile Control Block structure\n\n**Fields:**\n- `u8 Drive` — Drive number containing the file. (0 for Default drive, 1 for A, 2 for B, ..., 8 for H)\n- `c8 Name[11]` — Filename (format: 8.3)\n- `u16 CurrentBlock` — Number of blocks from the top of the file to the current block\n- `u16 RecordSize`\n- `u32 Size`\n- `u16 Date` — The two bytes format for DATE are [YYYYYYYM|MMMDDDDD].\n- `u16 Time`\n- `u8 DeviceID`\n- `u8 Directory`\n- `u16 TopCluster` — Top cluster number of the file\n- `u16 LastCluster` — Last cluster number accessed\n- `u16 RelativeLoc` — Relative location from top cluster of the file\n- `u8 CurrentRecord`\n- `u32 RandomRecord` — Record order from the top of the file\n\n*Defined in* `dos.h`.",
+  "PAWN_ACTION": "```c\ntypedef struct Pawn_Action {\n    const Pawn_Frame* FrameList;\n    u8 FrameNum;\n    u8 Loop;\n    u8 Interrupt;\n} Pawn_Action;\n```\n\nAnimation action structure\n\n**Fields:**\n- `const Pawn_Frame* FrameList` — Animation frames data\n- `u8 FrameNum` — Animation frames data count\n- `u8 Loop` — Is action looping?\n- `u8 Interrupt` — Is action interruptable?\n\n*Defined in* `pawn.h`.",
+  "SEQUENCE": "```c\ntypedef struct Sequence {\n    u16 ID;\n    u8 Mode;\n    u8 FirstFrame;\n    u8 LastFrame;\n    u8 StartEvent;\n    u8 EndEvent;\n    SeqNext Next;\n    const SeqAction* const Actions[];\n} Sequence;\n```\n\nSequence structure\n\n**Fields:**\n- `u16 ID` — Sequence ID\n- `u8 Mode` — Playback mode (see <SEQ_MODE>)\n- `u8 FirstFrame` — First frame of the sequence (or table index for timelined sequence)\n- `u8 LastFrame` — Last frame of the sequence (or number of entries for timelined sequence)\n- `u8 StartEvent` — Event triggered when sequence starts\n- `u8 EndEvent` — Event triggered when sequence ends or loops\n- `SeqNext Next` — Sequence to be played after this one (if Next.Seq is not NULL)\n- `const SeqAction* const Actions[]` — NULL-terminated list of actions\n\n*Defined in* `sequence.h`.",
+  "DOS_VERSION": "```c\ntypedef struct DOS_Version {\n    u16 Kernel;\n    u16 System;\n} DOS_Version;\n```\n\nMSX-DOS version structure\n\n*Defined in* `dos.h`.",
+  "FSM_STATE": "```c\ntypedef struct FSM_State {\n    u8 Flag;\n    callback Begin;\n    callback Update;\n    callback End;\n} FSM_State;\n```\n\nDEFINES\n\n**Fields:**\n- `u8 Flag` — State behavior flag (reserved)\n- `callback Begin` — Function to be called when state begin (can be NULL)\n- `callback Update` — Function to be called at each update tick\n- `callback End` — Function to be called when state end (can be NULL)\n\n*Defined in* `fsm.h`.",
+  "VDP_YJK": "```c\nenum VDP_YJK {\n    VDP_YJK_OFF = 0,  // Use classic 8-bits RGB mode\n    VDP_YJK_ON = R25_YJK,  // Use YJK mode (5-bits for lightness)\n    VDP_YJK_YAE = (R25_YJK|R25_YAE),  // Use YJK mode (4-bits for lightness) + 16 colors palette\n};\n```\n\nYJK modes\n\n**Constants:**\n- `VDP_YJK_OFF = 0` — Use classic 8-bits RGB mode\n- `VDP_YJK_ON = R25_YJK` — Use YJK mode (5-bits for lightness)\n- `VDP_YJK_YAE = (R25_YJK|R25_YAE)` — Use YJK mode (4-bits for lightness) + 16 colors palette\n\n*Defined in* `vdp.h`.",
+  "MENU": "```c\ntypedef struct Menu {\n    const c8* Title;\n    MenuItem* Items;\n    u8 ItemNum;\n    callback Callback;\n} Menu;\n```\n\nMenu parameters\n\n**Fields:**\n- `const c8* Title` — Title of the page (NULL means no title)\n- `MenuItem* Items` — List of the page's menu entries\n- `u8 ItemNum` — Number of the page's menu entries\n- `callback Callback` — Function to be called when page is opened\n\n*Defined in* `menu.h`.",
+  "GAME_ACTION": "```c\ntypedef struct Game_Action {\n    const Game_Frame* FrameList;\n    u8 FrameNum;\n    u8 Loop      : 1;\n    u8 Interrupt : 1;\n} Game_Action;\n```\n\nAnimation action structure\n\n**Fields:**\n- `const Game_Frame* FrameList` — Animation frames data\n- `u8 FrameNum` — Animation frames data count\n- `u8 Loop      : 1` — Is action looping?\n- `u8 Interrupt : 1` — Is action interruptable?\n\n*Defined in* `game_pawn.h`.",
+  "MENU_ITEM_TYPE": "```c\nenum MENU_ITEM_TYPE {\n    MENU_ITEM_ACTION = 0,  // Execute callback function defined in Action\n    MENU_ITEM_GOTO,  // Change page to the one defined in Value\n    MENU_ITEM_BACK,  // Return to the previous page\n    MENU_ITEM_INT,  // Handle pointer to 8-bits integer defined in Action\n    MENU_ITEM_BOOL,  // Handle pointer to boolean defined in Action\n    MENU_ITEM_TEXT,  // Handle pointer to zero-terminated string\n    MENU_ITEM_EMPTY,  // Empty entry\n    MENU_ITEM_UPDATE,\n    MENU_ITEM_MAX,\n    MENU_ITEM_MASK = 0x0F,\n    MENU_ITEM_ALIGN_DEFAULT = 0x00,\n    MENU_ITEM_ALIGN_LEFT = 0x10,\n    MENU_ITEM_ALIGN_CENTER = 0x20,\n    MENU_ITEM_ALIGN_RIGHT = 0x30,\n    MENU_ITEM_ALIGN_MASK = 0x30,\n    MENU_ITEM_DISABLE = 0x80,  // Item is disabled\n};\n```\n\nMenu item types\n\n**Constants:**\n- `MENU_ITEM_ACTION = 0` — Execute callback function defined in Action\n- `MENU_ITEM_GOTO` — Change page to the one defined in Value\n- `MENU_ITEM_BACK` — Return to the previous page\n- `MENU_ITEM_INT` — Handle pointer to 8-bits integer defined in Action\n- `MENU_ITEM_BOOL` — Handle pointer to boolean defined in Action\n- `MENU_ITEM_TEXT` — Handle pointer to zero-terminated string\n- `MENU_ITEM_EMPTY` — Empty entry\n- `MENU_ITEM_UPDATE`\n- `MENU_ITEM_MAX`\n- `MENU_ITEM_MASK = 0x0F`\n- `MENU_ITEM_ALIGN_DEFAULT = 0x00`\n- `MENU_ITEM_ALIGN_LEFT = 0x10`\n- `MENU_ITEM_ALIGN_CENTER = 0x20`\n- `MENU_ITEM_ALIGN_RIGHT = 0x30`\n- `MENU_ITEM_ALIGN_MASK = 0x30`\n- `MENU_ITEM_DISABLE = 0x80` — Item is disabled\n\n*Defined in* `menu.h`.",
+  "MENUITEM": "```c\ntypedef struct MenuItem {\n    const c8* Text;\n    u8 Type;\n    void* Action;\n    i16 Value;\n} MenuItem;\n```\n\nMenu item parameters\n\n**Fields:**\n- `const c8* Text` — Name of the item\n- `u8 Type` — Type of the item (see [`MENU_ITEM_TYPE`](hint:MENU_ITEM_TYPE))\n- `void* Action` — Action associated to the item (depends on item type)\n- `i16 Value` — Value associated to the item (depends on item type)\n\n*Defined in* `menu.h`.",
+  "REGISTERS": "```c\ntypedef struct Registers {\n    u16 IX;\n    u16 IY;\n    u16 HL;\n    u16 DE;\n    u16 BC;\n    u8 A;\n} Registers;\n```\n\nDEFINES\nz80 registers starage structure\n\n*Defined in* `reg.h`.",
+  "DOS_DISKPARAM": "```c\ntypedef struct DOS_DiskParam {\n    u8 DriveNum;\n    u16 SectorSize;\n    u8 ClusterSectors;\n    u16 ReservedSectors;\n    u8 FATNum;\n    u16 RootNum;\n    u16 LogicalSectors;\n    u8 Media;\n    u8 FATSectors;\n    u16 RootSector;\n    u16 DataSector;\n    u16 MaxClusters;\n    u8 DirtyFlag;\n    u32 VolumeID;\n    u8 Reserved[8];\n} DOS_DiskParam;\n```\n\nMSX-DOS 2 disk parameters structure\n\n**Fields:**\n- `u8 DriveNum` — Physical drive number (1=A: etc)\n- `u16 SectorSize` — Sector size (always 512 currently)\n- `u8 ClusterSectors` — Sectors per cluster (non-zero power of 2)\n- `u16 ReservedSectors` — Number of reserved sectors (usually 1)\n- `u8 FATNum` — Number of copies of the FAT (usually 2)\n- `u16 RootNum` — Number of root directory entries\n- `u16 LogicalSectors` — Total number of logical sectors\n- `u8 Media` — Media descriptor byte\n- `u8 FATSectors` — Number of sectors per FAT\n- `u16 RootSector` — First root directory sector number\n- `u16 DataSector` — First data sector number\n- `u16 MaxClusters` — Maximum cluster number\n- `u8 DirtyFlag` — Dirty disk flag\n- `u32 VolumeID` — Volume id. (-1 => no volume id.)\n- `u8 Reserved[8]` — Reserved (currently always zero)\n\n*Defined in* `dos.h`.",
+  "SEQKEY": "```c\ntypedef struct SeqKey {\n    u8 Time;\n    u8 Frame;\n    u8 Event;\n} SeqKey;\n```\n\nSequence timeline entry\n\n**Fields:**\n- `u8 Time` — Duration of the frame (in sequencer unit)\n- `u8 Frame` — Frame number (relative to start)\n- `u8 Event` — Event to be triggered at the begining of each step\n\n*Defined in* `sequence.h`.",
+  "GAME_PAWN": "```c\ntypedef struct Game_Pawn {\n    const Game_Sprite* SpriteList;\n    u8 SpriteNum;\n    u8 SpriteID;\n    const Game_Action* ActionList;\n    u8 PositionX;\n    u8 PositionY;\n    u8 ActionId;\n    u8 AnimFrame;\n    u8 AnimStep;\n    u8 AnimTimer;\n    u8 Update;\n    u8 Counter;\n    i8 MoveX;\n    i8 MoveY;\n    u8 BoundX;\n    u8 BoundY;\n    u8 PhysicsState;\n    Game_PhysicsCB PhysicsCB;\n    Game_CollisionCB CollisionCB;\n} Game_Pawn;\n```\n\nPawn structure\n\n**Fields:**\n- `const Game_Sprite* SpriteList` — List of sprite layers\n- `u8 SpriteNum` — Number of sprite layers\n- `u8 SpriteID` — Sprite ID of the first layer (0~31)\n- `const Game_Action* ActionList` — List of actions\n- `u8 PositionX` — Pawn screen position\n- `u8 PositionY`\n- `u8 ActionId` — Current action id\n- `u8 AnimFrame` — Current animation frame id\n- `u8 AnimStep` — Current step into the animation\n- `u8 AnimTimer` — Animation timer (into the current step)\n- `u8 Update` — Pawn update flags\n- `u8 Counter` — Global update counter\n- `i8 MoveX` — Pawn movement offset\n- `i8 MoveY`\n- `u8 BoundX` — Pawn collision bound\n- `u8 BoundY`\n- `u8 PhysicsState`\n- `Game_PhysicsCB PhysicsCB`\n- `Game_CollisionCB CollisionCB`\n\n*Defined in* `game_pawn.h`.",
+  "VDP_BLINK_TIME": "```c\nenum VDP_BLINK_TIME {\n    VDP_BLINK_TIME_0 = 0,\n    VDP_BLINK_TIME_167MS,\n    VDP_BLINK_TIME_334MS,\n    VDP_BLINK_TIME_501MS,\n    VDP_BLINK_TIME_667MS,\n    VDP_BLINK_TIME_834MS,\n    VDP_BLINK_TIME_1001MS,\n    VDP_BLINK_TIME_1168MS,\n    VDP_BLINK_TIME_1335MS,\n    VDP_BLINK_TIME_1510MS,\n    VDP_BLINK_TIME_1669MS,\n    VDP_BLINK_TIME_1836MS,\n    VDP_BLINK_TIME_2003MS,\n    VDP_BLINK_TIME_2169MS,\n    VDP_BLINK_TIME_2336MS,\n    VDP_BLINK_TIME_2503MS,\n    VDP_BLINK_TIME_500MS = VDP_BLINK_TIME_501MS,\n    VDP_BLINK_TIME_1000MS = VDP_BLINK_TIME_1001MS,\n    VDP_BLINK_TIME_1500MS = VDP_BLINK_TIME_1510MS,\n    VDP_BLINK_TIME_2000MS = VDP_BLINK_TIME_2003MS,\n    VDP_BLINK_TIME_2500MS = VDP_BLINK_TIME_2503MS,\n};\n```\n\nBlink time enumaration\n\n*Defined in* `vdp.h`.",
+  "VDP_COMMAND": "```c\ntypedef struct VDP_Command {\n    u16 SX;\n    u16 SY;\n    u16 DX;\n    u16 DY;\n    u16 NX;\n    u16 NY;\n    u8 CLR;\n    u8 ARG;\n    u8 CMD;\n} VDP_Command;\n```\n\nStructure used to store register data for VDP command\n\n**Fields:**\n- `u16 SX` — 32-33\n- `u16 SY` — 34-35\n- `u16 DX` — 36-37\n- `u16 DY` — 38-39\n- `u16 NX` — 40-41\n- `u16 NY` — 42-43\n- `u8 CLR` — 44\n- `u8 ARG` — 45\n- `u8 CMD` — 46\n\n*Defined in* `vdp.h`.",
+  "PRINT_DATA": "```c\ntypedef struct Print_Data {\n    u8 PatternX;\n    u8 PatternY;\n    u8 UnitX;\n    u8 UnitY;\n    u8 TabSize;\n    UX CursorX;\n    UY CursorY;\n    u8 TextColor;\n    u8 TextColor[PRINT_COLOR_NUM];\n    u8 BGColor;\n    u8 CharFirst;\n    u8 CharLast;\n    u8 CharCount;\n    print_drawchar DrawChar;\n    u8 SourceMode       : 4;\n    u16 ScreenWidth;\n    const u8* FontPatterns;\n    const u8* FontAddr;\n    UY FontVRAMY;\n    u8 CharPerLine;\n    u8 SpritePattern;\n    u8 SpriteID;\n    u8 PatternOffset;\n    u8 FX;\n    u8 ShadowOffsetX\t: 3;\n    u8 ShadowOffsetY\t: 3;\n    u8 ShadowColor;\n    u8 OutlineColor;\n    u8 Buffer[16];\n    i8 Direction;\n} Print_Data;\n```\n\n-----------------------------------------------------------------------------\nSTRUCTURES\n-----------------------------------------------------------------------------\nPrint module configuration structure\n\n**Fields:**\n- `u8 PatternX` — < X size of a character in screen unit (0-15)\n- `u8 PatternY` — < Y size of a character in screen unit (0-15)\n- `u8 UnitX` — < X size of a character in screen unit (0-15)\n- `u8 UnitY` — < Y size of a character in screen unit (0-15)\n- `u8 TabSize` — < Tabulation size in pixel (must be a power of 2 like 16, 32, 64, ...)\n- `UX CursorX` — < Current X position (screen coordinate)\n- `UY CursorY` — < Current Y position (screen coordinate)\n- `u8 TextColor` — < Text color\n- `u8 TextColor[PRINT_COLOR_NUM]` — < Text colors (1 per line)\n- `u8 BGColor` — < Background color\n- `u8 CharFirst` — < ASCII code of the first character of the current font\n- `u8 CharLast` — < ASCII code of the last character of the current font\n- `u8 CharCount` — < Characters count (/!\\ max is 255)\n- `print_drawchar DrawChar` — < Default function to draw a character (depend of the current mode)\n- `u8 SourceMode       : 4` — < Character display mode : RAM, VRAM or Sprite (@see PRINT_MODE)\n- `u16 ScreenWidth` — < Screen width\n- `const u8* FontPatterns` — < Forms of the font\n- `const u8* FontAddr` — < Address of the virtual index 0 character (used to quick drawing in DrawChar_GX functions)\n- `UY FontVRAMY` — < Y position of the font in VRAM\n- `u8 CharPerLine`\n- `u8 SpritePattern` — < Pattern index of the 1st sprite character\n- `u8 SpriteID` — < Index of the current sprite\n- `u8 PatternOffset`\n- `u8 FX`\n- `u8 ShadowOffsetX\t: 3` — < Shadow X offset (0:7 => -3:+4)\n- `u8 ShadowOffsetY\t: 3` — < Shadow Y offset (0:7 => -3:+4)\n- `u8 ShadowColor` — < Shadow color\n- `u8 OutlineColor` — < Outline color\n- `u8 Buffer[16]` — < Mode specifique buffer (used to pre-compute color combinations)\n- `i8 Direction` — <\n\n*Defined in* `print.h`.",
   "DOS_VARTABLE": "```c\ntypedef struct DOS_VarTable {\n    u8 Slot;\n    u8 NumSeg;\n    u8 FreeSeg;\n    u8 SysSeg;\n    u8 UserSeg;\n    u8 Reserved[3];\n} DOS_VarTable;\n```\n\nMemory Mappers variable table\n\n**Fields:**\n- `u8 Slot` — Main Memory Mapper slot Number (Address in HL as output)\n- `u8 NumSeg` — Number of segments\n- `u8 FreeSeg` — Number of free segments\n- `u8 SysSeg` — Number of segments reserved by the system\n- `u8 UserSeg` — Number of segments reserved by the user\n- `u8 Reserved[3]` — Reserved\n\n*Defined in* `dos_mapper.h`.",
+  "SEQACTIONAREA": "```c\ntypedef struct SeqActionArea {\n    u8 StartX;\n    u8 StartY;\n    u8 EndX;\n    u8 EndY;\n} SeqActionArea;\n```\n\nSequence action area coordinate definition\n\n**Fields:**\n- `u8 StartX` — X coordinate of the start of the area\n- `u8 StartY` — Y coordinate of the start of the area\n- `u8 EndX` — X coordinate of the end of the area\n- `u8 EndY` — Y coordinate of the end of the area\n\n*Defined in* `sequence.h`.",
+  "MGLV_HEADER_MODE": "```c\nenum MGLV_HEADER_MODE {\n    MGLV_HEADER_NONE = 0,\n    MGLV_HEADER_SHORT,\n    MGLV_HEADER_FULL,\n};\n```\n\n*Defined in* `mglv_player.h`.",
+  "PAWN": "```c\ntypedef struct Pawn {\n    const Pawn_Sprite* SpriteList;\n    u8 SpriteNum;\n    u8 SpriteID;\n    const Pawn_Action* ActionList;\n    PAWN_POS PositionX;\n    PAWN_POS PositionY;\n    u8 ActionId;\n    u8 AnimFrame;\n    u8 AnimStep;\n    u8 AnimTimer;\n    u8 Update;\n    u8 Counter;\n    const void* PatternAddr;\n    u8 SpriteFX;\n    i8 MoveX;\n    i8 MoveY;\n    u8 BoundX;\n    u8 BoundY;\n    u8 PhysicsState;\n    Pawn_PhysicsCB PhysicsCB;\n    Pawn_CollisionCB CollisionCB;\n} Pawn;\n```\n\nPawn structure\n\n**Fields:**\n- `const Pawn_Sprite* SpriteList` — List of sprite layers\n- `u8 SpriteNum` — Number of sprite layers\n- `u8 SpriteID` — Sprite ID of the first layer (0~31)\n- `const Pawn_Action* ActionList` — List of actions\n- `PAWN_POS PositionX` — Pawn screen position\n- `PAWN_POS PositionY`\n- `u8 ActionId` — Current action id\n- `u8 AnimFrame` — Current animation frame id\n- `u8 AnimStep` — Current step into the animation\n- `u8 AnimTimer` — Animation timer (into the current step)\n- `u8 Update` — Pawn update flags\n- `u8 Counter` — Global update counter\n- `const void* PatternAddr` — Pattern base address\n- `u8 SpriteFX` — Sprite effect\n- `i8 MoveX` — Pawn movement offset\n- `i8 MoveY`\n- `u8 BoundX` — Pawn collision bound\n- `u8 BoundY`\n- `u8 PhysicsState`\n- `Pawn_PhysicsCB PhysicsCB`\n- `Pawn_CollisionCB CollisionCB`\n\n*Defined in* `pawn.h`.",
+  "DOS_SEGMENT": "```c\ntypedef struct DOS_Segment {\n    u8 Number;\n    u8 Slot;\n} DOS_Segment;\n```\n\nMemory Mappers segment info\n\n**Fields:**\n- `u8 Number` — Segment number\n- `u8 Slot` — Segment's slot\n\n*Defined in* `dos_mapper.h`.",
+  "QRCODE_MODE": "```c\nenum QRCODE_MODE {\n    QRCODE_MODE_NUMERIC = 0x1,\n    QRCODE_MODE_ALPHANUMERIC = 0x2,\n    QRCODE_MODE_BYTE = 0x4,\n    QRCODE_MODE_KANJI = 0x8,\n    QRCODE_MODE_ECI = 0x7,\n};\n```\n\nDescribes how a segment's data bits are interpreted.\n\n*Defined in* `qrcode.h`.",
+  "QRCODE_SEGMENT": "```c\ntypedef struct QRCode_Segment {\n    enum QRCODE_MODE mode;\n    i16 numChars;\n    i16 bitLength;\n} QRCode_Segment;\n```\n\nA segment of character/binary/control data in a QR Code symbol.\nThe mid-level way to create a segment is to take the payload data and call a factory function such as QRCode_MakeNumeric().\nThe low-level way to create a segment is to custom-make the bit buffer and initialize a QRCode_Segment struct with appropriate values.\nEven in the most favorable conditions, a QR Code can only hold 7089 characters of data.\nAny segment longer than this is meaningless for the purpose of generating QR Codes.\nMoreover, the maximum allowed bit length is 32767 because the largest QR Code (version 40) has 31329 modules.\n\n*Defined in* `qrcode.h`.",
+  "DOS_TIME": "```c\ntypedef struct DOS_Time {\n    u16 Year;\n    u8 Date;\n    u8 Month;\n    u8 Day;\n    u8 Minute;\n    u8 Hour;\n    u8 Second;\n} DOS_Time;\n```\n\nMSX-DOS 2 time structure\n\n**Fields:**\n- `u16 Year` — +0 (note: order is important for fast update)\n- `u8 Date` — +2\n- `u8 Month` — +3\n- `u8 Day` — +4\n- `u8 Minute` — +5\n- `u8 Hour` — +6\n- `u8 Second` — +7\n\n*Defined in* `dos.h`.",
   "QRCODE_MASK": "```c\nenum QRCODE_MASK {\n    QRCODE_MASK_AUTO = -1,\n    QRCODE_MASK_0 = 0,  // (i + j) % 2 = 0\n    QRCODE_MASK_1,  // i % 2 = 0\n    QRCODE_MASK_2,  // j % 3 = 0\n    QRCODE_MASK_3,  // (i + j) % 3 = 0\n    QRCODE_MASK_4,  // (i / 2 + j / 3) % 2 = 0\n    QRCODE_MASK_5,  // (i * j) % 2 + (i * j) % 3 = 0\n    QRCODE_MASK_6,  // ((i * j) % 3 + i * j) % 2 = 0\n    QRCODE_MASK_7,  // ((i * j) % 3 + i + j) % 2 = 0\n    QRCODE_MASK_MAX,\n};\n```\n\nThe mask pattern used in a QR Code symbol.\n\n**Constants:**\n- `QRCODE_MASK_AUTO = -1`\n- `QRCODE_MASK_0 = 0` — (i + j) % 2 = 0\n- `QRCODE_MASK_1` — i % 2 = 0\n- `QRCODE_MASK_2` — j % 3 = 0\n- `QRCODE_MASK_3` — (i + j) % 3 = 0\n- `QRCODE_MASK_4` — (i / 2 + j / 3) % 2 = 0\n- `QRCODE_MASK_5` — (i * j) % 2 + (i * j) % 3 = 0\n- `QRCODE_MASK_6` — ((i * j) % 3 + i * j) % 2 = 0\n- `QRCODE_MASK_7` — ((i * j) % 3 + i + j) % 2 = 0\n- `QRCODE_MASK_MAX`\n\n*Defined in* `qrcode.h`.",
-  "V9_COLOR_MODE": "```c\nenum V9_COLOR_MODE {\n    V9_COLOR_BP2,  // 0    0    0\tColor palette (4 colors out of 32768 colors)\n    V9_COLOR_BP4,  // 1    0    0\tColor palette (16 colors out of 32768 colors)\n    V9_COLOR_BP6,  // 2    0    0\tColor palette (64 colors out of 32768 colors)\n    V9_COLOR_BD8,  // 2    1    0\tDirect RGB [G:3|R:3|B:2] (256 colors)\n    V9_COLOR_BYJK,  // 2    2    0\tYJK Decoder (19268 colors)\n    V9_COLOR_BYJKP,  // 2    2    1\tYJK Decoder + Color palette (12599 colors + 16 colors out of 32768 colors)\n    V9_COLOR_BYUV,  // 2    3    0\tYUV Decoder (19268 colors)\n    V9_COLOR_BYUVP,  // 2    3    1\tYUV Decoder + Color palette (12599 colors + 16 colors out of 32768 colors)\n    V9_COLOR_BD16,  // 3    0    0\tDirect RGB [YS|G:5|R:2][R:3|B:5] (32768 colors)\n    V9_COLOR_BMP_MAX,\n    V9_COLOR_PP,  // Display type when the display mode is P1 or P2 (16/32 colors out of 32768 colors)\n    V9_COLOR_MAX,\n};\n```\n\n**Constants:**\n- `V9_COLOR_BP2` — 0    0    0\tColor palette (4 colors out of 32768 colors)\n- `V9_COLOR_BP4` — 1    0    0\tColor palette (16 colors out of 32768 colors)\n- `V9_COLOR_BP6` — 2    0    0\tColor palette (64 colors out of 32768 colors)\n- `V9_COLOR_BD8` — 2    1    0\tDirect RGB [G:3|R:3|B:2] (256 colors)\n- `V9_COLOR_BYJK` — 2    2    0\tYJK Decoder (19268 colors)\n- `V9_COLOR_BYJKP` — 2    2    1\tYJK Decoder + Color palette (12599 colors + 16 colors out of 32768 colors)\n- `V9_COLOR_BYUV` — 2    3    0\tYUV Decoder (19268 colors)\n- `V9_COLOR_BYUVP` — 2    3    1\tYUV Decoder + Color palette (12599 colors + 16 colors out of 32768 colors)\n- `V9_COLOR_BD16` — 3    0    0\tDirect RGB [YS|G:5|R:2][R:3|B:5] (32768 colors)\n- `V9_COLOR_BMP_MAX`\n- `V9_COLOR_PP` — Display type when the display mode is P1 or P2 (16/32 colors out of 32768 colors)\n- `V9_COLOR_MAX`\n\n*Defined in* `v9990.h`."
+  "QRCODE_ECC": "```c\nenum QRCODE_ECC {\n    QRCODE_ECC_LOW = 0,  // The QR Code can tolerate about  7% erroneous codewords\n    QRCODE_ECC_MEDIUM,  // The QR Code can tolerate about 15% erroneous codewords\n    QRCODE_ECC_QUARTILE,  // The QR Code can tolerate about 25% erroneous codewords\n    QRCODE_ECC_HIGH,  // The QR Code can tolerate about 30% erroneous codewords\n    QRCODE_ECC_MAX,\n};\n```\n\nThe error correction level in a QR Code symbol.\n\n**Constants:**\n- `QRCODE_ECC_LOW = 0` — The QR Code can tolerate about  7% erroneous codewords\n- `QRCODE_ECC_MEDIUM` — The QR Code can tolerate about 15% erroneous codewords\n- `QRCODE_ECC_QUARTILE` — The QR Code can tolerate about 25% erroneous codewords\n- `QRCODE_ECC_HIGH` — The QR Code can tolerate about 30% erroneous codewords\n- `QRCODE_ECC_MAX`\n\n*Defined in* `qrcode.h`.",
+  "ONET_PACKETINFO": "```c\ntypedef struct ONET_PacketInfo {\n    u16 Size;\n    u16 Head;\n} ONET_PacketInfo;\n```\n\n*Defined in* `obsonet.h`."
  },
- "patterns": []
+ "patterns": [],
+ "structs": {
+  "BIOS_SpriteAttributes": [
+   [
+    "u8",
+    "y",
+    ""
+   ],
+   [
+    "u8",
+    "x",
+    ""
+   ],
+   [
+    "u8",
+    "pattern",
+    ""
+   ],
+   [
+    "u8",
+    "color",
+    ""
+   ]
+  ],
+  "BasicROMVersion": [
+   [
+    "u8",
+    "CharacterSet: 4",
+    "Character Set"
+   ],
+   [
+    "u8",
+    "DateFormat: 3",
+    "Date Format"
+   ],
+   [
+    "u8",
+    "VSF: 1",
+    "Vertical Synchronism and interruption Frequency"
+   ],
+   [
+    "u8",
+    "KeyboardType: 4",
+    "Character Set"
+   ],
+   [
+    "u8",
+    "SSM: 1",
+    "Start-up Screen Mode"
+   ],
+   [
+    "u8",
+    "SLS: 1",
+    "String Length Specificator Character of PRINT USING"
+   ],
+   [
+    "u8",
+    "SRC: 1",
+    "String Replacement Character of PRINT USING"
+   ],
+   [
+    "u8",
+    "Cur: 1",
+    "Currency Symbol"
+   ]
+  ],
+  "CassetteIO": [
+   [
+    "u8",
+    "low0",
+    "LOW signal length of bit 0. (53h by default)"
+   ],
+   [
+    "u8",
+    "high0",
+    "HIGH signal length of bit 0. (5Ch by default)"
+   ],
+   [
+    "u8",
+    "low1",
+    "Length of LOW signal of bit 1. (26h by default)"
+   ],
+   [
+    "u8",
+    "high1",
+    "Length of HIGH signal of bit 1. (2Dh by default)"
+   ],
+   [
+    "u8",
+    "header",
+    "Length of the header signal calculated by HEADLEN * 2/256"
+   ]
+  ],
+  "RS232Queue": [
+   [
+    "u8",
+    "head",
+    "Queue head offset (for writing)"
+   ],
+   [
+    "u8",
+    "tail",
+    "Queue tail offset (for reading)"
+   ],
+   [
+    "u8",
+    "flag",
+    "Flag indicating whether a byte has been returned"
+   ],
+   [
+    "u8",
+    "size",
+    "Queue size"
+   ],
+   [
+    "u16",
+    "addr",
+    "Queue start address"
+   ]
+  ],
+  "RS232Hook": [
+   [
+    "u8",
+    "rst",
+    "RST 30h (0F7h)"
+   ],
+   [
+    "u8",
+    "slot",
+    "Slot ID"
+   ],
+   [
+    "u16",
+    "address",
+    "Address"
+   ],
+   [
+    "u8",
+    "ret",
+    "RET (0C9h)"
+   ]
+  ],
+  "RS232Area": [
+   [
+    "u8",
+    "slot",
+    "Slot ID"
+   ],
+   [
+    "u16",
+    "address",
+    ""
+   ]
+  ],
+  "DOS_FCB": [
+   [
+    "u8",
+    "Drive",
+    "Drive number containing the file. (0 for Default drive, 1 for A, 2 for B, ..., 8 for H)"
+   ],
+   [
+    "c8",
+    "Name[11]",
+    "Filename (format: 8.3)"
+   ],
+   [
+    "u16",
+    "CurrentBlock",
+    "Number of blocks from the top of the file to the current block"
+   ],
+   [
+    "u16",
+    "RecordSize",
+    ""
+   ],
+   [
+    "u32",
+    "Size",
+    ""
+   ],
+   [
+    "u16",
+    "Date",
+    "The two bytes format for DATE are [YYYYYYYM|MMMDDDDD]."
+   ],
+   [
+    "u16",
+    "Time",
+    ""
+   ],
+   [
+    "u8",
+    "DeviceID",
+    ""
+   ],
+   [
+    "u8",
+    "Directory",
+    ""
+   ],
+   [
+    "u16",
+    "TopCluster",
+    "Top cluster number of the file"
+   ],
+   [
+    "u16",
+    "LastCluster",
+    "Last cluster number accessed"
+   ],
+   [
+    "u16",
+    "RelativeLoc",
+    "Relative location from top cluster of the file"
+   ],
+   [
+    "u8",
+    "CurrentRecord",
+    ""
+   ],
+   [
+    "u32",
+    "RandomRecord",
+    "Record order from the top of the file"
+   ]
+  ],
+  "DOS_FIB": [
+   [
+    "u8",
+    "Ident",
+    "0 - Always 0FFh"
+   ],
+   [
+    "u8",
+    "Filename[13]",
+    "1..13 - Filename as an ASCIIZ string"
+   ],
+   [
+    "u8",
+    "Attribute",
+    "14 - File attributes byte"
+   ],
+   [
+    "u16",
+    "Time",
+    "15..16 - Time of last modification"
+   ],
+   [
+    "u16",
+    "Date",
+    "17..18 - Date of last modification"
+   ],
+   [
+    "u16",
+    "Cluster",
+    "19..20 - Start cluster"
+   ],
+   [
+    "u32",
+    "Size",
+    "21..24 - File size"
+   ],
+   [
+    "u8",
+    "Drive",
+    "25 - Logical drive"
+   ],
+   [
+    "u8",
+    "Reserved[38]",
+    "26..63 - Internal information, must not be modified"
+   ]
+  ],
+  "DOS_Version": [
+   [
+    "u16",
+    "Kernel",
+    ""
+   ],
+   [
+    "u16",
+    "System",
+    ""
+   ]
+  ],
+  "DOS_DiskInfo": [
+   [
+    "u8",
+    "SectorPerCluster",
+    "Sectors per cluster"
+   ],
+   [
+    "u16",
+    "SectorSize",
+    "Sector size (always 512)"
+   ],
+   [
+    "u16",
+    "TotalClusters",
+    "Total clusters on disk"
+   ],
+   [
+    "u16",
+    "FreeClusters",
+    "Free clusters on disk"
+   ]
+  ],
+  "DOS_Time": [
+   [
+    "u16",
+    "Year",
+    "+0 (note: order is important for fast update)"
+   ],
+   [
+    "u8",
+    "Date",
+    "+2"
+   ],
+   [
+    "u8",
+    "Month",
+    "+3"
+   ],
+   [
+    "u8",
+    "Day",
+    "+4"
+   ],
+   [
+    "u8",
+    "Minute",
+    "+5"
+   ],
+   [
+    "u8",
+    "Hour",
+    "+6"
+   ],
+   [
+    "u8",
+    "Second",
+    "+7"
+   ]
+  ],
+  "DOS_DiskParam": [
+   [
+    "u8",
+    "DriveNum",
+    "Physical drive number (1=A: etc)"
+   ],
+   [
+    "u16",
+    "SectorSize",
+    "Sector size (always 512 currently)"
+   ],
+   [
+    "u8",
+    "ClusterSectors",
+    "Sectors per cluster (non-zero power of 2)"
+   ],
+   [
+    "u16",
+    "ReservedSectors",
+    "Number of reserved sectors (usually 1)"
+   ],
+   [
+    "u8",
+    "FATNum",
+    "Number of copies of the FAT (usually 2)"
+   ],
+   [
+    "u16",
+    "RootNum",
+    "Number of root directory entries"
+   ],
+   [
+    "u16",
+    "LogicalSectors",
+    "Total number of logical sectors"
+   ],
+   [
+    "u8",
+    "Media",
+    "Media descriptor byte"
+   ],
+   [
+    "u8",
+    "FATSectors",
+    "Number of sectors per FAT"
+   ],
+   [
+    "u16",
+    "RootSector",
+    "First root directory sector number"
+   ],
+   [
+    "u16",
+    "DataSector",
+    "First data sector number"
+   ],
+   [
+    "u16",
+    "MaxClusters",
+    "Maximum cluster number"
+   ],
+   [
+    "u8",
+    "DirtyFlag",
+    "Dirty disk flag"
+   ],
+   [
+    "u32",
+    "VolumeID",
+    "Volume id. (-1 => no volume id.)"
+   ],
+   [
+    "u8",
+    "Reserved[8]",
+    "Reserved (currently always zero)"
+   ]
+  ],
+  "DOS_VarTable": [
+   [
+    "u8",
+    "Slot",
+    "Main Memory Mapper slot Number (Address in HL as output)"
+   ],
+   [
+    "u8",
+    "NumSeg",
+    "Number of segments"
+   ],
+   [
+    "u8",
+    "FreeSeg",
+    "Number of free segments"
+   ],
+   [
+    "u8",
+    "SysSeg",
+    "Number of segments reserved by the system"
+   ],
+   [
+    "u8",
+    "UserSeg",
+    "Number of segments reserved by the user"
+   ],
+   [
+    "u8",
+    "Reserved[3]",
+    "Reserved"
+   ]
+  ],
+  "DOS_Segment": [
+   [
+    "u8",
+    "Number",
+    "Segment number"
+   ],
+   [
+    "u8",
+    "Slot",
+    "Segment's slot"
+   ]
+  ],
+  "FSM_State": [
+   [
+    "u8",
+    "Flag",
+    "State behavior flag (reserved)"
+   ],
+   [
+    "callback",
+    "Begin",
+    "Function to be called when state begin (can be NULL)"
+   ],
+   [
+    "callback",
+    "Update",
+    "Function to be called at each update tick"
+   ],
+   [
+    "callback",
+    "End",
+    "Function to be called when state end (can be NULL)"
+   ]
+  ],
+  "Game_Frame": [
+   [
+    "u8",
+    "Id",
+    "Animation frame data index (0-255)"
+   ],
+   [
+    "u8",
+    "Duration",
+    "Frame duration (in frame number)"
+   ],
+   [
+    "callback",
+    "Event",
+    "Event to execute at this frame"
+   ]
+  ],
+  "Game_Action": [
+   [
+    "const Game_Frame*",
+    "FrameList",
+    "Animation frames data"
+   ],
+   [
+    "u8",
+    "FrameNum",
+    "Animation frames data count"
+   ],
+   [
+    "u8",
+    "Loop      : 1",
+    "Is action looping?"
+   ],
+   [
+    "u8",
+    "Interrupt : 1",
+    "Is action interruptable?"
+   ]
+  ],
+  "Game_Sprite": [
+   [
+    "u8",
+    "SpriteID",
+    "Sprite ID"
+   ],
+   [
+    "i8",
+    "OffsetX",
+    "Layer position offset..."
+   ],
+   [
+    "i8",
+    "OffsetY",
+    "...can be positive or negative"
+   ],
+   [
+    "u8",
+    "DataOffset",
+    "Data index offset"
+   ],
+   [
+    "u8",
+    "Color",
+    "Sprite color"
+   ],
+   [
+    "u8",
+    "Flag",
+    "Sprite flag"
+   ]
+  ],
+  "Game_Pawn": [
+   [
+    "const Game_Sprite*",
+    "SpriteList",
+    "List of sprite layers"
+   ],
+   [
+    "u8",
+    "SpriteNum",
+    "Number of sprite layers"
+   ],
+   [
+    "u8",
+    "SpriteID",
+    "Sprite ID of the first layer (0~31)"
+   ],
+   [
+    "const Game_Action*",
+    "ActionList",
+    "List of actions"
+   ],
+   [
+    "u8",
+    "PositionX",
+    "Pawn screen position"
+   ],
+   [
+    "u8",
+    "PositionY",
+    ""
+   ],
+   [
+    "u8",
+    "ActionId",
+    "Current action id"
+   ],
+   [
+    "u8",
+    "AnimFrame",
+    "Current animation frame id"
+   ],
+   [
+    "u8",
+    "AnimStep",
+    "Current step into the animation"
+   ],
+   [
+    "u8",
+    "AnimTimer",
+    "Animation timer (into the current step)"
+   ],
+   [
+    "u8",
+    "Update",
+    "Pawn update flags"
+   ],
+   [
+    "u8",
+    "Counter",
+    "Global update counter"
+   ],
+   [
+    "i8",
+    "MoveX",
+    "Pawn movement offset"
+   ],
+   [
+    "i8",
+    "MoveY",
+    ""
+   ],
+   [
+    "u8",
+    "BoundX",
+    "Pawn collision bound"
+   ],
+   [
+    "u8",
+    "BoundY",
+    ""
+   ],
+   [
+    "u8",
+    "PhysicsState",
+    ""
+   ],
+   [
+    "Game_PhysicsCB",
+    "PhysicsCB",
+    ""
+   ],
+   [
+    "Game_CollisionCB",
+    "CollisionCB",
+    ""
+   ]
+  ],
+  "IPM_Event": [
+   [
+    "u8",
+    "Device",
+    ""
+   ],
+   [
+    "u8",
+    "Input",
+    ""
+   ],
+   [
+    "u8",
+    "Event",
+    ""
+   ],
+   [
+    "IPM_cb",
+    "Callback",
+    ""
+   ]
+  ],
+  "IPM_Process": [
+   [
+    "u8",
+    "CurrentStatus",
+    ""
+   ],
+   [
+    "u8",
+    "PreviousStatus",
+    ""
+   ],
+   [
+    "u8",
+    "State[IPM_INPUT_MAX]",
+    ""
+   ],
+   [
+    "u8",
+    "Timer[IPM_INPUT_MAX]",
+    ""
+   ]
+  ],
+  "IPM_KeySet": [
+   [
+    "u8",
+    "Up",
+    ""
+   ],
+   [
+    "u8",
+    "Right",
+    ""
+   ],
+   [
+    "u8",
+    "Down",
+    ""
+   ],
+   [
+    "u8",
+    "Left",
+    ""
+   ],
+   [
+    "u8",
+    "TriggerA",
+    ""
+   ],
+   [
+    "u8",
+    "TriggerB",
+    ""
+   ]
+  ],
+  "IPM_Config": [
+   [
+    "u8",
+    "DeviceSupport[IPM_DEVICE_MAX]",
+    ""
+   ],
+   [
+    "u8",
+    "HoldTimer",
+    ""
+   ],
+   [
+    "u8",
+    "DoubleClickTimer",
+    ""
+   ],
+   [
+    "IPM_KeySet",
+    "KeySet[2]",
+    ""
+   ]
+  ],
+  "IPM_Data": [
+   [
+    "IPM_Process",
+    "Process[IPM_DEVICE_MAX]",
+    ""
+   ],
+   [
+    "IPM_Event",
+    "Events[IPM_EVENT_TAB_SIZE]",
+    ""
+   ],
+   [
+    "u8",
+    "EventsNum",
+    ""
+   ],
+   [
+    "IPM_check",
+    "Checker[IPM_EVENT_MAX]",
+    ""
+   ],
+   [
+    "IPM_Config",
+    "Config",
+    ""
+   ]
+  ],
+  "VectorU8": [
+   [
+    "u8",
+    "x",
+    ""
+   ],
+   [
+    "u8",
+    "y",
+    ""
+   ]
+  ],
+  "VectorI8": [
+   [
+    "i8",
+    "x",
+    ""
+   ],
+   [
+    "i8",
+    "y",
+    ""
+   ]
+  ],
+  "VectorU16": [
+   [
+    "u16",
+    "x",
+    ""
+   ],
+   [
+    "u16",
+    "y",
+    ""
+   ]
+  ],
+  "VectorI16": [
+   [
+    "i16",
+    "x",
+    ""
+   ],
+   [
+    "i16",
+    "y",
+    ""
+   ]
+  ],
+  "MemChunkHeader": [
+   [
+    "u16",
+    "Size",
+    ""
+   ],
+   [
+    "struct MemChunkHeader*",
+    "Next",
+    ""
+   ]
+  ],
+  "Mouse_State": [
+   [
+    "u8",
+    "Buttons",
+    ""
+   ],
+   [
+    "i8",
+    "dX",
+    ""
+   ],
+   [
+    "i8",
+    "dY",
+    ""
+   ],
+   [
+    "u8",
+    "PrevButtons",
+    ""
+   ]
+  ],
+  "Print_Data": [
+   [
+    "u8",
+    "PatternX",
+    "< X size of a character in screen unit (0-15)"
+   ],
+   [
+    "u8",
+    "PatternY",
+    "< Y size of a character in screen unit (0-15)"
+   ],
+   [
+    "u8",
+    "UnitX",
+    "< X size of a character in screen unit (0-15)"
+   ],
+   [
+    "u8",
+    "UnitY",
+    "< Y size of a character in screen unit (0-15)"
+   ],
+   [
+    "u8",
+    "TabSize",
+    "< Tabulation size in pixel (must be a power of 2 like 16, 32, 64, ...)"
+   ],
+   [
+    "UX",
+    "CursorX",
+    "< Current X position (screen coordinate)"
+   ],
+   [
+    "UY",
+    "CursorY",
+    "< Current Y position (screen coordinate)"
+   ],
+   [
+    "u8",
+    "TextColor",
+    "< Text color"
+   ],
+   [
+    "u8",
+    "TextColor[PRINT_COLOR_NUM]",
+    "< Text colors (1 per line)"
+   ],
+   [
+    "u8",
+    "BGColor",
+    "< Background color"
+   ],
+   [
+    "u8",
+    "CharFirst",
+    "< ASCII code of the first character of the current font"
+   ],
+   [
+    "u8",
+    "CharLast",
+    "< ASCII code of the last character of the current font"
+   ],
+   [
+    "u8",
+    "CharCount",
+    "< Characters count (/!\\ max is 255)"
+   ],
+   [
+    "print_drawchar",
+    "DrawChar",
+    "< Default function to draw a character (depend of the current mode)"
+   ],
+   [
+    "u8",
+    "SourceMode       : 4",
+    "< Character display mode : RAM, VRAM or Sprite (@see PRINT_MODE)"
+   ],
+   [
+    "u16",
+    "ScreenWidth",
+    "< Screen width"
+   ],
+   [
+    "const u8*",
+    "FontPatterns",
+    "< Forms of the font"
+   ],
+   [
+    "const u8*",
+    "FontAddr",
+    "< Address of the virtual index 0 character (used to quick drawing in DrawChar_GX functions)"
+   ],
+   [
+    "UY",
+    "FontVRAMY",
+    "< Y position of the font in VRAM"
+   ],
+   [
+    "u8",
+    "CharPerLine",
+    ""
+   ],
+   [
+    "u8",
+    "SpritePattern",
+    "< Pattern index of the 1st sprite character"
+   ],
+   [
+    "u8",
+    "SpriteID",
+    "< Index of the current sprite"
+   ],
+   [
+    "u8",
+    "PatternOffset",
+    ""
+   ],
+   [
+    "u8",
+    "FX",
+    ""
+   ],
+   [
+    "u8",
+    "ShadowOffsetX\t: 3",
+    "< Shadow X offset (0:7 => -3:+4)"
+   ],
+   [
+    "u8",
+    "ShadowOffsetY\t: 3",
+    "< Shadow Y offset (0:7 => -3:+4)"
+   ],
+   [
+    "u8",
+    "ShadowColor",
+    "< Shadow color"
+   ],
+   [
+    "u8",
+    "OutlineColor",
+    "< Outline color"
+   ],
+   [
+    "u8",
+    "Buffer[16]",
+    "< Mode specifique buffer (used to pre-compute color combinations)"
+   ],
+   [
+    "i8",
+    "Direction",
+    "<"
+   ]
+  ],
+  "PSG_Data": [
+   [
+    "u16",
+    "Tone[3]",
+    "6"
+   ],
+   [
+    "u8",
+    "Noise",
+    "1"
+   ],
+   [
+    "u8",
+    "Mixer",
+    "1"
+   ],
+   [
+    "u8",
+    "Volume[3]",
+    "3"
+   ],
+   [
+    "u16",
+    "Envelope",
+    "2"
+   ],
+   [
+    "u8",
+    "Shape",
+    "1"
+   ],
+   [
+    "u8",
+    "IOPortA",
+    "1"
+   ],
+   [
+    "u8",
+    "IOPortB",
+    "1"
+   ]
+  ],
+  "V9_Sprite": [
+   [
+    "u8",
+    "Y",
+    "Sprite Y-coordinate (Actual display position is one line below specified)"
+   ],
+   [
+    "u8",
+    "Pattern",
+    "Sprite Pattern Number (Pattern Offset is specified in R#25 SGBA)"
+   ],
+   [
+    "u16",
+    "X  : 10",
+    "Sprite X-coordinate"
+   ],
+   [
+    "u16",
+    "_1 : 2",
+    ""
+   ],
+   [
+    "u16",
+    "D  : 1",
+    "Sprite is disabled when D=1"
+   ],
+   [
+    "u16",
+    "P  : 1",
+    "Sprite is in front of the front layer when P=0, sprite is behind the front layer when P=1."
+   ],
+   [
+    "u16",
+    "SC : 2",
+    "Palette offset for sprite colors"
+   ]
+  ],
+  "V9_Address": [
+   [
+    "u8",
+    "Lower",
+    ""
+   ],
+   [
+    "u8",
+    "Center",
+    ""
+   ],
+   [
+    "u8",
+    "Upper",
+    ""
+   ]
+  ],
+  "V9_ColorTriplet": [
+   [
+    "u8",
+    "R\t\t: 5",
+    "Red"
+   ],
+   [
+    "u8",
+    "unused1\t: 2",
+    ""
+   ],
+   [
+    "u8",
+    "YS\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "G\t\t: 5",
+    "Green"
+   ],
+   [
+    "u8",
+    "unused2\t: 3",
+    ""
+   ],
+   [
+    "u8",
+    "B\t\t: 5",
+    "Blue"
+   ],
+   [
+    "u8",
+    "unused3\t: 3",
+    ""
+   ]
+  ],
+  "V9_RegisterSelect": [
+   [
+    "u8",
+    "Number\t: 6",
+    ""
+   ],
+   [
+    "u8",
+    "RII\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "WII\t\t: 1",
+    ""
+   ]
+  ],
+  "V9_Status": [
+   [
+    "u8",
+    "CE\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "EO\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "MCS\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "unused\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "BD\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "HR\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "VR\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "TR\t\t: 1",
+    ""
+   ]
+  ],
+  "V9_InterruptFlag": [
+   [
+    "u8",
+    "VI\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "HI\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "CE\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "unused\t: 5",
+    ""
+   ]
+  ],
+  "V9_SystemControl": [
+   [
+    "u8",
+    "MCS\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "SRS\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "unused\t: 6",
+    ""
+   ]
+  ],
+  "V9_SuperimposeControl": [
+   [
+    "u8",
+    "YM\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "MIX\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "unused1\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "TRN\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "GEN\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "S2\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "S1\t\t: 1",
+    ""
+   ],
+   [
+    "u8",
+    "unused2\t: 1",
+    ""
+   ]
+  ],
+  "VDP_Data": [
+   [
+    "u8",
+    "Mode",
+    "Current screen mode (see <VDP_MODE>)"
+   ],
+   [
+    "u8",
+    "BPC    : 4",
+    "Bits per color of the current mode (can be 1, 2, 4 or 8)"
+   ],
+   [
+    "u8",
+    "Width  : 1",
+    "Width of the current screen (0: 256 px, 1: 512 px)"
+   ],
+   [
+    "u8",
+    "Height : 1",
+    "Height of the current screen (0: 192 px, 1: 212 px)"
+   ]
+  ],
+  "VDP_Command": [
+   [
+    "u16",
+    "SX",
+    "32-33"
+   ],
+   [
+    "u16",
+    "SY",
+    "34-35"
+   ],
+   [
+    "u16",
+    "DX",
+    "36-37"
+   ],
+   [
+    "u16",
+    "DY",
+    "38-39"
+   ],
+   [
+    "u16",
+    "NX",
+    "40-41"
+   ],
+   [
+    "u16",
+    "NY",
+    "42-43"
+   ],
+   [
+    "u8",
+    "CLR",
+    "44"
+   ],
+   [
+    "u8",
+    "ARG",
+    "45"
+   ],
+   [
+    "u8",
+    "CMD",
+    "46"
+   ]
+  ],
+  "VDP_Command36": [
+   [
+    "u16",
+    "DX",
+    "36-37"
+   ],
+   [
+    "u16",
+    "DY",
+    "38-39"
+   ],
+   [
+    "u16",
+    "NX",
+    "40-41"
+   ],
+   [
+    "u16",
+    "NY",
+    "42-43"
+   ],
+   [
+    "u8",
+    "CLR",
+    "44"
+   ],
+   [
+    "u8",
+    "ARG",
+    "45"
+   ],
+   [
+    "u8",
+    "CMD",
+    "46"
+   ]
+  ],
+  "VDP_Sprite": [
+   [
+    "u8",
+    "Y",
+    "Y coordinate on screen (all lower priority sprite will be disable if equal to 216 or 0xD0)"
+   ],
+   [
+    "u8",
+    "X",
+    "X coordinate of the sprite"
+   ],
+   [
+    "u8",
+    "Pattern",
+    "Pattern index"
+   ],
+   [
+    "u8",
+    "Color",
+    "Color index (Sprite Mode 1 only)"
+   ]
+  ],
+  "MenuItem": [
+   [
+    "const c8*",
+    "Text",
+    "Name of the item"
+   ],
+   [
+    "u8",
+    "Type",
+    "Type of the item (see <MENU_ITEM_TYPE>)"
+   ],
+   [
+    "void*",
+    "Action",
+    "Action associated to the item (depends on item type)"
+   ],
+   [
+    "i16",
+    "Value",
+    "Value associated to the item (depends on item type)"
+   ]
+  ],
+  "MenuItemMinMax": [
+   [
+    "i8",
+    "Min",
+    "Minimal value limit"
+   ],
+   [
+    "i8",
+    "Max",
+    "Maximal value limit"
+   ],
+   [
+    "i8",
+    "Step",
+    "Increment/decrement step value"
+   ]
+  ],
+  "Menu": [
+   [
+    "const c8*",
+    "Title",
+    "Title of the page (NULL means no title)"
+   ],
+   [
+    "MenuItem*",
+    "Items",
+    "List of the page's menu entries"
+   ],
+   [
+    "u8",
+    "ItemNum",
+    "Number of the page's menu entries"
+   ],
+   [
+    "callback",
+    "Callback",
+    "Function to be called when page is opened"
+   ]
+  ],
+  "MenuData": [
+   [
+    "const Menu*",
+    "Table",
+    ""
+   ],
+   [
+    "const Menu*",
+    "Page",
+    ""
+   ],
+   [
+    "u8",
+    "Item",
+    ""
+   ],
+   [
+    "Menu_InputCB",
+    "InputCB",
+    ""
+   ],
+   [
+    "Menu_DrawCB",
+    "DrawCB",
+    ""
+   ],
+   [
+    "Menu_EventCB",
+    "EventCB",
+    ""
+   ],
+   [
+    "u8",
+    "PageIdx",
+    ""
+   ],
+   [
+    "u8",
+    "PrevPage",
+    ""
+   ],
+   [
+    "u8",
+    "Flag",
+    ""
+   ],
+   [
+    "MenuItem*",
+    "CurItem",
+    ""
+   ],
+   [
+    "u8",
+    "InputPrev",
+    ""
+   ],
+   [
+    "u8",
+    "ScrWidth",
+    ""
+   ]
+  ],
+  "Pawn_Frame": [
+   [
+    "u8",
+    "Id",
+    "Animation frame data index (0-255)"
+   ],
+   [
+    "u8",
+    "Duration",
+    "Frame duration (in frame number)"
+   ],
+   [
+    "callback",
+    "Event",
+    "Event to execute at this frame"
+   ]
+  ],
+  "Pawn_Action": [
+   [
+    "const Pawn_Frame*",
+    "FrameList",
+    "Animation frames data"
+   ],
+   [
+    "u8",
+    "FrameNum",
+    "Animation frames data count"
+   ],
+   [
+    "u8",
+    "Loop",
+    "Is action looping?"
+   ],
+   [
+    "u8",
+    "Interrupt",
+    "Is action interruptable?"
+   ]
+  ],
+  "Pawn_Sprite": [
+   [
+    "u8",
+    "SpriteID",
+    "Sprite ID"
+   ],
+   [
+    "i8",
+    "OffsetX",
+    "Layer position offset..."
+   ],
+   [
+    "i8",
+    "OffsetY",
+    "...can be positive or negative"
+   ],
+   [
+    "u8",
+    "DataOffset",
+    "Data index offset"
+   ],
+   [
+    "u8",
+    "Color",
+    "Sprite color"
+   ],
+   [
+    "u8",
+    "Flag",
+    "Sprite flag"
+   ]
+  ],
+  "Pawn": [
+   [
+    "const Pawn_Sprite*",
+    "SpriteList",
+    "List of sprite layers"
+   ],
+   [
+    "u8",
+    "SpriteNum",
+    "Number of sprite layers"
+   ],
+   [
+    "u8",
+    "SpriteID",
+    "Sprite ID of the first layer (0~31)"
+   ],
+   [
+    "const Pawn_Action*",
+    "ActionList",
+    "List of actions"
+   ],
+   [
+    "PAWN_POS",
+    "PositionX",
+    "Pawn screen position"
+   ],
+   [
+    "PAWN_POS",
+    "PositionY",
+    ""
+   ],
+   [
+    "u8",
+    "ActionId",
+    "Current action id"
+   ],
+   [
+    "u8",
+    "AnimFrame",
+    "Current animation frame id"
+   ],
+   [
+    "u8",
+    "AnimStep",
+    "Current step into the animation"
+   ],
+   [
+    "u8",
+    "AnimTimer",
+    "Animation timer (into the current step)"
+   ],
+   [
+    "u8",
+    "Update",
+    "Pawn update flags"
+   ],
+   [
+    "u8",
+    "Counter",
+    "Global update counter"
+   ],
+   [
+    "const void*",
+    "PatternAddr",
+    "Pattern base address"
+   ],
+   [
+    "u8",
+    "SpriteFX",
+    "Sprite effect"
+   ],
+   [
+    "i8",
+    "MoveX",
+    "Pawn movement offset"
+   ],
+   [
+    "i8",
+    "MoveY",
+    ""
+   ],
+   [
+    "u8",
+    "BoundX",
+    "Pawn collision bound"
+   ],
+   [
+    "u8",
+    "BoundY",
+    ""
+   ],
+   [
+    "u8",
+    "PhysicsState",
+    ""
+   ],
+   [
+    "Pawn_PhysicsCB",
+    "PhysicsCB",
+    ""
+   ],
+   [
+    "Pawn_CollisionCB",
+    "CollisionCB",
+    ""
+   ]
+  ],
+  "SeqActionArea": [
+   [
+    "u8",
+    "StartX",
+    "X coordinate of the start of the area"
+   ],
+   [
+    "u8",
+    "StartY",
+    "Y coordinate of the start of the area"
+   ],
+   [
+    "u8",
+    "EndX",
+    "X coordinate of the end of the area"
+   ],
+   [
+    "u8",
+    "EndY",
+    "Y coordinate of the end of the area"
+   ]
+  ],
+  "SeqNext": [
+   [
+    "u8",
+    "Mode",
+    "Next sequence mode"
+   ],
+   [
+    "const struct Sequence*",
+    "Seq",
+    "Sequence to transition to"
+   ],
+   [
+    "u8",
+    "Frame",
+    "Transition sequence start frame"
+   ]
+  ],
+  "SeqTransition": [
+   [
+    "u8",
+    "From",
+    "Pan's frame to transition from"
+   ],
+   [
+    "const struct Sequence*",
+    "Seq",
+    "Sequence to transition to"
+   ],
+   [
+    "u8",
+    "Frame",
+    "Transition sequence start frame"
+   ]
+  ],
+  "SeqAction": [
+   [
+    "u8",
+    "Event",
+    "Action ID sent to the callback"
+   ],
+   [
+    "u8",
+    "Cursor",
+    "Cursor type (see <SEQ_CURSOR>)"
+   ],
+   [
+    "SeqCondCB",
+    "Condition",
+    "Condition check callback"
+   ],
+   [
+    "SeqTransition",
+    "Trans",
+    "Sequence to auto-start when action triggered (if Trans.Seq is not NULL)"
+   ],
+   [
+    "u8",
+    "FrameMin",
+    "Minimum frame to trigger the action"
+   ],
+   [
+    "u8",
+    "FrameMax",
+    "Maximum frame to trigger the action"
+   ],
+   [
+    "SeqActionArea",
+    "Areas[]",
+    "Action area"
+   ]
+  ],
+  "SeqKey": [
+   [
+    "u8",
+    "Time",
+    "Duration of the frame (in sequencer unit)"
+   ],
+   [
+    "u8",
+    "Frame",
+    "Frame number (relative to start)"
+   ],
+   [
+    "u8",
+    "Event",
+    "Event to be triggered at the begining of each step"
+   ]
+  ],
+  "Sequence": [
+   [
+    "u16",
+    "ID",
+    "Sequence ID"
+   ],
+   [
+    "u8",
+    "Mode",
+    "Playback mode (see <SEQ_MODE>)"
+   ],
+   [
+    "u8",
+    "FirstFrame",
+    "First frame of the sequence (or table index for timelined sequence)"
+   ],
+   [
+    "u8",
+    "LastFrame",
+    "Last frame of the sequence (or number of entries for timelined sequence)"
+   ],
+   [
+    "u8",
+    "StartEvent",
+    "Event triggered when sequence starts"
+   ],
+   [
+    "u8",
+    "EndEvent",
+    "Event triggered when sequence ends or loops"
+   ],
+   [
+    "SeqNext",
+    "Next",
+    "Sequence to be played after this one (if Next.Seq is not NULL)"
+   ],
+   [
+    "const SeqAction* const",
+    "Actions[]",
+    "NULL-terminated list of actions"
+   ]
+  ],
+  "MGLV_Header": [
+   [
+    "u8",
+    "Sign[3]",
+    ""
+   ],
+   [
+    "u8",
+    "Flag",
+    ""
+   ],
+   [
+    "u8",
+    "Image",
+    ""
+   ],
+   [
+    "u8",
+    "Replay",
+    ""
+   ],
+   [
+    "u8",
+    "Width",
+    ""
+   ],
+   [
+    "u8",
+    "Height",
+    ""
+   ]
+  ],
+  "CMSXi_Header": [
+   [
+    "unsigned short",
+    "sizeX",
+    "Width of each image"
+   ],
+   [
+    "unsigned short",
+    "sizeY",
+    "Height of each image"
+   ],
+   [
+    "unsigned short",
+    "numX",
+    "Number of columns of images"
+   ],
+   [
+    "unsigned short",
+    "numY",
+    "Number of rows of images"
+   ],
+   [
+    "unsigned char",
+    "bpc",
+    "Bits-per-colors"
+   ],
+   [
+    "unsigned char",
+    "comp",
+    "Compressor ID @see CMSXi_Compressor"
+   ],
+   [
+    "unsigned char",
+    "bSkipEmpty",
+    "Tell is empty blocks have been skipped or not"
+   ]
+  ],
+  "CMSXi_Font": [
+   [
+    "unsigned char",
+    "dataSize",
+    "Data size [x|y]"
+   ],
+   [
+    "unsigned char",
+    "fontSize",
+    "Font size [x|y]"
+   ],
+   [
+    "unsigned char",
+    "firstChr",
+    "First character ASCII code"
+   ],
+   [
+    "unsigned char",
+    "lastChe",
+    "Last character ASCII code"
+   ]
+  ],
+  "MSXi_UnpackParam": [
+   [
+    "void*",
+    "Source",
+    ""
+   ],
+   [
+    "u16",
+    "DestX",
+    ""
+   ],
+   [
+    "u16",
+    "DestY",
+    ""
+   ],
+   [
+    "u8",
+    "SizeX",
+    ""
+   ],
+   [
+    "u8",
+    "SizeY",
+    ""
+   ],
+   [
+    "u8",
+    "NumX",
+    ""
+   ],
+   [
+    "u8",
+    "NumY",
+    ""
+   ],
+   [
+    "u8",
+    "Compressor",
+    "< The decompressor to use. @see MSXi_Compressor"
+   ],
+   [
+    "u8",
+    "Destination : 1",
+    "< Destination"
+   ],
+   [
+    "u8",
+    "SourceBPC   : 2",
+    "< Source bits-per-colors (0 = 1-bit, 1 = 2-bits, 2 = 4-bits, 3 = 8-bits)"
+   ],
+   [
+    "u8",
+    "DestBPC     : 2",
+    "< Destination bits-per-colors (0 = 1-bit, 1 = 2-bits, 2 = 4-bits, 3 = 8-bits)"
+   ],
+   [
+    "u8",
+    "_unused1    : 3",
+    ""
+   ],
+   [
+    "u8*",
+    "ColorReplace",
+    "< Color replacement (format = { num, c1_from, c1_to, c2_from, c2_to, ... })"
+   ]
+  ],
+  "NDP_WorkArea": [
+   [
+    "u16",
+    "PlayDataAddr",
+    "+0 1\t演奏データ読み込みアドレス"
+   ],
+   [
+    "u8",
+    "NoteNumber",
+    "+2\tノート番号"
+   ],
+   [
+    "u8",
+    "Volume",
+    "+3\t設定音量 (0=v15, 1=V14, 2=V13 … 15=v0)"
+   ],
+   [
+    "u8",
+    "NoteLenCnt",
+    "+4\t音長カウンタ"
+   ],
+   [
+    "u8",
+    "NoteLenExt",
+    "+5\t次の1バイトも音長かどうか"
+   ],
+   [
+    "u8",
+    "ToneNumber",
+    "+6\t音色番号 (90～9FHの場合はハードエンベ番号)"
+   ],
+   [
+    "u8",
+    "Legato",
+    "+7\tレガート"
+   ],
+   [
+    "u8",
+    "Sustain",
+    "+8\tサスティン"
+   ],
+   [
+    "u8",
+    "QuantizeQ",
+    "+9\tQ(クオンタイズ)の値"
+   ],
+   [
+    "u8",
+    "ChannelState",
+    "+10\tチャンネル有効/無効 0=無効 1=有効 2=効果音発音中 3～255=一時ミュート(フレーム数)"
+   ],
+   [
+    "u8",
+    "PitchEnvNum",
+    "+11\tピッチエンベ番号 (bit7=ピッチを戻す？ bit6=ピッチ更新する？ bit5=元音程からの相対値？)"
+   ],
+   [
+    "u8",
+    "LegatoCheck",
+    "+12\tレガート確認用フラグ（+7のレガート設定の値が1音あとに入る）"
+   ],
+   [
+    "u16",
+    "CurrentPitch",
+    "+13 14\t発音中の音程（レジスタ値）"
+   ],
+   [
+    "u8",
+    "CurrentVolume",
+    "+15\t発音中の音量"
+   ],
+   [
+    "u16",
+    "SoftEnvPtr",
+    "+16 17\tソフトエンベロープポインタ / ハードエンベ音量半減カウンタ"
+   ],
+   [
+    "u8",
+    "SoftEnvWait",
+    "+18\tソフトエンベロープウェイトカウンタ"
+   ],
+   [
+    "u16",
+    "Detune",
+    "+19 20\tデチューン"
+   ],
+   [
+    "u16",
+    "PitchEnvPtr",
+    "+21 22\tピッチエンベロープポインタ"
+   ],
+   [
+    "u8",
+    "PitchEnvDelay",
+    "+23\tピッチエンベロープディレイカウンタ"
+   ],
+   [
+    "u8",
+    "ReleaseVolume",
+    "+24\tリリース音量"
+   ],
+   [
+    "u8",
+    "ReleaseSet",
+    "+25\tリリースカウンタ設定値"
+   ],
+   [
+    "u8",
+    "ReleaseCnt",
+    "+26\tリリースカウンタ"
+   ],
+   [
+    "u16",
+    "ReleasePitch",
+    "+27 28\tリリースディレイ用ピッチ"
+   ],
+   [
+    "u8",
+    "ReleaseDelay",
+    "+29\tリリースディレイ用スイッチ兼指定フレーム数"
+   ],
+   [
+    "u8",
+    "ReleaseVolSet",
+    "+30\tリリース音量設定"
+   ],
+   [
+    "u8",
+    "KeyOnPitchUpd",
+    "+31\tキーオン時の音程レジスタ更新フラグ"
+   ],
+   [
+    "u8",
+    "RepeatNest",
+    "+32\tリピートネスト数"
+   ],
+   [
+    "u8",
+    "PortaAddFrac",
+    "+33\tポルタメント加算値(小数)"
+   ],
+   [
+    "u8",
+    "PortaAdd",
+    "+34\tポルタメント加算値"
+   ],
+   [
+    "u16",
+    "PortaPitch",
+    "+35 36\tポルタメント用の現在音程 (13-14に向かって加減算)"
+   ],
+   [
+    "u8",
+    "PortaSetFrac",
+    "+37\tポルタメント設定値(小数)"
+   ],
+   [
+    "u8",
+    "PortaSet",
+    "+38\tポルタメント設定値兼スイッチ (0=OFF)"
+   ],
+   [
+    "u8",
+    "PortaOnce",
+    "+39\tポルタメント単発フラグ"
+   ],
+   [
+    "u8",
+    "QuantizeQ2",
+    "+40\t@Q(後ろを削るクオンタイズ)の値"
+   ],
+   [
+    "u8",
+    "PrevNote",
+    "+41\tキーオン直前のノート番号（リリースディレイ用）"
+   ],
+   [
+    "u8",
+    "VolIntervalSet",
+    "+42\t音量インターバル設定値"
+   ],
+   [
+    "u8",
+    "NoteEnvNum",
+    "+43\tノートエンベ番号"
+   ],
+   [
+    "u16",
+    "NoteEnvPtr",
+    "+44 45\tノートエンベロープポインタ"
+   ],
+   [
+    "u8",
+    "NoteEnvWait",
+    "+46\tノートエンベロープウェイトカウンタ"
+   ],
+   [
+    "u8",
+    "VolIntervalCnt",
+    "+47\t音量インターバルのカウンタ"
+   ],
+   [
+    "u8",
+    "VolIntervalVol",
+    "+48\t音量インターバルの音量値"
+   ],
+   [
+    "u16",
+    "PrevDetune",
+    "+49 50\t前回のデチューン値"
+   ],
+   [
+    "u8",
+    "ReleaseDelayCnt",
+    "+51\tリリースディレイ用カウンタ"
+   ],
+   [
+    "u8",
+    "GateTime",
+    "+52\tゲートタイム (Qから計算してキーオン時に設定)"
+   ],
+   [
+    "u8",
+    "ReleaseSkipCnt",
+    "+53\tリリースディレイスキップ用カウンタ"
+   ],
+   [
+    "u16",
+    "PrePitchEnv",
+    "+54 55\tピッチエンベ適用前の音程（レジスタ値）"
+   ],
+   [
+    "u8",
+    "VolIntervalEnd",
+    "+56\t音量インターバル到達値"
+   ],
+   [
+    "u8",
+    "FixedGateTime",
+    "+57\t固定ゲートタイム"
+   ],
+   [
+    "u8",
+    "ParamBackup",
+    "+58\tパラメータの退避領域"
+   ],
+   [
+    "u8",
+    "ReleaseActive",
+    "+59\tリリースディレイ発動フラグ"
+   ],
+   [
+    "u8",
+    "MixMode",
+    "+60\t*n（ミックスモード）の値"
+   ]
+  ],
+  "EtherHeader": [
+   [
+    "u8",
+    "Dest[6]",
+    ""
+   ],
+   [
+    "u8",
+    "Source[6]",
+    ""
+   ],
+   [
+    "u16",
+    "Type",
+    "!\\ Big endian"
+   ]
+  ],
+  "EtherHeaderIEEE": [
+   [
+    "u8",
+    "Dest[6]",
+    ""
+   ],
+   [
+    "u8",
+    "Source[6]",
+    ""
+   ],
+   [
+    "u16",
+    "Length",
+    "!\\ Big endian"
+   ],
+   [
+    "u8",
+    "Payload[6]",
+    ""
+   ],
+   [
+    "u16",
+    "Type",
+    "!\\ Big endian"
+   ]
+  ],
+  "ONET_PacketInfo": [
+   [
+    "u16",
+    "Size",
+    ""
+   ],
+   [
+    "u16",
+    "Head",
+    ""
+   ]
+  ],
+  "tcpip_unapi_capab_flags_llproto": [
+   [
+    "char",
+    "proto_used",
+    "Link level protocol used"
+   ],
+   [
+    "int",
+    "feat_flags",
+    "Features flags"
+   ],
+   [
+    "int",
+    "capab_flags",
+    "Capabilities flags"
+   ]
+  ],
+  "tcpip_unapi_capab_connections": [
+   [
+    "char",
+    "max_tcp_conn",
+    "Maximum simultaneous TCP connections supported"
+   ],
+   [
+    "char",
+    "max_udp_conn",
+    "Maximum simultaneous UDP connections supported"
+   ],
+   [
+    "char",
+    "max_raw_conn",
+    "Maximum simultaneous raw IP connections supported"
+   ],
+   [
+    "char",
+    "free_tcp_conn",
+    "Free TCP connections currently available"
+   ],
+   [
+    "char",
+    "free_udp_conn",
+    "Free UDP connections currently available"
+   ],
+   [
+    "char",
+    "free_raw_conn",
+    "Free raw IP connections currently available"
+   ]
+  ],
+  "tcpip_unapi_capab_dtg_sizes": [
+   [
+    "int",
+    "max_outgoing_dtg_size",
+    "Maximum outgoing datagram size supported"
+   ],
+   [
+    "int",
+    "max_incoming_dtg_size",
+    "Maximum incoming datagram size supported"
+   ]
+  ],
+  "tcpip_unapi_ip_info": [
+   [
+    "char",
+    "local_ip[4]",
+    "Local IP address"
+   ],
+   [
+    "char",
+    "peer_ip[4]",
+    "Peer IP address"
+   ],
+   [
+    "char",
+    "subnet_mask[4]",
+    "Subnet mask"
+   ],
+   [
+    "char",
+    "gateway_ip[4]",
+    "Default gateway"
+   ],
+   [
+    "char",
+    "dns_ip_pri[4]",
+    "Primary DNS server IP address"
+   ],
+   [
+    "char",
+    "dns_ip_sec[4]",
+    "Secondary DNS server IP address"
+   ]
+  ],
+  "tcpip_unapi_echo": [
+   [
+    "char",
+    "dest_ip[4]",
+    "+0 (4): IP address of the destination machine"
+   ],
+   [
+    "char",
+    "ttl",
+    "+4 (1): TTL for the datagram"
+   ],
+   [
+    "int",
+    "icmp_id",
+    "+5 (2): ICMP identifier"
+   ],
+   [
+    "int",
+    "seq_number",
+    "+7 (2): ICMP sequence number"
+   ],
+   [
+    "int",
+    "data_length",
+    "+9 (2): Data length, 0 to maximum datagram size - 28"
+   ]
+  ],
+  "tcpip_unapi_dns_q": [
+   [
+    "char",
+    "flags",
+    ""
+   ],
+   [
+    "char",
+    "state",
+    "note that state (reg B) and substate (reg C) have different meaning for tcpip_dns_q"
+   ],
+   [
+    "char",
+    "substate",
+    "and tcpip_dns_s. Please refer to the UNAPI description for more information"
+   ],
+   [
+    "char",
+    "host_ip[4]",
+    "Resolved IP address (only if no error occurred and state of 1 or 2 is returned)"
+   ]
+  ],
+  "tcpip_unapi_udp_state": [
+   [
+    "char",
+    "num_of_pend_dtg",
+    "Number of pending incoming datagrams"
+   ],
+   [
+    "int",
+    "size_of_oldest_dtg",
+    "Size of oldest pending incoming datagram (data part only)"
+   ],
+   [
+    "int",
+    "port_number",
+    "Local port number"
+   ]
+  ],
+  "tcpip_unapi_udp_dtg_parms": [
+   [
+    "char",
+    "dest_ip[4]",
+    "+0 (4): Destination IP address"
+   ],
+   [
+    "int",
+    "dest_port",
+    "+4 (2): Destination port"
+   ],
+   [
+    "int",
+    "data_length",
+    "+6 (2): Data length to send or actual data length when receiving)"
+   ]
+  ],
+  "tcpip_unapi_tcp_conn_parms": [
+   [
+    "char",
+    "dest_ip[4]",
+    "+0 (4): Remote IP address (0.0.0.0 for unespecified remote socket)"
+   ],
+   [
+    "int",
+    "dest_port",
+    "+4 (2): Remote port (ignored if unespecified remote socket)"
+   ],
+   [
+    "int",
+    "local_port",
+    "+6 (2): Local port, 0FFFFh for a random value"
+   ],
+   [
+    "int",
+    "user_timeout",
+    "+8 (2): Suggestion for user timeout value"
+   ],
+   [
+    "char",
+    "flags",
+    "+10 (1): Flags"
+   ],
+   [
+    "char",
+    "conn_state",
+    "+11 (1): Connection state updated by TCPIP_TCP_STATE"
+   ],
+   [
+    "char",
+    "close_reason",
+    "+12 (1): Close reason (only if ERR_NO_CONN is returned) by TCPIP_TCP_STATE"
+   ],
+   [
+    "int",
+    "incoming_bytes",
+    "+13 (2): Number of total available incoming bytes updated by TCPIP_TCP_STATE and TCPIP_TCP_RCV"
+   ],
+   [
+    "int",
+    "urgent_incoming_bytes",
+    "+15 (2): Number of urgent available incoming bytes updated by TCPIP_TCP_STATE and TCPIP_TCP_RCV"
+   ],
+   [
+    "int",
+    "send_free_bytes",
+    "+17 (2): Available free space in the output buffer (0FFFFh = infinite) updated by TCPIP_TCP_STATE"
+   ]
+  ],
+  "tcpip_unapi_ipraw_parms": [
+   [
+    "char",
+    "ip[4]",
+    "+0 (4): Destination IP address"
+   ],
+   [
+    "int",
+    "data_length",
+    "+4 (2): Data length"
+   ]
+  ],
+  "tcpip_unapi_ipraw_state": [
+   [
+    "char",
+    "proto_code",
+    "+0 (1): Associated protocol code"
+   ],
+   [
+    "int",
+    "num_of_pend_dtg",
+    "+2 (2): Number of pending incoming datagrams"
+   ],
+   [
+    "int",
+    "size_of_oldest_dtg",
+    "+4 (2): Size of the oldest pending incoming datagram"
+   ]
+  ],
+  "QRCode_Segment": [
+   [
+    "enum QRCODE_MODE",
+    "mode",
+    ""
+   ],
+   [
+    "i16",
+    "numChars",
+    ""
+   ],
+   [
+    "i16",
+    "bitLength",
+    ""
+   ]
+  ],
+  "Registers": [
+   [
+    "u16",
+    "IX",
+    ""
+   ],
+   [
+    "u16",
+    "IY",
+    ""
+   ],
+   [
+    "u16",
+    "HL",
+    ""
+   ],
+   [
+    "u16",
+    "DE",
+    ""
+   ],
+   [
+    "u16",
+    "BC",
+    ""
+   ],
+   [
+    "u8",
+    "A",
+    ""
+   ]
+  ],
+  "TCL_Data": [
+   [
+    "c8*",
+    "Output",
+    "offset + 0"
+   ],
+   [
+    "u16",
+    "OutputSize",
+    "offset + 2"
+   ],
+   [
+    "c8*",
+    "Input",
+    "offset + 4"
+   ],
+   [
+    "u16",
+    "InputMax",
+    "offset + 6"
+   ],
+   [
+    "u16",
+    "InputSize",
+    "offset + 8"
+   ],
+   [
+    "i8",
+    "Status",
+    "offset + 10"
+   ]
+  ],
+  "LVGM_Header": [
+   [
+    "u8",
+    "Ident[4]",
+    "'lVGM'"
+   ],
+   [
+    "u8",
+    "Option",
+    "see <LVGM_OPTION>"
+   ],
+   [
+    "u8",
+    "Device",
+    "see <LVGM_CHIP>"
+   ]
+  ],
+  "VGM_Header": [
+   [
+    "u32",
+    "Ident",
+    ""
+   ],
+   [
+    "u32",
+    "YM2413_clock",
+    ""
+   ],
+   [
+    "u32",
+    "Loop_samples",
+    ""
+   ],
+   [
+    "u8",
+    "SNW",
+    ""
+   ],
+   [
+    "u8",
+    "SF",
+    ""
+   ],
+   [
+    "u32",
+    "YM2151_clock",
+    ""
+   ],
+   [
+    "u32",
+    "RF5C68_clock",
+    ""
+   ],
+   [
+    "u32",
+    "YM3812_clock",
+    ""
+   ],
+   [
+    "u32",
+    "YMF278B_clock",
+    ""
+   ],
+   [
+    "u32",
+    "PWM_clock",
+    ""
+   ],
+   [
+    "u8",
+    "AY_Flags[3]",
+    ""
+   ],
+   [
+    "u8",
+    "dummy7D",
+    ""
+   ],
+   [
+    "u8",
+    "LB",
+    ""
+   ],
+   [
+    "u8",
+    "LM",
+    ""
+   ],
+   [
+    "u32",
+    "GB_DMG_clock",
+    ""
+   ],
+   [
+    "u32",
+    "OKIM6258_clock",
+    ""
+   ],
+   [
+    "u8",
+    "KF",
+    ""
+   ],
+   [
+    "u8",
+    "CF",
+    ""
+   ],
+   [
+    "u8",
+    "dummy97",
+    ""
+   ],
+   [
+    "u32",
+    "K054539_clock",
+    ""
+   ],
+   [
+    "u32",
+    "Pokey_clock",
+    ""
+   ],
+   [
+    "u32",
+    "WonderSwan_clock",
+    ""
+   ],
+   [
+    "u32",
+    "ES5506_clock",
+    ""
+   ],
+   [
+    "u8",
+    "CD",
+    ""
+   ],
+   [
+    "u8",
+    "dummyD7",
+    ""
+   ],
+   [
+    "u32",
+    "GA20_clock",
+    ""
+   ],
+   [
+    "u32",
+    "dummyF0",
+    ""
+   ]
+  ]
+ }
 }

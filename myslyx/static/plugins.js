@@ -32,16 +32,31 @@
             return !!val;
         },
 
-        // A plugin runs for its declared languages (the current file's language
-        // as tracked by the server in window.__wbCurrentLang). '*' = all.
+        // A plugin runs for its declared languages and/or its base language
+        // (window.__wbBaseLang). Two orthogonal scopes:
+        //   - "languages" scopes to the exact languages (the LANGUAGES keys
+        //     from editor_page.py, e.g. "C", "C MSXgl");
+        //   - "baseLang" scopes to any language sharing a base (e.g. "c"
+        //     covers both plain C and the MSXgl C framework, and any future
+        //     C-derived language). '*' = all.
+        // An absent filter passes; when both are declared they both must match.
         _langOk: function(def) {
-            var langs = def.languages;
-            if (!langs || langs.indexOf('*') >= 0) return true;
             var cur = window.__wbCurrentLang || 'Text';
-            if (langs.indexOf(cur) >= 0) return true;
-            // "HitBasic" superseded the "VBScript" stored id; keep plugin
-            // manifests written for the old id matching HitBasic files too.
-            return cur === 'HitBasic' && langs.indexOf('VBScript') >= 0;
+            var langs = def.languages;
+            if (langs && langs.indexOf('*') < 0) {
+                if (langs.indexOf(cur) < 0
+                    // "HitBasic" superseded the "VBScript" stored id; keep
+                    // plugin manifests written for the old id matching too.
+                    && !(cur === 'HitBasic' && langs.indexOf('VBScript') >= 0)) {
+                    return false;
+                }
+            }
+            var bases = def.baseLang;
+            if (bases && bases.length) {
+                var base = window.__wbBaseLang || 'text';
+                if (bases.indexOf(base) < 0) return false;
+            }
+            return true;
         },
 
         // Attach the enabled plugins' extensions to a CodeMirror view. Runs once

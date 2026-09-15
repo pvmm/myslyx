@@ -30,6 +30,9 @@ META_PLUGINS = [
     ('lazy-swatches', 'orange', {'enabledByDefault': False}),
     # Only applies to C files (languages:["C"]).
     ('c-swatches', 'cyan', {'languages': ['C']}),
+    # Applies to every C-based language via the shared base-language attribute
+    # (baseLang:["c"] covers plain C, C MSXgl and any future C derivative).
+    ('base-c-swatches', 'magenta', {'baseLang': ['c']}),
 ]
 
 
@@ -102,7 +105,7 @@ async def _render_state(page) -> dict:
     """Count the color widgets rendered by user plugins in the active editor."""
     return await page.evaluate(
         """() => window.WBEditorActive.current(3000).then(v => {
-            const out = { red: 0, green: 0, orange: 0, cyan: 0 };
+            const out = { red: 0, green: 0, orange: 0, cyan: 0, magenta: 0 };
             if (!v) return out;
             v.contentDOM.querySelectorAll('.cm-line span').forEach(s => {
                 const c = getComputedStyle(s).backgroundColor;
@@ -110,6 +113,7 @@ async def _render_state(page) -> dict:
                 if (c === 'rgb(0, 128, 0)') out.green++;
                 if (c === 'rgb(255, 165, 0)') out.orange++;
                 if (c === 'rgb(0, 255, 255)') out.cyan++;
+                if (c === 'rgb(255, 0, 255)') out.magenta++;
             });
             return out;
         })""")
@@ -257,9 +261,61 @@ async def plugin_language_filter(page, msgs):
     assert msgs == []
 
 
+async def plugin_base_language_filter(page, msgs):
+    """A user plugin scoped on baseLang:['c'] covers every C-based language.
+
+    The generic base-language axis means a plugin declares the shared family
+    it belongs to, not an exhaustive list of languages: plain C and the MSXgl
+    C framework both match 'c', and any future C-derived language would too.
+    """
+    await page.evaluate("""() => {
+        const cfg = WBStorage.loadConfig();
+        cfg.plugins = {};
+        WBStorage.saveConfig(cfg);
+    }""")
+    await page.reload(wait_until='load')
+    await page.wait_for_selector('.wb-file-tab', timeout=20000)
+    # New files default to HitBasic (base 'basic') -> the C-base plugin must
+    # not install or render there.
+    await h.new_file(page, 2)
+    await page.keyboard.type('#00ffff')
+    colors = await _wait_render(page, lambda c: c['red'] >= 1 and c['green'] >= 1)
+    assert colors['magenta'] == 0, f'base-c-swatches must not render in HitBasic: {colors}'
+
+    # Import a C source file -> baseLanguage 'c' installs the plugin.
+    before = await page.evaluate("document.querySelectorAll('.wb-file-tab').length")
+    await page.evaluate("""() => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['int main(void){return 0;}'], 'prog.c', {type: 'text/plain'}));
+        const ev = new Event('drop', {bubbles: true, cancelable: true});
+        try { Object.defineProperty(ev, 'dataTransfer', {value: dt}); } catch(e) { ev.dataTransfer = dt; }
+        document.dispatchEvent(ev);
+    }""")
+    await page.wait_for_function(
+        f"document.querySelectorAll('.wb-file-tab').length > {before}",
+        timeout=15000)
+    await h.doc_equals(page, 'int main(void){return 0;}')
+    await h.active_cm(page).click()
+    await page.keyboard.type('#00ffff')
+    colors = await _wait_render(page, lambda c: c['magenta'] >= 1)
+    assert colors['magenta'] >= 1, f'base-c-swatches must render in a C file: {colors}'
+
+    # Switching that (already installed) view to C MSXgl — still base 'c' —
+    # keeps the plugin active.
+    await page.keyboard.press('Control+End')
+    await page.keyboard.type('#00ff00')
+    await h.set_language(page, 'C+MSXgl')
+    await page.wait_for_function("window.__wbBaseLang === 'c'")
+    await page.keyboard.type('#00ff00')
+    colors = await _wait_render(page, lambda c: c['magenta'] >= 1)
+    assert colors['magenta'] >= 1, f'base-c-swatches must still render in C MSXgl: {colors}'
+    assert msgs == []
+
+
 PLUGIN_SUITES = [
     ('plugins/user-installed', user_installed_plugins),
     ('plugins/disable-via-config', plugin_disable_via_config),
     ('plugins/lazy-disabled-by-default', plugin_lazy_disabled_by_default),
     ('plugins/language-filter', plugin_language_filter),
+    ('plugins/base-language-filter', plugin_base_language_filter),
 ]

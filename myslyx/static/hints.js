@@ -7,6 +7,31 @@
 
     var HINTS_CONTENT_ID = 'hints-content';
 
+    // ===== External completion providers =====
+    // Plugins can register providers that supply autocomplete matches instead
+    // of (or in addition to) the built-in keyword/builtin/type lists — e.g. a
+    // C plugin completing struct members after "." / "->". A provider is a
+    // function (context, hints) returning an array of {label, detail} matches
+    // to show, or null to fall through to the default sources. Registration is
+    // idempotent by name (plugin module factories can run once per editor).
+
+    window.WBHintCompletions = window.WBHintCompletions || (function() {
+        var providers = [];
+        return {
+            providers: providers,
+            register: function(name, fn) {
+                if (typeof name !== 'string' || typeof fn !== 'function') return;
+                for (var i = 0; i < providers.length; i++) {
+                    if (providers[i].name === name) {
+                        providers[i].fn = fn;
+                        return;
+                    }
+                }
+                providers.push({ name: name, fn: fn });
+            }
+        };
+    })();
+
     // ===== Markdown rendering =====
 
     // Real HTML tags the hints render on purpose (root <details> sections, ...).
@@ -603,6 +628,36 @@
         var state = view.state;
         var wordInfo = getWord(state, state.selection.main.head);
         var word = wordInfo.word;
+
+        // Plugins may supply completions (e.g. struct members after "." / "->"),
+        // even when the word itself is empty. The first provider that returns a
+        // non-null array wins; [] means "show nothing", null falls through.
+        var providers = window.WBHintCompletions && window.WBHintCompletions.providers;
+        if (providers) {
+            for (var i = 0; i < providers.length; i++) {
+                var result;
+                try {
+                    result = providers[i].fn({
+                        view: view,
+                        word: word,
+                        line: wordInfo.lineText,
+                        col: state.selection.main.head - wordInfo.line.from,
+                        start: wordInfo.start
+                    });
+                } catch (e) {
+                    result = null;
+                }
+                if (result !== null) {
+                    if (result.length > 0) {
+                        showPopup(result, wordInfo.line.from + wordInfo.start);
+                    } else {
+                        removePopup();
+                    }
+                    return;
+                }
+            }
+        }
+
         if (!word) { removePopup(); return; }
 
         WBHints.get(getHintKey()).then(function(hints) {
@@ -704,6 +759,10 @@
             tryHook();
         } catch(e) {}
     });
+
+    // A provider (e.g. the c-struct-complete plugin) signals that external
+    // data it needed asynchronously has arrived; re-run the completion check.
+    window.addEventListener('wb-hints-ready', scheduleCompletions);
 
     // F2 reloads the current language's root page.
     document.addEventListener('keydown', function(e) {

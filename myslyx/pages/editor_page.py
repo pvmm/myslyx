@@ -131,6 +131,20 @@ HINT_KEYS: dict[str, str] = {
     'Text': 'plaintext',
 }
 
+# Base-language attribute: the normalized family/dialect a language belongs
+# to, shared by every variant of the same base (plain C and the MSXgl C
+# framework both are 'c'). Plugins scope on this with "baseLang": ["c"] so a
+# future C-derived framework only needs entries here (and in LANGUAGES) to be
+# picked up automatically.
+BASE_LANG: dict[str, str] = {
+    'HitBasic': 'basic',
+    'Pascal': 'pascal',
+    'C': 'c',
+    'C MSXgl': 'c',
+    'Z80': 'asm',
+    'Text': 'text',
+}
+
 # Editor font choices (CSS font-family values)
 FONTS: dict[str, str] = {
     'Press Start 2P': 'Press Start 2P',
@@ -163,6 +177,9 @@ def _plugin_metadata(plugin_dir: Path) -> dict[str, Any] | None:
             extra = json.loads(meta_file.read_text())
             if isinstance(extra.get('languages'), list):
                 meta['languages'] = extra['languages']
+            bl = extra.get('baseLang')
+            if isinstance(bl, str) or isinstance(bl, list):
+                meta['baseLang'] = bl
             if isinstance(extra.get('enabledByDefault'), bool):
                 meta['enabledByDefault'] = extra['enabledByDefault']
             # "boot": load and run the module factory at page startup so global
@@ -652,6 +669,7 @@ def editor_page() -> None:
             f'window.__wbHintKey = {json.dumps(HINT_KEYS.get(cm_lang, "plaintext"))};'
             f'window.__wbActiveFid = {json.dumps(fid)};' 
             f'window.__wbEditorId = {json.dumps(ed.id)};'
+            f'window.__wbBaseLang = {json.dumps(BASE_LANG.get(cm_lang, "text"))};'
         )
         status_lang.set_text(LANGUAGES.get(cm_lang, cm_lang))
         ui.run_javascript(f'''
@@ -787,6 +805,7 @@ def editor_page() -> None:
                 ed.set_language(_cm_mode(language))
         ui.run_javascript(f'window.__wbHintKey = {json.dumps(HINT_KEYS.get(language, "plaintext"))};')
         ui.run_javascript(f'window.__wbCurrentLang = {json.dumps(language)};')
+        ui.run_javascript(f'window.__wbBaseLang = {json.dumps(BASE_LANG.get(language, "text"))};')
         status_lang.set_text(LANGUAGES.get(language, language))
         ui.run_javascript(f'''
             (function() {{

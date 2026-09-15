@@ -97,15 +97,54 @@ default) and can be used to read options that live in the shared client config.
 
 ```json
 {
-    "languages": ["VBScript"],
-    "enabledByDefault": false
+    "languages": ["C MSXgl"],
+    "baseLang": ["c"],
+    "enabledByDefault": false,
+    "boot": true
 }
 ```
 
-- `languages` — restrict the plugin to specific file languages (values from the
-  language dropdown: `VBScript`, `Pascal`, `C`, `Z80`, `Text`). Default: all.
+- `languages` — a list of file-language ids (the `LANGUAGES` keys in
+  `pages/editor_page.py`: `HitBasic`, `Pascal`, `C`, `C MSXgl`, `Z80`,
+  `Text`; `"*"` = all). Present and empty means *all* languages.
+- `baseLang` — a list of **base-language family** ids. The editor publishes
+  `window.__wbBaseLang` alongside the current language: `HitBasic` -> `basic`,
+  `Pascal` -> `pascal`, `C` and `C MSXgl` -> `c`, `Z80` -> `asm`, `Text` ->
+  `text`. A generic plugin declares `"baseLang": ["c"]` and runs for **every**
+  C-derived language — plain C, the MSXgl framework, and any future one —
+  with no manifest updates. `languages` and `baseLang` are two independent
+  scopes: when both are declared they must *both* match (AND); `"*"` / absent
+  always matches. Internally this is `WBPlugins._langOk()`.
 - `enabledByDefault` — whether the plugin is on until the user disables it.
   Default: `true`.
+- `boot` — load the module and run its factory once at page startup (global
+  side effects before any editor exists). The factory must be idempotent; the
+  per-view install re-runs it for actual extensions.
+
+> Legacy id: a plugin whose `languages` says `"VBScript"` (the pre-rename
+> BASIC id) also runs on `HitBasic` files.
+
+### Contributing autocomplete suggestions
+
+The editor's autocomplete popup normally serves keywords/builtins from the
+hints JSON. Plugins can add their own suggestions by registering a provider
+on `window.WBHintCompletions` (boot plugins do this once at startup):
+
+```js
+window.WBHintCompletions.register('my-completions', function(ctx) {
+    // ctx: { view, word, line, col, start }
+    //   null  -> let the default keyword/builtin path handle this keystroke;
+    //   []    -> show nothing;
+    //   [{ label, detail?, apply? }] -> show a popup.
+});
+```
+
+`static/hints.js` consults providers first; the first non-null array wins.
+`apply` is an optional string that replaces the typed word (for example a
+complete `cmd.length` inserted over `cmd.`). Hint data can load asynchronously
+(`window.WBHints.get(key)`): once loaded, dispatch `wb-hints-ready` on
+`window` and hints.js re-runs the completion check automatically. The bundled
+`c-struct-complete` plugin is the reference implementation.
 
 ---
 

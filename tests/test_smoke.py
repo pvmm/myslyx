@@ -1061,6 +1061,114 @@ async def storage_pool_hardened(page, msgs):
     assert msgs == []
 
 
+async def base_lang_tracks_language_family(page, msgs):
+    # The server publishes a base-language attribute shared by every variant
+    # of a language family: plain C and the MSXgl C framework are both 'c', so
+    # generic base-language plugins (baseLang: ["c"]) light up for both.
+    await h.new_file(page, 2)
+    await h.set_language(page, 'C')
+    await page.wait_for_function("window.__wbBaseLang === 'c'")
+    await page.wait_for_function("window.__wbCurrentLang === 'C'")
+    await h.set_language(page, 'C+MSXgl')
+    await page.wait_for_function("window.__wbBaseLang === 'c'")
+    await page.wait_for_function("window.__wbCurrentLang === 'C MSXgl'")
+    await h.set_language(page, 'HitBasic')
+    await page.wait_for_function("window.__wbBaseLang === 'basic'")
+    await page.wait_for_function("window.__wbCurrentLang === 'HitBasic'")
+    assert msgs == []
+
+
+async def c_struct_member_complete(page, msgs):
+    # The bundled c-struct-complete plugin autocompletes struct members after
+    # "." / "->" from in-file definitions (plain C exercises the model without
+    # any framework hints data).
+    snippet = ('typedef struct { u8 x; u8 y; } Point;\n'
+               'Point p;\n'
+               'Point * pp;\n'
+               'Point p2, p3;\n')
+    await h.new_file(page, 2)
+    await h.set_language(page, 'C')
+    # The plugin ships enabled by default; make that explicit so the suite is
+    # independent of plugin config left behind by earlier suites (same origin).
+    await page.evaluate("""() => {
+        const cfg = window.WBStorage.loadConfig();
+        cfg.plugins = cfg.plugins || {};
+        cfg.plugins['c-struct-complete'] = true;
+        window.WBStorage.saveConfig(cfg);
+    }""")
+    await h.focus_active_editor(page)
+    await page.evaluate("""(text) => window.WBEditorActive.current(3000).then(v => {
+        v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: text } });
+        return true;
+    })""", snippet)
+    await h.doc_equals(page, snippet)
+    await page.keyboard.press('Control+End')
+    await page.keyboard.type('p.')
+    await page.wait_for_selector('.wb-autocomplete-popup', timeout=15000)
+    labels = await page.evaluate("""() => Array.from(
+        document.querySelectorAll('.wb-autocomplete-popup > div'))
+        .map(e => e.firstChild ? e.firstChild.textContent : '')""")
+    assert labels == ['x', 'y'], f'expected [x, y] after "p.", got {labels}'
+    details = await page.evaluate("""() => Array.from(
+        document.querySelectorAll('.wb-autocomplete-popup > div'))
+        .map(e => e.lastChild ? e.lastChild.textContent : '')""")
+    assert details == ['u8', 'u8'], f'expected field types as detail, got {details}'
+    # Prefix filtering while typing a member name.
+    await page.keyboard.press('Escape')
+    await page.keyboard.type('x')
+    await page.wait_for_function("""() => {
+        const d = document.querySelector('.wb-autocomplete-popup > div');
+        return !!d && d.firstChild.textContent === 'x';
+    }""", timeout=5000)
+    n = await page.evaluate("document.querySelectorAll('.wb-autocomplete-popup > div').length")
+    assert n == 1, f'prefix filter must narrow to one field, got {n}'
+    # Enter inserts the member (replacing the partial word).
+    await page.keyboard.press('Enter')
+    await page.wait_for_function("""() => new Promise(res => {
+        window.WBEditorActive.current(3000).then(v =>
+            res(v.state.doc.toString().endsWith('p.x')));
+    })""", timeout=5000)
+    # "->" dereference from a pointer variable completes the same fields.
+    await page.keyboard.type(';')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('pp->')
+    await page.wait_for_selector('.wb-autocomplete-popup', timeout=15000)
+    labels2 = await page.evaluate("""() => Array.from(
+        document.querySelectorAll('.wb-autocomplete-popup > div'))
+        .map(e => e.firstChild ? e.firstChild.textContent : '')""")
+    assert labels2 == ['x', 'y'], f'expected [x, y] after "pp->", got {labels2}'
+    await page.keyboard.press('Escape')
+    assert msgs == []
+
+
+async def msxgl_struct_member_complete(page, msgs):
+    # In a C MSXgl file the plugin resolves framework structs (fields shipped
+    # in the msxgl.json "structs" map) too.
+    await h.new_file(page, 2)
+    await h.set_language(page, 'C+MSXgl')
+    await page.wait_for_function("window.__wbBaseLang === 'c'")
+    await page.evaluate("""() => {
+        const cfg = window.WBStorage.loadConfig();
+        cfg.plugins = cfg.plugins || {};
+        cfg.plugins['c-struct-complete'] = true;
+        window.WBStorage.saveConfig(cfg);
+    }""")
+    await h.focus_active_editor(page)
+    await page.evaluate("""(text) => window.WBEditorActive.current(3000).then(v => {
+        v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: text } });
+        return true;
+    })""", 'BIOS_SpriteAttributes attr;')
+    await page.keyboard.press('Control+End')
+    await page.keyboard.type('attr.')
+    await page.wait_for_selector('.wb-autocomplete-popup', timeout=15000)
+    labels = await page.evaluate("""() => Array.from(
+        document.querySelectorAll('.wb-autocomplete-popup > div'))
+        .map(e => e.firstChild ? e.firstChild.textContent : '')""")
+    assert 'x' in labels and 'y' in labels, f'expected MSXgl fields, got {labels}'
+    await page.keyboard.press('Escape')
+    assert msgs == []
+
+
 async def autocomplete_enter_completes(page, msgs):
     # Enter in the autocompletion popup must insert the selected completion
     # (replacing the typed prefix) without leaving a stray newline.
@@ -1316,6 +1424,9 @@ SMOKE_SUITES = [
     ('smoke/js-interpolation-quoting', js_interpolation_quoting),
     ('smoke/server-echoes-edits', server_echoes_edits),
     ('smoke/autocomplete-enter', autocomplete_enter_completes),
+    ('smoke/base-lang-tracks-family', base_lang_tracks_language_family),
+    ('smoke/c-struct-member-complete', c_struct_member_complete),
+    ('smoke/msxgl-struct-member-complete', msxgl_struct_member_complete),
     ('smoke/plugins-submenu-keyboard-nav', plugins_submenu_keyboard_nav),
     ('smoke/shortcuts-toolbar-actions', shortcuts_toolbar_actions),
     ('smoke/shortcuts-file-io', shortcuts_file_io),

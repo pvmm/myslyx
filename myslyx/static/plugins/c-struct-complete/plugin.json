@@ -1,0 +1,5 @@
+{
+  "baseLang": ["c"],
+  "enabledByDefault": true,
+  "boot": true
+}
