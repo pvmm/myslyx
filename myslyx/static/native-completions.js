@@ -1,29 +1,33 @@
-// Myslyx Text Editor - native CodeMirror autocomplete for C MSXgl source.
+// Myslyx Text Editor - native CodeMirror autocomplete for C MSXgl and Pascal.
 //
-// C MSXgl (and only C MSXgl) replaces the custom .wb-autocomplete-popup with
-// CodeMirror's built-in (native) autocompletion. NiceGUI's basicSetup already
-// wires @codemirror/autocomplete into every editor, so no bundled module is
-// needed here — we only REGISTER completion sources. autocompletion() reads
-// its default sources from the "autocomplete" language-data field, which
+// C MSXgl is the reference implementation for how a language joins the native
+// popup; Pascal follows it. Both replace the custom .wb-autocomplete-popup
+// with CodeMirror's built-in (native) autocompletion. NiceGUI's basicSetup
+// already wires @codemirror/autocomplete into every editor, so no bundled
+// module is needed here — we only REGISTER completion sources. autocompletion()
+// reads its default sources from the "autocomplete" language-data field, which
 // EditorState.languageData lets us provide from page JS (both are exported by
 // nicegui-codemirror).
 //
 // The provider is appended to every view once (view.__wbNativeCmInstalled) and
 // the SOURCE guards on window.__wbHintKey, so it stays invisible for other
 // languages and also keeps working when the language combo switches a view
-// between plain C and C MSXgl.
+// between plain C and C MSXgl/Pascal.
 //
-// Word completions reuse the same curated data as the custom popup: msxgl.json
-// keywords (C + SDCC), builtins and types, plus the user's own discovered
-// symbols. Member completions ("." / "->") are driven by the parse tree
-// (FieldExpression nodes, with a text-based fallback) and resolve field types
-// through the shared C struct document model in plugins/c-struct-complete/
-// (the same tables the c-struct-complete plugin uses for plain C).
+// Word completions reuse the same curated data as the custom popup: the hints
+// JSON keywords and builtins (plus types and structs for C MSXgl) and the
+// user's own discovered symbols. C MSXgl member completions ("." / "->") are
+// driven by the parse tree (FieldExpression nodes, with a text-based fallback)
+// and resolve field types through the shared C struct document model in
+// plugins/c-struct-complete/ (the same tables the c-struct-complete plugin
+// uses for plain C). Pascal completes words only: its language parser is
+// stream-based (no Lezer tree) and pascal.json carries no structs.
 import * as CM from 'nicegui-codemirror';
 import { parseModel, collectVars, membersOf, memberNamed, fieldsToShow }
     from './plugins/c-struct-complete/c-struct-model.js';
 
 const MSXGL_HINT_KEY = 'msxgl';
+const PASCAL_HINT_KEY = 'pascal';
 const MAX_WORD_OPTIONS = 200;
 
 const hintsCache = {};
@@ -35,6 +39,14 @@ function hintKey() {
 
 function isMsxgl() {
     return hintKey() === MSXGL_HINT_KEY;
+}
+
+function isPascal() {
+    return hintKey() === PASCAL_HINT_KEY;
+}
+
+function isNativeAutocomplete() {
+    return isMsxgl() || isPascal();
 }
 
 function loadHints(key) {
@@ -217,8 +229,9 @@ function looksLikeEnumConstant(name) {
     return /^[A-Z][A-Z0-9_]*$/.test(name) && name.indexOf('_') >= 0;
 }
 
-function buildWordOptions(hints, word) {
+function buildWordOptions(hints, word, caseInsensitive) {
     var lower = (word || '').toLowerCase();
+    var upper = (word || '').toUpperCase();
     var seen = {};
     var out = [];
 
@@ -248,8 +261,11 @@ function buildWordOptions(hints, word) {
     });
     matched.forEach(function(m) {
         // Exact-case prefix (the normal C convention) ranks first; the native
-        // popup otherwise falls back to its own label sort.
-        if (lower && m.label.indexOf(word) === 0) m.boost = 20;
+        // popup otherwise falls back to its own label sort. Pascal is
+        // case-insensitive, so its boost compares case-indifferently.
+        if (lower && (caseInsensitive
+            ? m.label.substring(0, word.length).toUpperCase() === upper
+            : m.label.indexOf(word) === 0)) m.boost = 20;
     });
     matched.sort(function(a, b) {
         return (b.boost || 0) - (a.boost || 0) || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
@@ -257,26 +273,31 @@ function buildWordOptions(hints, word) {
     return matched.slice(0, MAX_WORD_OPTIONS);
 }
 
-function wordSource(ctx, wordInfo, hints) {
+function wordSource(ctx, wordInfo, hints, caseInsensitive) {
     var w = ctx.matchBefore(/[A-Za-z_][A-Za-z0-9_]*/);
     if (!w) return null;
     if (!ctx.explicit && !w.text) return null;
-    return { from: w.from, options: buildWordOptions(hints, w.text) };
+    return { from: w.from, options: buildWordOptions(hints, w.text, caseInsensitive) };
 }
 
-async function msxglSource(ctx) {
+async function nativeSource(ctx) {
     try {
-        if (!isMsxgl()) return null;
-        var hints = await loadHints(MSXGL_HINT_KEY);
+        if (!isNativeAutocomplete()) return null;
+        var key = hintKey();
+        var hints = await loadHints(key);
         if (!hints) return null;
         var state = ctx.state;
         var pos = ctx.pos;
         var wordInfo = wordBefore(state, pos);
-        var member = await memberContext(state, pos, wordInfo);
-        if (member) {
-            return await memberSource(ctx, wordInfo, hints);
+        // Member completion is C-only for now (CST + shared struct model);
+        // Pascal .json carries no structs and its parser has no tree.
+        if (isMsxgl()) {
+            var member = await memberContext(state, pos, wordInfo);
+            if (member) {
+                return await memberSource(ctx, wordInfo, hints);
+            }
         }
-        return wordSource(ctx, wordInfo, hints);
+        return wordSource(ctx, wordInfo, hints, isPascal());
     } catch (e) {
         return null;
     }
@@ -286,7 +307,7 @@ async function msxglSource(ctx) {
 // mechanism: it is read through languageDataAt for every completion query, and
 // merges with (and de-duplicates against) the language's own sources.
 var nativeConfig = CM.EditorState.languageData.of(function() {
-    return [{ autocomplete: msxglSource }];
+    return [{ autocomplete: nativeSource }];
 });
 
 function installOnView(view) {

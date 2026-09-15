@@ -207,9 +207,10 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/settings-menu.js"></script>')
     ui.add_head_html('<script src="/static/editor-toolbar.js"></script>')
     ui.add_head_html('<script src="/static/shortcuts.js"></script>')
-    # C MSXgl completes through CodeMirror's native autocomplete (module:
-    # runs after the classic scripts above, and imports the shared struct
-    # model used by the c-struct-complete plugin).
+    # C MSXgl and Pascal complete through CodeMirror's native autocomplete
+    # (module: runs after the classic scripts above, and imports the shared
+    # struct model used by the c-struct-complete plugin). C MSXgl is the
+    # reference implementation for how a language joins the native popup.
     ui.add_head_html('<script type="module" src="/static/native-completions.js"></script>')
     plugin_manifest_by_name: dict[str, Any] = {}
 

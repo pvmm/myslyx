@@ -3,6 +3,7 @@
 This file helps AI agents and new contributors quickly understand how to work on this repository.
 
 Guidelines for agents
+- C+MSXgl is the reference implementation for any language support in Myslyx: when adding or changing a language feature (hints dictionaries, native autocomplete, user-symbol scanning, plugin providers), mirror how `C MSXgl` does it first.
 - Follow the project's coding conventions: keep changes small and focused.
 - When editing UI code, prefer client-side handlers in `myslyx/pages/editor_page.py`'s `_init()` and use `ui.run_javascript()` rather than inline attributes.
 - For Python changes, run: `.venv/bin/python -m py_compile myslyx/pages/editor_page.py` before pushing.
@@ -20,6 +21,7 @@ Key files
 - `myslyx/static/retro.js` — client-side helpers and storage (`WBStorage`, `WBHints`).
 - `myslyx/static/hints/` — language hint dictionaries (JSON). To add/change keyword or builtin help texts, see `myslyx/static/hints/README.md`.
 - `tools/gen_msxgl_hints.py` — generates `static/hints/msxgl.json` (`C MSXgl` hints) from the MSXgl engine sources; re-run it after an MSXgl upgrade. `msxgl.json` is never hand-edited.
+- `myslyx/static/native-completions.js` — native CodeMirror autocomplete for `C MSXgl` and `Pascal`; the reference implementation for how a language joins the native popup.
 - `myslyx/static/hints.js` — hints sidebar, autocomplete popup and user-symbol scanner.
 - `myslyx/static/retro.css` — theme and editor gutter alignment.
 
