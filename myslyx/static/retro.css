@@ -590,9 +590,15 @@ html, body {
     border: 2px solid #000;
     box-shadow: inset 1px 1px 0 #555, 3px 3px 0 rgba(0, 0, 0, 0.3);
     font-family: var(--wb-editor-font, 'Press Start 2P'), monospace;
-    font-size: 9px;
+    font-size: var(--wb-editor-font-size, 13px);
     min-width: 160px;
     max-height: 180px;
+}
+/* The @codemirror/autocomplete base theme pins the list's font-family to
+   'monospace' on "& > ul", which beats inherited values; the label and the
+   matched-text spans live in that ul, so force the editor font there too. */
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul {
+    font-family: var(--wb-editor-font, 'Press Start 2P'), monospace;
 }
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete .cm-completionList {
     max-height: 176px;
@@ -608,7 +614,7 @@ html, body {
 }
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete .cm-completionDetail {
     opacity: 0.6;
-    font-size: 7px;
+    font-size: 0.78em;
     margin-left: 8px;
 }
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete .cm-completionIcon {

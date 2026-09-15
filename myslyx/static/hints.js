@@ -546,7 +546,8 @@
         popup.style.cssText =
             'position:fixed;z-index:10000;background:#fff;border:2px solid #000;' +
             'box-shadow:inset 1px 1px 0 #555,3px 3px 0 rgba(0,0,0,0.3);' +
-            'font-family:"Press Start 2P",monospace;font-size:9px;max-height:180px;' +
+            'font-family:var(--wb-editor-font,"Press Start 2P"),monospace;' +
+            'font-size:var(--wb-editor-font-size,13px);max-height:180px;' +
             'overflow-y:auto;min-width:160px;';
 
         matches.forEach(function(m, i) {
@@ -559,7 +560,7 @@
             var kind = document.createElement('span');
             kind.textContent = m.detail || '';
             kind.style.opacity = '0.6';
-            kind.style.fontSize = '7px';
+            kind.style.fontSize = '0.78em';
             item.appendChild(label);
             item.appendChild(kind);
             item.addEventListener('mouseenter', function() {

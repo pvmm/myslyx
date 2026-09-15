@@ -8,7 +8,8 @@ the parse tree plus the shared struct model, and plain words complete from
 msxgl.json (keywords incl. SDCC, builtins, types) plus user symbols; Pascal
 completes words from pascal.json (keywords, builtins, user symbols —
 case-insensitive, no member completion). All other languages keep the custom
-popup.
+popup. Both popups follow the editor's FONT/BASE FONT SIZE controls (the CSS
+vars --wb-editor-font / --wb-editor-font-size).
 """
 
 from tests import helpers as h
@@ -199,9 +200,80 @@ async def native_msxgl_language_toggle(page, msgs):
     assert msgs == []
 
 
+async def _pick_font(page, font_label):
+    """Select ``font_label`` from the FONT combo (second .wb-select)."""
+    await page.locator('.wb-select').nth(1).click()
+    await page.wait_for_function("""() => {
+        const m = document.querySelector('.q-menu');
+        if (!m) return false;
+        const cs = getComputedStyle(m);
+        return cs.visibility !== 'hidden' && cs.opacity !== '0'
+            && m.getBoundingClientRect().width > 0;
+    }""", timeout=10000)
+    await page.locator('.q-menu').get_by_text(font_label, exact=True).first.click()
+    await page.wait_for_function("""() => {
+        const m = document.querySelector('.q-menu');
+        return !m || m.getBoundingClientRect().width === 0;
+    }""", timeout=10000)
+
+
+async def native_font_follows_editor(page, msgs):
+    """The autocomplete tooltip uses the editor's font family AND size.
+
+    The @codemirror/autocomplete base theme pins the tooltip's list to
+    'monospace' ("& > ul"), so the override lives in retro.css on
+    '.cm-tooltip-autocomplete > ul'; a live var change (the FONT combo) must
+    restyle an already-open popup without a reload.
+    """
+    await _goto_pascal(page)
+    await page.keyboard.type('writ')
+    await _labels_rendered(page)
+
+    # Rebinding the editor font through the FONT combo must restyle the popup.
+    await _pick_font(page, 'Courier New')
+    await h.focus_active_editor(page)
+    await page.keyboard.press('End')
+    await page.keyboard.type('e')
+    await _labels_rendered(page)
+    probe = await page.evaluate("""() => {
+        const pick = (sel) => {
+            const el = document.querySelector(sel);
+            if (!el) return null;
+            const cs = getComputedStyle(el);
+            return cs.fontFamily + ' @ ' + cs.fontSize;
+        };
+        const root = getComputedStyle(document.documentElement);
+        return {
+            font: root.getPropertyValue('--wb-editor-font'),
+            size: root.getPropertyValue('--wb-editor-font-size'),
+            tooltip: pick('.cm-tooltip-autocomplete'),
+            label: pick('.cm-tooltip-autocomplete .cm-completionLabel'),
+            matched: pick('.cm-tooltip-autocomplete .cm-completionMatchedText'),
+        };
+    }""")
+    assert 'Courier New' in probe['font'], f'FONT combo must set the var: {probe["font"]!r}'
+    assert probe['label'] is not None, 'native tooltip must render after reopening'
+    assert 'Courier New' in probe['tooltip'], f'tooltip shell must follow editor font: {probe}'
+    assert 'Courier New' in probe['label'], f'label must follow editor font: {probe}'
+    assert 'Courier New' in probe['matched'], f'matched text must follow editor font: {probe}'
+
+    # Font size: the same CSS-var mechanism (drive the var exactly like
+    # _apply_editor_font_size does) must resize an open popup immediately.
+    await page.evaluate("""() =>
+        document.documentElement.style.setProperty('--wb-editor-font-size', '10px')""")
+    await page.wait_for_timeout(150)
+    probe2 = await page.evaluate("""() => {
+        const e = document.querySelector('.cm-tooltip-autocomplete .cm-completionLabel');
+        return e ? getComputedStyle(e).fontSize : null;
+    }""")
+    assert probe2 == '10px', f'popup must resize with the editor font size: {probe2!r}'
+    assert msgs == []
+
+
 NATIVE_SUITES = [
     ('native/msxgl-member', native_msxgl_member_completion),
     ('native/msxgl-lang-toggle', native_msxgl_language_toggle),
     ('native/pascal-word', native_pascal_word_completion),
     ('native/pascal-lang-toggle', native_pascal_language_toggle),
+    ('native/font-follows-editor', native_font_follows_editor),
 ]
