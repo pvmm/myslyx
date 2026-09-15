@@ -284,6 +284,13 @@
         return window.__wbHintKey || 'plaintext';
     }
 
+    // C MSXgl switches to CodeMirror's native autocomplete (see
+    // static/native-completions.js); the custom popup below must sit this
+    // language out so the two popups never fight.
+    function usesNativeAutocomplete() {
+        return getHintKey() === 'msxgl';
+    }
+
     // ===== User symbol scanning (language-aware) =====
 
     // Maps the CodeMirror language name to a scanner key.
@@ -625,6 +632,9 @@
 
     function checkCompletions() {
         if (!view || isReadonly()) { removePopup(); return; }
+        // C MSXgl completes natively; suppress the custom popup entirely so
+        // neither the plugin providers nor the built-in word scan can show it.
+        if (usesNativeAutocomplete()) { removePopup(); return; }
         var state = view.state;
         var wordInfo = getWord(state, state.selection.main.head);
         var word = wordInfo.word;

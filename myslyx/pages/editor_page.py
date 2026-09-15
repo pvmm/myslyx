@@ -207,6 +207,10 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/settings-menu.js"></script>')
     ui.add_head_html('<script src="/static/editor-toolbar.js"></script>')
     ui.add_head_html('<script src="/static/shortcuts.js"></script>')
+    # C MSXgl completes through CodeMirror's native autocomplete (module:
+    # runs after the classic scripts above, and imports the shared struct
+    # model used by the c-struct-complete plugin).
+    ui.add_head_html('<script type="module" src="/static/native-completions.js"></script>')
     plugin_manifest_by_name: dict[str, Any] = {}
 
     def collect(base_url: str, plugins_dir: Path) -> None:

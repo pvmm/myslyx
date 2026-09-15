@@ -34,6 +34,15 @@ after an MSXgl upgrade:
     --src <path to msxgl/engine/src> --out myslyx/static/hints/msxgl.json
 ```
 
+Because MSXgl targets SDCC, the generated `keywords` list is the standard C set
+(`tools/gen_msxgl_hints.py`'s `C_KEYWORDS`, shared with `c.json`) plus
+`SDCC_KEYWORDS`: SDCC compiler keywords/extensions (`__asm`, `__endasm`, `__at`,
+`__sfr`, `__naked`, `__xdata`/`__data`/`__code`/`__bit`/..., `__z88dk_fastcall`,
+`__sdcccall`, ...) and the engine's own `__`-conventions (`__NAKED`,
+`__PRESERVES`, `__FASTCALL`, `__CALLEE`). Any keyword that collides with a
+generated builtin or type name is dropped so each name completes only once.
+`c.json` (plain C) keeps the plain C keyword set.
+
 ## Schema
 
 ```json

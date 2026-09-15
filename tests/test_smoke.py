@@ -764,6 +764,29 @@ async def hint_link_jumps_to_tip(page, msgs):
     assert msgs == []
 
 
+async def _native_autocomplete_labels(page, expect, timeout=15000):
+    """Wait for a native (CodeMirror) completion with the given label.
+
+    ``expect is None`` only waits until at least one completion is rendered.
+    """
+    await page.wait_for_function(
+        """expect => {
+            const ls = Array.from(document.querySelectorAll(
+                '.cm-tooltip-autocomplete .cm-completionLabel'));
+            return expect === null ? ls.length > 0 : ls.some(l => l.textContent === expect);
+        }""",
+        arg=expect, timeout=timeout)
+    return await page.evaluate("""() => Array.from(
+        document.querySelectorAll('.cm-tooltip-autocomplete .cm-completionLabel'))
+        .map(l => l.textContent)""")
+
+
+async def _native_autocomplete_details(page):
+    return await page.evaluate("""() => Array.from(
+        document.querySelectorAll('.cm-tooltip-autocomplete .cm-completionDetail'))
+        .map(e => e.textContent)""")
+
+
 async def hints_msxgl_root_and_builtins(page, msgs):
     # The C+MSXgl language maps to static/hints/msxgl.json: its root page must
     # group the engine functions by module (collapsible <details>) and functions
@@ -815,32 +838,29 @@ async def hints_msxgl_root_and_builtins(page, msgs):
         const h1 = document.querySelector('#hints-content .hint-text h1');
         return !!h1 && h1.textContent.trim() === 'MSXgl (C + engine)';
     }""", timeout=15000)
-    # MSXgl functions are autocomplete builtins.
+    # MSXgl functions are native autocomplete builtins (C MSXgl uses the
+    # CodeMirror popup, not the custom .wb-autocomplete-popup).
     await h.active_cm(page).click()
     await page.keyboard.type('PSG_Set')
-    await page.wait_for_selector('.wb-autocomplete-popup', timeout=15000)
-    popup = await page.evaluate("""() =>
-        Array.from(document.querySelectorAll('.wb-autocomplete-popup div'))
-            .map(el => el.textContent.trim()).filter(Boolean)""")
-    assert any('PSG_SetRegister' in t for t in popup), \
-        f'autocomplete must offer PSG_SetRegister, got {popup!r}'
-    assert any('builtin' in t for t in popup), \
-        f'completions must be tagged builtin, got {popup!r}'
+    labels = await _native_autocomplete_labels(page, 'PSG_SetRegister')
+    assert any('PSG_SetRegister' in t for t in labels), \
+        f'autocomplete must offer PSG_SetRegister, got {labels!r}'
+    details = await _native_autocomplete_details(page)
+    assert any('builtin' in t for t in details), \
+        f'completions must be tagged builtin, got {details!r}'
     # MSXgl types autocomplete too, tagged "type".
     await page.keyboard.press('Escape')
     await page.keyboard.press('Control+a')
     await page.keyboard.press('Backspace')
     await page.keyboard.type('VDP_MO')
-    await page.wait_for_selector('.wb-autocomplete-popup', timeout=15000)
-    popup = await page.evaluate("""() =>
-        Array.from(document.querySelectorAll('.wb-autocomplete-popup div'))
-            .map(el => el.textContent.trim()).filter(Boolean)""")
-    assert any('VDP_MODE' in t for t in popup), \
-        f'autocomplete must offer VDP_MODE, got {popup!r}'
-    assert any('VDP_MODE_GRAPHIC4' in t for t in popup), \
-        f'autocomplete must offer the enum constant VDP_MODE_GRAPHIC4, got {popup!r}'
-    assert any('type' in t for t in popup), \
-        f'type completions must be tagged "type", got {popup!r}'
+    labels = await _native_autocomplete_labels(page, 'VDP_MODE')
+    assert any('VDP_MODE' in t for t in labels), \
+        f'autocomplete must offer VDP_MODE, got {labels!r}'
+    assert any('VDP_MODE_GRAPHIC4' in t for t in labels), \
+        f'autocomplete must offer the enum constant VDP_MODE_GRAPHIC4, got {labels!r}'
+    details = await _native_autocomplete_details(page)
+    assert any('const' in t or 'type' in t for t in details), \
+        f'type completions must be tagged, got {details!r}'
     assert msgs == []
 
 
@@ -1142,17 +1162,11 @@ async def c_struct_member_complete(page, msgs):
 
 
 async def msxgl_struct_member_complete(page, msgs):
-    # In a C MSXgl file the plugin resolves framework structs (fields shipped
-    # in the msxgl.json "structs" map) too.
+    # In a C MSXgl file the native completion resolves framework structs (fields
+    # shipped in the msxgl.json "structs" map) through the CodeMirror popup.
     await h.new_file(page, 2)
     await h.set_language(page, 'C+MSXgl')
     await page.wait_for_function("window.__wbBaseLang === 'c'")
-    await page.evaluate("""() => {
-        const cfg = window.WBStorage.loadConfig();
-        cfg.plugins = cfg.plugins || {};
-        cfg.plugins['c-struct-complete'] = true;
-        window.WBStorage.saveConfig(cfg);
-    }""")
     await h.focus_active_editor(page)
     await page.evaluate("""(text) => window.WBEditorActive.current(3000).then(v => {
         v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: text } });
@@ -1160,10 +1174,7 @@ async def msxgl_struct_member_complete(page, msgs):
     })""", 'BIOS_SpriteAttributes attr;')
     await page.keyboard.press('Control+End')
     await page.keyboard.type('attr.')
-    await page.wait_for_selector('.wb-autocomplete-popup', timeout=15000)
-    labels = await page.evaluate("""() => Array.from(
-        document.querySelectorAll('.wb-autocomplete-popup > div'))
-        .map(e => e.firstChild ? e.firstChild.textContent : '')""")
+    labels = await _native_autocomplete_labels(page, None)
     assert 'x' in labels and 'y' in labels, f'expected MSXgl fields, got {labels}'
     await page.keyboard.press('Escape')
     assert msgs == []

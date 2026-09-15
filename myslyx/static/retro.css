@@ -582,6 +582,39 @@ html, body {
     padding-bottom: 6px;
 }
 
+/* Native autocomplete tooltip (C MSXgl) — matches the look of the custom
+   .wb-autocomplete-popup used by the other languages. */
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete {
+    background: #fff;
+    color: #000;
+    border: 2px solid #000;
+    box-shadow: inset 1px 1px 0 #555, 3px 3px 0 rgba(0, 0, 0, 0.3);
+    font-family: var(--wb-editor-font, 'Press Start 2P'), monospace;
+    font-size: 9px;
+    min-width: 160px;
+    max-height: 180px;
+}
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete .cm-completionList {
+    max-height: 176px;
+    overflow-y: auto;
+}
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete .cm-completionListItem {
+    padding: 5px 8px;
+    line-height: 1.4;
+}
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete .cm-completionListItem.cm-completionSelected {
+    background: #0055aa;
+    color: #fff;
+}
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete .cm-completionDetail {
+    opacity: 0.6;
+    font-size: 7px;
+    margin-left: 8px;
+}
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete .cm-completionIcon {
+    margin-right: 6px;
+}
+
 .wb-main-area {
     flex: 1;
     display: flex;

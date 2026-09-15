@@ -31,6 +31,7 @@ from playwright.async_api import async_playwright
 import tests.helpers  # noqa: F401  (keeps per-suite `from tests import ...` importable)
 from tests.test_header import HEADER_SUITES
 from tests.test_multiedit import MULTIEDIT_SUITES
+from tests.test_native import NATIVE_SUITES
 from tests.test_plugins import PLUGIN_SUITES, prepare_user_plugin_layout
 from tests.test_smoke import SMOKE_SUITES
 
@@ -38,7 +39,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SERVER = ROOT / 'main.py'
 ARTIFACTS = ROOT / 'tests' / 'artifacts'
 DEFAULT_BROWSERS = ['chromium', 'firefox']
-ALL_SUITES = MULTIEDIT_SUITES + HEADER_SUITES + SMOKE_SUITES + PLUGIN_SUITES
+ALL_SUITES = MULTIEDIT_SUITES + HEADER_SUITES + SMOKE_SUITES + PLUGIN_SUITES + NATIVE_SUITES
 
 
 def free_port() -> int:

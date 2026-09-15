@@ -50,6 +50,27 @@ C_KEYWORDS = [
     "typedef", "union", "unsigned", "void", "volatile", "while",
 ]
 
+# SDCC compiler keywords/extensions (only valid for the MSXgl C dialect, so
+# they are appended to the msxgl.json keyword list after C_KEYWORDS; c.json for
+# plain C keeps the standard C set). Includes the MSXgl engine's own __-prefixed
+# conventions (macros such as __NAKED are widely used in example code even
+# though they are defined elsewhere).
+SDCC_KEYWORDS = [
+    "__asm", "__endasm", "__at", "__sfr", "__naked",
+    "__z88dk_fastcall", "__sdcccall", "__sdcc_call_hl", "__sdcc_call_iy",
+    "__data", "__xdata", "__idata", "__pdata", "__sdata", "__code", "__bit",
+    "__critical", "__interrupt", "__using", "__reentrant", "__small",
+    "__large", "__packed", "__aligned", "__signed", "__unsigned",
+    "__NAKED", "__PRESERVES", "__FASTCALL", "__CALLEE",
+]
+
+
+def _msxgl_keywords(builtin_names, type_names):
+    """Keyword list for msxgl.json: standard C + SDCC, minus anything already
+    offered as a builtin or type (a name can only complete once)."""
+    taken = set(builtin_names) | set(type_names)
+    return C_KEYWORDS + [kw for kw in SDCC_KEYWORDS if kw not in taken]
+
 # Human-friendly module labels shown on the root page.
 MODULE_LABELS = {
     "psg": "PSG",
@@ -771,7 +792,7 @@ def main():
     data = {
         "root": root_markdown(modules, all_doc_enums, all_doc_structs,
                               all_doc_unions) or "# MSXgl",
-        "keywords": C_KEYWORDS,
+        "keywords": _msxgl_keywords(all_names.keys(), all_symbol_names),
         "builtins": list(all_names.keys()),
         "types": all_symbol_names,
         "tips": tips,
