@@ -88,6 +88,14 @@ Tests
 
   python -m tests.runner -l
 
+- Feature workflow: after completing a feature, run the suite you created for
+  it first (`python -m tests.runner -f <suite>`); once it passes, run the
+  complete set (`python -m tests.runner`) before finishing — never ship a
+  feature on an untested suite or a skipped full run.
+
+- Timeouts: approximate 12 seconds per test in a run — the single suite gets
+  `timeout 12` (12 s), the complete 58-suite set `timeout 696` (11.6 min).
+
 - Browsers that cannot launch (e.g. missing host libraries) are reported as SKIP rather than failing the run.
 
 Contributing
