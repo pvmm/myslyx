@@ -582,6 +582,17 @@ html, body {
     padding-bottom: 6px;
 }
 
+/* Text selection: red for contrast against the dark editor background.
+   basicDark paints the selection via the .cm-selectionBackground layer; the
+   native ::selection rule covers text selected with an unmanaged selection. */
+.cm-editor .cm-content ::selection {
+    background: #aa0000;
+}
+.cm-editor .cm-selectionBackground,
+.cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+    background-color: #aa0000 !important;
+}
+
 /* Native autocomplete tooltip (C MSXgl) — matches the look of the custom
    .wb-autocomplete-popup used by the other languages. */
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete {

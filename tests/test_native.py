@@ -308,11 +308,27 @@ async def native_msxgl_function_keeps_case(page, msgs):
     assert any('myFunc' in t for t in custom), f'custom popup must keep case: {custom}'
     assert not any('MYFUNC' in t for t in custom), f'custom popup uppercased: {custom}'
     assert msgs == []
-    custom = await page.evaluate("""() =>
-        Array.from(document.querySelectorAll('.wb-autocomplete-popup div'))
-            .map(e => e.textContent.trim()).filter(Boolean)""")
-    assert any('myFunc' in t for t in custom), f'custom popup must keep case: {custom}'
-    assert not any('MYFUNC' in t for t in custom), f'custom popup uppercased: {custom}'
+
+
+async def native_selection_is_red(page, msgs):
+    """The editor's text selection is red, not basicDark's near-black.
+
+    Regression: after switching the editor to NiceGUI's basicDark theme, the
+    selection background blended into the dark editor. retro.css forces both
+    the .cm-selectionBackground layer and the native ::selection red.
+    """
+    await _goto_msxgl(page)
+    await page.keyboard.type('SELECT ME')
+    await page.keyboard.press('Control+a')
+    await page.wait_for_timeout(150)
+    bg = await page.evaluate("""() => {
+        const el = document.querySelector('.cm-editor .cm-selectionBackground');
+        if (el) return getComputedStyle(el).backgroundColor;
+        const c = document.querySelector(
+            '.wb-editor-slot:not(.wb-editor-hidden) .cm-content');
+        return getComputedStyle(c, '::selection').backgroundColor;
+    }""")
+    assert bg == 'rgb(170, 0, 0)', f'selection must be dark red: {bg!r}'
     assert msgs == []
 
 
@@ -323,4 +339,5 @@ NATIVE_SUITES = [
     ('native/pascal-lang-toggle', native_pascal_language_toggle),
     ('native/font-follows-editor', native_font_follows_editor),
     ('native/msxgl-function-case', native_msxgl_function_keeps_case),
+    ('native/selection-red', native_selection_is_red),
 ]
