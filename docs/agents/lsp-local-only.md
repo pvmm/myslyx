@@ -1,40 +1,56 @@
-# Local-only LSP follow-up (not implemented)
+# Local-only LSP (implemented: v1 completions)
 
 This note records the agreed design for wiring a Language Server Protocol
-server into Myslyx. It is intentionally **local-only**: it is meant for a
-developer running the editor on their own machine against their own files, not
-for the shared / multi-user / Hugging Face Space deployment. Nothing here is
-implemented yet.
+server into Myslyx, and the state of the implementation. It is intentionally
+**local-only**: it is meant for a developer running the editor on their own
+machine against their own files, not for the shared / multi-user / Hugging
+Face Space deployment.
 
-## Idea
-Let a locally installed LSP (e.g. `clangd`) provide completions (and later
-diagnostics / definitions) for C / C MSXgl files. Because a browser page cannot
-spawn a child process or reach a Unix socket, the flow is:
+## Implemented (v1)
 
-- The app server (or a sidecar process) spawns the LSP for the file being
-  edited.
-- The page talks to the server over a bridge (the existing
-  `__wbPyBridge`-style channel) to send the current buffer content and receive
-  completion lists.
-- Completions are injected into the editor as a `CompletionSource` registered
-  through the same `EditorState.languageData.at("autocomplete")` mechanism that
-  `myslyx/static/native-completions.js` uses.
+Completions from a locally installed LSP (e.g. `clangd`) for C / C MSXgl
+files, delivered through the plugin system:
+
+- `myslyx/local.py` — `is_local()` decides local vs. shared deployment
+  (`MYSLYX_LOCAL` override; otherwise remote when `SPACE_ID` / `HF_SPACE_ID` /
+  `SPACE_HOST` are set). Injected into the page as `window.__wbLocal`.
+- `myslyx/lsp.py` — minimal stdio LSP client: JSON-RPC 2.0 with
+  `Content-Length` framing, `available()`, `ping()`, `complete()`, `close()`.
+  Sessions are keyed by file id and get a temp workspace with a real buffer
+  file and a minimal `compile_commands.json` (clangd runs with
+  `--compile-commands-dir`). Only serves when `MYSLYX_LSP` is set AND
+  `is_local()` is true.
+- `myslyx/app.py` — `POST /wb/lsp/ping`, `/wb/lsp/complete`, `/wb/lsp/close`
+  (pydantic payloads).
+- `myslyx/pages/editor_page.py` — injects `window.__wbLocal` and
+  `window.__wbLsp = {enabled, server, error}`; the plugin manifest picks up
+  `onlyLocal`.
+- `myslyx/static/plugins/lsp/` — the client plugin (`plugin.json` with
+  `"onlyLocal": true`, `"boot": true`; `lsp.js` bridge). Pings once at page
+  load, feeds C MSXgl through the **native** autocomplete popup
+  (`EditorState.languageData.at("autocomplete")`, the same mechanism as
+  `native-completions.js`) and plain C through a **custom** popup via a
+  `WBHintCompletions` async provider (hints.js `checkCompletions` now accepts
+  Promises). On a failed ping the plugin auto-disables for the session
+  (`window.__wbLspAutodisabled`) and shows a retro toast.
+- Runner/tests — LSP suites are gated on real binaries (`clangd` via
+  `shutil.which`, absolute paths via `os.path.exists`); sits SKIP when the
+  environment cannot provide the binary. `tests/runner.py` starts one app
+  server per distinct suite environment.
+
+Double gate: the plugin is `onlyLocal` (client-side `__wbLocal`) *and* the
+server advertises `enabled:false` on shared runs — either alone is enough for
+a shared deployment to stay inert.
 
 ## Env gate (default off)
-New environment variable `MYSLYX_LSP` (e.g. `clangd`). The LSP machinery only
-starts when it is set; otherwise behavior is identical to today. This keeps the
-shared/HF Space deployment untouched and avoids installing/probing for LSP
-binaries on every `ui.run()`.
 
-## Why native autocomplete integrates cleanly
-`native-completions.js` registers the C MSXgl completion source purely through
-the "autocomplete" language-data field, which CodeMirror's `autocompletion()`
-reads for its default sources. The LSP source would be appended the same way
-(`StateEffect.appendConfig` + `EditorState.languageData.of(...)`), gated on
-`window.__wbHintKey === 'msxgl'` (or `'c'` when LSP is enabled), and would
-replace/augment the curated JSON word source with the live LSP results.
+Environment variable `MYSLYX_LSP` (e.g. `clangd`, or an absolute path to the
+LSP binary). The LSP machinery only starts when it is set; otherwise behavior
+is identical to today.
 
-## Out of scope
+## Out of scope / future
+
+- Diagnostics and go-to-definition (only `textDocument/completion` is wired).
 - No shared/server-side LSP for remote users.
 - No auto-install of LSP binaries.
 - No persistence of LSP state across sessions beyond the buffer round trip.

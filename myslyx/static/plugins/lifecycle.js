@@ -22,6 +22,7 @@
             languages: def.languages || ['*'],
             baseLang: def.baseLang ? (Array.isArray(def.baseLang) ? def.baseLang : [def.baseLang]) : null,
             enabledByDefault: def.enabledByDefault !== false,
+            onlyLocal: def.onlyLocal === true,
             extensions: function(view, CM, ctx) {
                 return import(url).then(function(mod) {
                     if (typeof mod.default !== 'function') {
@@ -46,6 +47,9 @@
         import('nicegui-codemirror').then(function(CM) {
             boot.forEach(function(plugin) {
                 if (!WBPlugins._enabled(plugin)) return;
+                // A local-only plugin must not run on a shared deployment
+                // (window.__wbLocal is published by pages/editor_page.py).
+                if (plugin.onlyLocal && !window.__wbLocal) return;
                 plugin.extensions(null, CM, {
                     config: (window.WBStorage.loadConfig().plugins || {})[plugin.name] || {}
                 }).catch(function(e) {

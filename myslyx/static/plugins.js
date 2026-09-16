@@ -59,6 +59,13 @@
             return true;
         },
 
+        // A local-only plugin (plugin.json "onlyLocal": true) runs only when
+        // the server reports a local run via window.__wbLocal. Shared
+        // deployments keep their plugins inert (still listed in the menu).
+        _localOk: function(def) {
+            return !(def.onlyLocal && !window.__wbLocal);
+        },
+
         // Attach the enabled plugins' extensions to a CodeMirror view. Runs once
         // per view; config changes take effect on the next page load. Extension
         // providers may be synchronous (an array) or asynchronous (a Promise,
@@ -70,7 +77,7 @@
                 if (!view) return;
                 var providers = registry.map(function(def) {
                     return Promise.resolve().then(function() {
-                        if (WBPlugins._enabled(def) && WBPlugins._langOk(def)) {
+                        if (WBPlugins._enabled(def) && WBPlugins._langOk(def) && WBPlugins._localOk(def)) {
                             return def.extensions(view, CM, { config: (window.WBStorage.loadConfig().plugins || {})[def.name] || {} });
                         }
                         return [];

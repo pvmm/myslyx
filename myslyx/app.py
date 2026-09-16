@@ -4,8 +4,11 @@ import os
 import sys
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from nicegui import app, ui
 
+from myslyx import lsp
 from myslyx.paths import user_plugins_dir
 
 # Register pages (importing triggers @ui.page decorator registration)
@@ -71,6 +74,41 @@ async def _log_requests(request, call_next):
         except Exception:
             logging.exception('Failed to log request')
     return await call_next(request)
+
+
+# Local-only LSP bridge (see myslyx/lsp.py). The browser cannot spawn an LSP
+# process or reach its socket, so the page sends the buffer to these routes and
+# the server runs the LSP for it. Gated: they answer {enabled:false} unless
+# MYSLYX_LSP names a binary AND the server is a local run, which keeps the
+# shared / Hugging Face Space deployment untouched.
+class _LspCompletePayload(BaseModel):
+    fid: str
+    language: str = 'C MSXgl'
+    name: str | None = None
+    content: str = ''
+    line: int = 0
+    character: int = 0
+
+
+class _LspClosePayload(BaseModel):
+    fid: str
+
+
+@app.post('/wb/lsp/ping')
+def _lsp_ping() -> dict:
+    return lsp.ping()
+
+
+@app.post('/wb/lsp/complete')
+def _lsp_complete(payload: _LspCompletePayload) -> dict:
+    return lsp.complete(payload.fid, payload.language, payload.name,
+                        payload.content, payload.line, payload.character)
+
+
+@app.post('/wb/lsp/close')
+def _lsp_close(payload: _LspClosePayload) -> dict:
+    lsp.close(payload.fid)
+    return {'enabled': lsp.available()['enabled']}
 
 
 # Disable auto-reload to avoid multi-process reloader issues during debugging.

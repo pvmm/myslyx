@@ -670,14 +670,30 @@
                 } catch (e) {
                     result = null;
                 }
-                if (result !== null) {
-                    if (result.length > 0) {
-                        showPopup(result, wordInfo.line.from + wordInfo.start);
-                    } else {
+                if (result === null) continue;
+                // A provider may also return a Promise (e.g. an LSP round
+                // trip). It wins the same way a sync array does; when it
+                // settles an empty list hides the popup and a non-empty one
+                // shows it, so async results behave like sync ones.
+                if (result && typeof result.then === 'function') {
+                    var popupStart = wordInfo.line.from + wordInfo.start;
+                    result.then(function(list) {
+                        if (list && list.length > 0) {
+                            showPopup(list, popupStart);
+                        } else {
+                            removePopup();
+                        }
+                    }).catch(function() {
                         removePopup();
-                    }
+                    });
                     return;
                 }
+                if (result.length > 0) {
+                    showPopup(result, wordInfo.line.from + wordInfo.start);
+                } else {
+                    removePopup();
+                }
+                return;
             }
         }
 

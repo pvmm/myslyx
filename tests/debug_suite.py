@@ -1,4 +1,9 @@
-"""Debug runner: run a filtered subset of acceptance suites against one browser."""
+"""Debug runner: run a filtered subset of acceptance suites against one browser.
+
+Shares suite definitions with `tests/runner.py` but keeps the per-suite
+isolation (fresh context/page), console-error capture, server management and
+cleanup local so nothing lingers after a run.
+"""
 
 import asyncio
 import os
@@ -7,9 +12,16 @@ import sys
 import time
 import traceback
 
-from playwright.async_api import Browser, BrowserContext, async_playwright
+from playwright.async_api import async_playwright
 
-from tests.runner import ALL_SUITES, free_port, neutralize_display_env, start_server, wait_for_server
+from tests.runner import (
+    ALL_SUITES,
+    env_satisfiable,
+    free_port,
+    neutralize_display_env,
+    start_server,
+    wait_for_server,
+)
 
 DEFAULT_BROWSER = "chromium"
 
@@ -111,113 +123,121 @@ async def main() -> int:
         filters.append(arg)
         i += 1
 
-    wanted = [
-        (name, fn)
-        for name, fn in ALL_SUITES
-        if any(f in name for f in filters)
-    ]
+    wanted = [(name, fn, env) for name, fn, env in ALL_SUITES if not filters or any(f in name for f in filters)]
 
-    if not wanted:
-        wanted = ALL_SUITES
+    # Group by the server environment they need (None = the default server).
+    phases: list[tuple[dict | None, list]] = [(None, [])]
+    phases_by_env: dict[tuple, tuple[dict, list]] = {}
+    for name, fn, env in wanted:
+        if not env:
+            phases[0][1].append((name, fn))
+        else:
+            key = tuple(sorted(env.items()))
+            if key not in phases_by_env:
+                phases_by_env[key] = (env, [])
+            phases_by_env[key][1].append((name, fn))
+    for _key, (env, entries) in phases_by_env.items():
+        phases.append((env, entries))
 
-    port = free_port()
-    proc = start_server(port)
+    ok_total = 0
+    failed = 0
+    procs = []
 
     try:
-        await wait_for_server(port)
+        for extra_env, suite_list in phases:
+            if not suite_list:
+                continue
 
-        async with async_playwright() as pw:
-            browser: Browser | None = None
+            ok, reason = env_satisfiable(extra_env)
+            if not ok:
+                for name, _fn in suite_list:
+                    print(f"SKIP  {name}  --  {reason}")
+                continue
 
-            try:
-                browser = await pw[browser_type].launch(headless=True)
+            port = free_port()
+            procs.append(start_server(port, extra_env=extra_env))
+            await wait_for_server(port)
 
-                context: BrowserContext | None = None
-
+            async with async_playwright() as pw:
                 try:
-                    context = await browser.new_context(
-                        service_workers="block",
-                        accept_downloads=True,
-                    )
-
-                    page = await context.new_page()
-
-                    msgs: list[str] = []
-                    page.on(
-                        "console",
-                        lambda message: (
-                            msgs.append(message.text)
-                            if message.type == "error"
-                            else None
-                        ),
-                    )
-
-                    await page.goto(
-                        f"http://127.0.0.1:{port}/editor?reset=1",
-                        wait_until="load",
-                    )
-                    await page.wait_for_timeout(5000)
-                    await page.wait_for_selector(
-                        ".wb-file-tab",
-                        timeout=30000,
-                    )
-
-                    for name, fn in wanted:
-                        msgs.clear()
-
-                        await page.goto(
-                            f"http://127.0.0.1:{port}/editor?reset=1",
-                            wait_until="load",
-                        )
-                        await page.wait_for_timeout(5000)
-                        await page.wait_for_selector(
-                            ".wb-file-tab",
-                            timeout=30000,
-                        )
-
+                    browser = await pw[browser_type].launch(headless=True)
+                except Exception:
+                    traceback.print_exc()
+                    for name, _fn in suite_list:
+                        print(f"SKIP  {name}  --  browser unavailable")
+                    continue
+                try:
+                    for name, fn in suite_list:
+                        msgs: list[str] = []
                         try:
-                            await fn(page, msgs)
-                            print(f"PASS  {name}")
-                        except Exception as exc:
-                            print(
-                                f"FAIL  {name}  -- "
-                                f"{type(exc).__name__}: {exc}"
+                            context = await browser.new_context(
+                                service_workers="block",
+                                accept_downloads=True,
                             )
-                            traceback.print_exc()
-
-                    print("\nconsole errors:", msgs)
-
-                finally:
-                    if context is not None:
-                        try:
-                            await context.close()
                         except Exception:
                             traceback.print_exc()
+                            failed += 1
+                            print(f"FAIL  {name}  --  context creation failed")
+                            continue
+                        try:
+                            page = await context.new_page()
+                            page.on(
+                                "console",
+                                lambda m, msgs=msgs: (
+                                    msgs.append(m.text)
+                                    if m.type == "error"
+                                    else None
+                                ),
+                            )
+                            await page.goto(
+                                f"http://127.0.0.1:{port}/editor?reset=1",
+                                wait_until="load",
+                            )
+                            await page.wait_for_timeout(5000)
+                            await page.wait_for_selector(
+                                ".wb-file-tab",
+                                timeout=30000,
+                            )
+                            try:
+                                await fn(page, msgs)
+                                ok_total += 1
+                                print(f"PASS  {name}")
+                            except Exception as exc:
+                                failed += 1
+                                print(
+                                    f"FAIL  {name}  -- "
+                                    f"{type(exc).__name__}: {exc}"
+                                )
+                                traceback.print_exc()
+                        finally:
+                            await context.close()
+                        print(f"      console errors: {msgs}")
+                finally:
+                    await browser.close()
 
-            finally:
-                if browser is not None:
-                    try:
-                        await browser.close()
-                    except Exception:
-                        traceback.print_exc()
-
-        return 0
-
+        print(f"\n{ok_total} passed, {failed} failed")
+        return 0 if failed == 0 else 1
     finally:
-        try:
-            proc.terminate()
-            proc.wait(timeout=10)
-        except Exception:
+        for proc in procs:
             try:
-                proc.kill()
-                proc.wait(timeout=5)
+                proc.terminate()
+                proc.wait(timeout=10)
+            except Exception:
+                try:
+                    proc.kill()
+                    proc.wait(timeout=5)
+                except Exception:
+                    traceback.print_exc()
+            try:
+                proc._log.close()
+            except (AttributeError, OSError):
+                pass
+            try:
+                import shutil
+
+                shutil.rmtree(proc._cfg_dir, ignore_errors=True)
             except Exception:
                 traceback.print_exc()
-
-        try:
-            proc._log.close()
-        except (AttributeError, OSError):
-            pass
 
         _kill_orphan_test_browsers()
 

@@ -12,9 +12,15 @@ Python package and its browsers:
     python -m tests.runner -f native -b chromium    # filtered group, one browser
     python -m tests.runner -l                       # list every registered suite
 
+Every suite is a ``(name, fn, env)`` triple. ``env`` is ``None`` for the default
+server phase, or a dict of extra environment variables for a dedicated phase
+(the LSP suites need ``MYSLYX_LSP``/``SPACE_ID``). Phases whose environment
+cannot be provided (e.g. ``clangd`` not installed) are reported as SKIP, never
+as failures.
+
 WebKit is NOT in the default set: Playwright's prebuilt WebKit targets older
 Debian/Ubuntu libs (ICU 74, libjpeg 8, libbacktrace 0) that Fedora 44 does not
-ship (ICU 77, libjpeg-turbo 62), so it cannot launch there. Pass `-b webkit`
+ship (ICU 77, libjpeg-turbo 62), so it cannot launch there. Pass ``-b webkit``
 only on a host that provides those libraries.
 """
 
@@ -33,6 +39,7 @@ from playwright.async_api import async_playwright
 
 import tests.helpers  # noqa: F401  (keeps per-suite `from tests import ...` importable)
 from tests.test_header import HEADER_SUITES
+from tests.test_lsp import LSP_SUITES
 from tests.test_multiedit import MULTIEDIT_SUITES
 from tests.test_native import NATIVE_SUITES
 from tests.test_plugins import PLUGIN_SUITES, prepare_user_plugin_layout
@@ -42,7 +49,12 @@ ROOT = Path(__file__).resolve().parents[1]
 SERVER = ROOT / 'main.py'
 ARTIFACTS = ROOT / 'tests' / 'artifacts'
 DEFAULT_BROWSERS = ['chromium', 'firefox']
-ALL_SUITES = MULTIEDIT_SUITES + HEADER_SUITES + SMOKE_SUITES + PLUGIN_SUITES + NATIVE_SUITES
+
+# (name, fn, env): env is None for the default server phase, or a dict of
+# extra environment variables for the dedicated server phase that runs the
+# suite (see tests/test_lsp.py).
+_ALL_PLAIN = MULTIEDIT_SUITES + HEADER_SUITES + SMOKE_SUITES + PLUGIN_SUITES + NATIVE_SUITES
+ALL_SUITES = [(name, fn, None) for name, fn in _ALL_PLAIN] + LSP_SUITES
 
 
 def free_port() -> int:
@@ -77,7 +89,7 @@ async def wait_for_server(port: int, timeout: float = 45.0) -> None:
     raise RuntimeError(f'app did not become ready on port {port}')
 
 
-def start_server(port: int) -> subprocess.Popen:
+def start_server(port: int, extra_env: dict | None = None) -> subprocess.Popen:
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, WB_TESTING='1')
     cfg_dir = prepare_user_plugin_layout()
@@ -85,6 +97,8 @@ def start_server(port: int) -> subprocess.Popen:
     # XDG_CONFIG_HOME, Windows APPDATA; macOS is HOME-based and not covered).
     env['XDG_CONFIG_HOME'] = str(cfg_dir)
     env['APPDATA'] = str(cfg_dir)
+    if extra_env:
+        env.update(extra_env)
     log = open(ARTIFACTS / 'server.log', 'wb')
     proc = subprocess.Popen(
         [sys.executable, str(SERVER), '-p', str(port), '--no-reload'],
@@ -97,6 +111,16 @@ def start_server(port: int) -> subprocess.Popen:
     proc._log = log  # type: ignore[attr-defined]
     proc._cfg_dir = cfg_dir  # type: ignore[attr-defined]
     return proc
+
+
+def env_satisfiable(extra_env: dict | None) -> tuple[bool, str]:
+    """Whether a dedicated phase's environment can be provided here."""
+    for _key, value in (extra_env or {}).items():
+        if value == 'clangd' and not shutil.which('clangd'):
+            return False, 'clangd not found'
+        if value.startswith('/') and not os.path.exists(value):
+            return False, f'{value} not found'
+    return True, ''
 
 
 async def run_suite(browser, page, suite_name, fn, port):
@@ -143,59 +167,88 @@ async def main() -> int:
     parser.add_argument('-p', '--port', type=int, default=0)
     args = parser.parse_args()
 
-    suites = ALL_SUITES
+    selected = ALL_SUITES
     if args.filter:
         needles = [f.lower() for f in args.filter]
-        suites = [(name, fn) for name, fn in ALL_SUITES
-                  if any(n in name.lower() for n in needles)]
+        selected = [(name, fn, env) for name, fn, env in ALL_SUITES
+                    if any(n in name.lower() for n in needles)]
         if args.list:
-            names = '\n'.join(sorted(name for name, _ in suites))
+            names = '\n'.join(sorted(name for name, _, _ in selected))
             if names:
                 print(names)
-            print(f'\n{len(suites)} suite(s) match the filter(s) {args.filter!r}')
+            print(f'\n{len(selected)} suite(s) match the filter(s) {args.filter!r}')
             return 0
-        if not suites:
-            names = '\n'.join(sorted(name for name, _ in ALL_SUITES))
+        if not selected:
+            names = '\n'.join(sorted(name for name, _, _ in ALL_SUITES))
             parser.error(
                 f'no suite matches the filter(s) {args.filter!r}.\n'
                 f'Available suites:\n{names}')
 
     if args.list:
-        names = '\n'.join(sorted(name for name, _ in ALL_SUITES))
+        names = '\n'.join(sorted(name for name, _, _ in ALL_SUITES))
         print(names)
         print(f'\n{len(ALL_SUITES)} suites registered (tests/runner.py ALL_SUITES)')
         return 0
 
-    port = args.port or free_port()
-    proc = start_server(port)
+    # Group the selected suites by the server environment they need: the
+    # default phase (env None) first, then one server per distinct env dict.
+    phases: list[tuple[dict | None, list]] = [(None, [])]
+    phases_by_env: dict[tuple, tuple[dict, list]] = {}
+    for name, fn, env in selected:
+        if not env:
+            phases[0][1].append((name, fn))
+        else:
+            key = tuple(sorted(env.items()))
+            if key not in phases_by_env:
+                phases_by_env[key] = (env, [])
+            phases_by_env[key][1].append((name, fn))
+    for _key, (env, entries) in phases_by_env.items():
+        phases.append((env, entries))
+
+    results: list = []
+    procs: list = []
     try:
-        await wait_for_server(port)
-        all_results = []
-        for browser_type in args.browsers:
-            try:
-                all_results += await run_browser(browser_type, port, suites)
-            except Exception as exc:  # pragma: no cover - launch failure path
-                reason = f'{type(exc).__name__}: {exc}'.replace('\n', ' ')[:160]
-                all_results += [(browser_type, f'{dep}', 'SKIP', reason)
+        for extra_env, phase_suites in phases:
+            if not phase_suites:
+                continue
+            ok, reason = env_satisfiable(extra_env)
+            if not ok:
+                for browser_type in args.browsers:
+                    for name, _fn in phase_suites:
+                        results.append((browser_type, name, 'SKIP', reason))
+                continue
+            port = args.port or free_port()
+            procs.append(start_server(port, extra_env=extra_env))
+            await wait_for_server(port)
+            for browser_type in args.browsers:
+                try:
+                    results += await run_browser(browser_type, port, phase_suites)
+                except Exception as exc:  # pragma: no cover - launch failure path
+                    reason = f'{type(exc).__name__}: {exc}'.replace('\n', ' ')[:160]
+                    results += [(browser_type, f'{dep}', 'SKIP', reason)
                                 for dep in ('all suites (browser unavailable)',)]
     finally:
-        proc.terminate()
-        proc.wait(timeout=10)
-        try:
-            proc._log.close()  # type: ignore[attr-defined]
-        except Exception:
-            pass
-        shutil.rmtree(proc._cfg_dir, ignore_errors=True)  # type: ignore[attr-defined]
+        for proc in procs:
+            try:
+                proc.terminate()
+                proc.wait(timeout=10)
+                proc._log.close()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            try:
+                shutil.rmtree(proc._cfg_dir, ignore_errors=True)  # type: ignore[attr-defined]
+            except Exception:
+                pass
 
-    width = max((len(name) for _, name, _, _ in all_results), default=0)
-    for browser, name, status, detail in all_results:
+    width = max((len(name) for _, name, _, _ in results), default=0)
+    for browser, name, status, detail in results:
         line = f'[{browser:9}] {name:<{width}}  {status}'
         if detail:
             line += f'  --  {detail}'
         print(line)
 
-    failed = [r for r in all_results if r[2] == 'FAIL']
-    print(f'\n{len(all_results) - len(failed)}/{len(all_results)} suites passed')
+    failed = [r for r in results if r[2] == 'FAIL']
+    print(f'\n{len(results) - len(failed)}/{len(results)} suites passed')
     return 1 if failed else 0
 
 

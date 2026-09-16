@@ -40,13 +40,21 @@ directories and binds each module to the editor through the runtime in
    {
      "languages": ["C MSXgl"],
      "baseLang": ["c"],
-     "enabledByDefault": false
+     "enabledByDefault": false,
+     "onlyLocal": true
    }
    ```
 
    Defaults: `languages: ["*"]` (all languages), `enabledByDefault: true`.
    `name`, `dir` and `entry` (the module file) come from the directory name:
    `static/plugins/<name>/<name>.js`.
+
+   `onlyLocal: true` restricts the plugin to local runs. The page head injects
+   `window.__wbLocal` (see `myslyx/local.py` — true unless the run looks like a
+   shared deployment, e.g. a Hugging Face Space; `MYSLYX_LOCAL=0/1` forces it).
+   The runtime (`lifecycle.js` boot skip and `plugins.js` `_localOk`) then skips
+   the whole plugin on remote runs, so local-only services (LSP bridges, local
+   file access) can never leak into a shared deployment.
 
    Set `"boot": true` when the plugin has global side effects that must be
    in place before any editor exists — the canonical example is registering a
@@ -180,6 +188,15 @@ runtime toggle yet.
   autocomplete popup through a completion provider registered with
   `WBHintCompletions` (see `static/hints.js`). With no Python changes it
   covers plain C, the C MSXgl framework, and any future base-`c` language.
+- `static/plugins/lsp/` — local-only C completions from a Language Server
+  (`onlyLocal`, `enabledByDefault`, `boot`). Its Python counterpart
+  (`myslyx/lsp.py`, exposed as `POST /wb/lsp/{ping,complete,close}`) only
+  activates when `MYSLYX_LSP=<binary>` is set on a local run; the page head
+  then advertises `window.__wbLsp = {enabled, server, error}`. The plugin pings
+  once at page load, feeds C MSXgl through the native autocomplete popup and
+  plain C through a `WBHintCompletions` async provider, and **auto-disables**
+  itself with a toast when the bridge reports a failure. See
+  `docs/agents/lsp-local-only.md` and the README's "Local LSP completions".
 
 ### Completions providers
 
@@ -196,10 +213,13 @@ window.WBHintCompletions.register('my-completions', function(ctx) {
 ```
 
 `static/hints.js` runs the providers first; the first non-null result wins.
-`apply` is optional (a string replaces the typed word). Because hints data can
-arrive asynchronously, a provider may load it and then dispatch
+A provider may also return a **Promise** for the same values — the popup is
+shown only after it resolves, and while it is pending the default keyword path
+is held off. This is how the bundled `lsp` plugin feeds live server results
+into the popup. `apply` is optional (a string replaces the typed word). Because
+hints data can arrive asynchronously, a provider may load it and then dispatch
 `wb-hints-ready` on `window`; hints.js re-runs the completion check for you.
-See `c-struct-complete` for the full pattern.
+See `c-struct-complete` for the sync pattern and `lsp` for the async one.
 
 ## Validation
 

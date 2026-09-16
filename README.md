@@ -50,6 +50,27 @@ Running
 
 - Open the editor in your browser at: http://localhost:8081/editor (adjust port as needed)
 
+Local LSP completions (C / C MSXgl)
+- Myslyx can feed completions from a local Language Server over the plugin
+  system (the bundled `lsp` plugin). This is **local-only** by design: it is
+  disabled in shared / multi-user deployments (e.g. a Hugging Face Space) and
+  reads the file you are editing off your own disk — the server never stores it.
+- On a Linux machine, install a C language server (clangd) and start Myslyx with
+  `MYSLYX_LSP` set to the binary name (or an absolute path):
+
+  Debian/Ubuntu:   sudo apt install clangd
+  Fedora/RHEL:     sudo dnf install clang-tools-extra
+
+  MYSLYX_LSP=clangd python main.py
+
+- Open a `.c` file (plain C) or a C MSXgl file, type a few characters (e.g.
+  `#include <string.h>` then `strl`) and the native/custom popup shows live
+  suggestions from clangd, on top of the curated keyword dictionary.
+- If the LSP cannot be reached the plugin auto-disables with a brief toast and
+  the editor falls back to the built-in hints — nothing breaks.
+- Set `MYSLYX_LOCAL=0` yourself to make Myslyx behave like a remote/shared run
+  (useful to verify all local-only plugins stay off).
+
 Developer notes
 - Auto-reload is on for development (uvicorn watches `*.py`, `*.css`, `*.js`). Disable it with `--no-reload` (or `WB_TESTING=1`) when you need a single quiet process.
 - To quickly check Python syntax for pages, run:
@@ -93,8 +114,9 @@ Tests
   complete set (`python -m tests.runner`) before finishing — never ship a
   feature on an untested suite or a skipped full run.
 
-- Timeouts: approximate 12 seconds per test in a run — the single suite gets
-  `timeout 12` (12 s), the complete 58-suite set `timeout 696` (11.6 min).
+- Timeouts: approximate 16 seconds per test in a run — the single suite gets
+  `timeout 16` (16 s), the complete 63-suite set (including the clangd-gated
+  LSP suites) `timeout 1020` (17 min).
 
 - Browsers that cannot launch (e.g. missing host libraries) are reported as SKIP rather than failing the run.
 
