@@ -73,6 +73,21 @@ Tests
 
   python -m tests.runner -b chromium firefox
 
+- Run one suite (or any subset) by name substring — repeat `-f` for several
+  filters, or add `-b` to keep the run to a single browser:
+
+  python -m tests.runner -f native/msxgl-member -b chromium
+  python -m tests.runner -f hints -f multiedit
+
+  Filters match case-insensitively against the registered suite names (e.g.
+  `fold`, `lang-combo`, `native`). No server or browser is started until you
+  actually run suites, so narrowing with `-f` is the fast way to iterate on a
+  single test.
+
+- List every registered suite name:
+
+  python -m tests.runner -l
+
 - Browsers that cannot launch (e.g. missing host libraries) are reported as SKIP rather than failing the run.
 
 Contributing

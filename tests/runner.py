@@ -8,6 +8,9 @@ Python package and its browsers:
     playwright install chromium firefox webkit
     python -m tests.runner            # defaults: chromium + firefox
     python -m tests.runner -b webkit  # explicit third browser
+    python -m tests.runner -f native/msxgl-member   # a single suite
+    python -m tests.runner -f native -b chromium    # filtered group, one browser
+    python -m tests.runner -l                       # list every registered suite
 
 WebKit is NOT in the default set: Playwright's prebuilt WebKit targets older
 Debian/Ubuntu libs (ICU 74, libjpeg 8, libbacktrace 0) that Fedora 44 does not
@@ -110,12 +113,12 @@ async def run_suite(browser, page, suite_name, fn, port):
         return (browser, suite_name, 'FAIL', f'{type(exc).__name__}: {exc}')
 
 
-async def run_browser(browser_type: str, port: int) -> list:
+async def run_browser(browser_type: str, port: int, suites) -> list:
     results = []
     async with async_playwright() as pw:
         browser = await pw[browser_type].launch(headless=True)
         try:
-            for suite_name, fn in ALL_SUITES:
+            for suite_name, fn in suites:
                 context = await browser.new_context(service_workers='block')
                 page = await context.new_page()
                 try:
@@ -131,8 +134,37 @@ async def main() -> int:
     neutralize_display_env()
     parser = argparse.ArgumentParser()
     parser.add_argument('-b', '--browsers', nargs='*', default=DEFAULT_BROWSERS)
+    parser.add_argument('-f', '--filter', nargs='*', default=[],
+                        help='run only suites whose registered name contains any '
+                             'of these substrings (case-insensitive); e.g. '
+                             '-f native/msxgl-member -f multiedit')
+    parser.add_argument('-l', '--list', action='store_true',
+                        help='list all registered suites and exit')
     parser.add_argument('-p', '--port', type=int, default=0)
     args = parser.parse_args()
+
+    suites = ALL_SUITES
+    if args.filter:
+        needles = [f.lower() for f in args.filter]
+        suites = [(name, fn) for name, fn in ALL_SUITES
+                  if any(n in name.lower() for n in needles)]
+        if args.list:
+            names = '\n'.join(sorted(name for name, _ in suites))
+            if names:
+                print(names)
+            print(f'\n{len(suites)} suite(s) match the filter(s) {args.filter!r}')
+            return 0
+        if not suites:
+            names = '\n'.join(sorted(name for name, _ in ALL_SUITES))
+            parser.error(
+                f'no suite matches the filter(s) {args.filter!r}.\n'
+                f'Available suites:\n{names}')
+
+    if args.list:
+        names = '\n'.join(sorted(name for name, _ in ALL_SUITES))
+        print(names)
+        print(f'\n{len(ALL_SUITES)} suites registered (tests/runner.py ALL_SUITES)')
+        return 0
 
     port = args.port or free_port()
     proc = start_server(port)
@@ -141,7 +173,7 @@ async def main() -> int:
         all_results = []
         for browser_type in args.browsers:
             try:
-                all_results += await run_browser(browser_type, port)
+                all_results += await run_browser(browser_type, port, suites)
             except Exception as exc:  # pragma: no cover - launch failure path
                 reason = f'{type(exc).__name__}: {exc}'.replace('\n', ' ')[:160]
                 all_results += [(browser_type, f'{dep}', 'SKIP', reason)
@@ -155,7 +187,7 @@ async def main() -> int:
             pass
         shutil.rmtree(proc._cfg_dir, ignore_errors=True)  # type: ignore[attr-defined]
 
-    width = max(len(name) for _, name, _, _ in all_results)
+    width = max((len(name) for _, name, _, _ in all_results), default=0)
     for browser, name, status, detail in all_results:
         line = f'[{browser:9}] {name:<{width}}  {status}'
         if detail:
