@@ -270,10 +270,57 @@ async def native_font_follows_editor(page, msgs):
     assert msgs == []
 
 
+async def native_msxgl_function_keeps_case(page, msgs):
+    """C user functions autocomplete in their declared case.
+
+    C is case-sensitive: a local `myFunc` must complete as `myFunc`, never as
+    the uppercased `MYFUNC` the symbol scanner historically stored.
+    """
+    await _goto_msxgl(page)
+    await page.keyboard.type('void myFunc(void) {')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('    x += 1;')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('}')
+    await page.wait_for_timeout(600)  # symbol scan (scheduleScan debounce ~250ms)
+
+    await page.keyboard.press('End')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('my')
+    await _labels_rendered(page)
+    labels = await _labels(page)
+    assert 'myFunc' in labels, f'user function must keep its original case: {labels}'
+    assert 'MYFUNC' not in labels, f'user function must not be uppercased: {labels}'
+
+    # Plain C shows the same name in the custom popup.
+    await page.keyboard.press('Escape')
+    await h.set_language(page, 'C')
+    await page.wait_for_function("window.__wbHintKey === 'c'")
+    await h.focus_active_editor(page)
+    await page.keyboard.press('End')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('my')
+    await page.wait_for_function(
+        "!!document.querySelector('.wb-autocomplete-popup')", timeout=10000)
+    custom = await page.evaluate("""() =>
+        Array.from(document.querySelectorAll('.wb-autocomplete-popup div'))
+            .map(e => e.textContent.trim()).filter(Boolean)""")
+    assert any('myFunc' in t for t in custom), f'custom popup must keep case: {custom}'
+    assert not any('MYFUNC' in t for t in custom), f'custom popup uppercased: {custom}'
+    assert msgs == []
+    custom = await page.evaluate("""() =>
+        Array.from(document.querySelectorAll('.wb-autocomplete-popup div'))
+            .map(e => e.textContent.trim()).filter(Boolean)""")
+    assert any('myFunc' in t for t in custom), f'custom popup must keep case: {custom}'
+    assert not any('MYFUNC' in t for t in custom), f'custom popup uppercased: {custom}'
+    assert msgs == []
+
+
 NATIVE_SUITES = [
     ('native/msxgl-member', native_msxgl_member_completion),
     ('native/msxgl-lang-toggle', native_msxgl_language_toggle),
     ('native/pascal-word', native_pascal_word_completion),
     ('native/pascal-lang-toggle', native_pascal_language_toggle),
     ('native/font-follows-editor', native_font_follows_editor),
+    ('native/msxgl-function-case', native_msxgl_function_keeps_case),
 ]

@@ -329,8 +329,16 @@
         var found = [];
         var m;
 
-        function add(name, kind, index) {
-            found.push({ name: name.toUpperCase(), kind: kind, line: lineNumberAt(text, index), file: fid });
+        function add(name, kind, index, preserveCase) {
+            // BASIC/Pascal (case-insensitive) store names uppercased by
+            // convention; C is case-sensitive, so its function names keep the
+            // exact case they were declared in.
+            found.push({
+                name: preserveCase ? name : name.toUpperCase(),
+                kind: kind,
+                line: lineNumberAt(text, index),
+                file: fid
+            });
         }
 
         if (key === 'pascal') {
@@ -353,7 +361,7 @@
                 + '(?:(?:const|static|inline|extern|volatile|unsigned|signed|long|short|register)\\s+)*'
                 + TYPES + '\\s+[*\\s]*([A-Za-z_][A-Za-z0-9_]*)\\s*\\([^;{}]*\\)\\s*\\{', 'g');
             while ((m = reC.exec(text)) !== null) {
-                add(m[1], 'function', m.index + m[0].indexOf(m[1]));
+                add(m[1], 'function', m.index + m[0].indexOf(m[1]), true);
             }
         } else if (key === 'asm') {
             // Assembly labels: a name at the start of a line ending with ':'
@@ -411,10 +419,12 @@
     }
 
     function findSymbol(word, symbols) {
+        // Case-sensitive languages store their (C) function names in original
+        // case, so compare case-insensitively on both sides.
         var upper = word.toUpperCase();
         var found = null;
         symbols.forEach(function(s) {
-            if (s.name === upper && !found) found = s;
+            if (s.name && s.name.toUpperCase() === upper && !found) found = s;
         });
         return found;
     }
