@@ -1,5 +1,6 @@
 {
   "enabledByDefault": true,
   "boot": true,
-  "onlyLocal": true
+  "onlyLocal": true,
+  "languageServer": true
 }

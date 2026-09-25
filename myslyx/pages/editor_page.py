@@ -189,6 +189,11 @@ def _plugin_metadata(plugin_dir: Path) -> dict[str, Any] | None:
             # Face Space) must never run local-only plugins. See myslyx/local.py.
             if isinstance(extra.get('onlyLocal'), bool):
                 meta['onlyLocal'] = extra['onlyLocal']
+            # "languageServer": marks a plugin as a language server. The
+            # Settings > PLUGINS menu treats these as mutually exclusive:
+            # enabling one stops the others (see static/settings-menu.js).
+            if isinstance(extra.get('languageServer'), bool):
+                meta['languageServer'] = extra['languageServer']
             # "boot": load and run the module factory at page startup so global
             # side effects (e.g. registering a language in the catalog) happen
             # before the server can activate an editor that needs them.
@@ -214,9 +219,9 @@ def editor_page() -> None:
     ui.add_head_html('<script src="/static/settings-menu.js"></script>')
     ui.add_head_html('<script src="/static/editor-toolbar.js"></script>')
     ui.add_head_html('<script src="/static/shortcuts.js"></script>')
-    # Deployment adverts read by the plugin runtime and the LSP plugin.
+    # Deployment adverts read by the plugin runtime and the local-lsp plugin.
     # window.__wbLocal gates "onlyLocal" plugins; window.__wbLsp tells the
-    # lsp plugin whether the server can talk to an LSP (see myslyx/lsp.py).
+    # local-lsp plugin whether the server can talk to an LSP (see myslyx/lsp.py).
     ui.add_head_html(f'<script>window.__wbLocal = {str(is_local()).lower()};</script>')
     ui.add_head_html(f'<script>window.__wbLsp = {json.dumps(lsp.available())};</script>')
     # C MSXgl and Pascal complete through CodeMirror's native autocomplete

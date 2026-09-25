@@ -1,4 +1,5 @@
-// Myslyx Text Editor - local-only LSP completions for C / C MSXgl.
+// Myslyx Text Editor - local-only LSP completions for C / C MSXgl
+// (the "local-lsp" plugin; machine-installed LSP servers via myslyx/lsp.py).
 //
 // When the server has an LSP configured and this is a local run
 // (window.__wbLsp.enabled && window.__wbLocal), completions come from the
@@ -44,6 +45,12 @@ function disable(msg) {
     bridge.disabled = true;
     // Observed by the test suite; re-enabled only on the next page load.
     window.__wbLspAutodisabled = true;
+    // The in-browser LSP plugin (weblsp) reads this to decide whether the
+    // local bridge is serving the current file: while it is true, weblsp
+    // stands down its completion sources so exactly one language server
+    // answers each popup (hover/signature stay with the worker, which the
+    // bridge does not provide).
+    window.__wbLocalLspWorking = false;
     toast('LSP unavailable: ' + msg);
 }
 
@@ -73,6 +80,10 @@ function toast(msg) {
     setTimeout(dismiss, 4000);
 }
 
+// Page-level flag read by the weblsp plugin for completion mutual
+// exclusion (see disable()). False until the ping proves the bridge works.
+window.__wbLocalLspWorking = false;
+
 // One connectivity probe per page load. A failure disables the bridge before
 // the user ever types, so the curated hints keep working immediately.
 function startBridge() {
@@ -91,6 +102,7 @@ function startBridge() {
         .then(function(j) {
             if (j && j.enabled === true) {
                 bridge.working = true;
+                window.__wbLocalLspWorking = true;
                 return;
             }
             disable((j && j.error) || 'LSP not reachable');
@@ -163,15 +175,15 @@ function customProvider(pctx) {
 }
 
 if (window.WBHintCompletions) {
-    window.WBHintCompletions.register('lsp', customProvider);
+    window.WBHintCompletions.register('local-lsp', customProvider);
 }
 
 // ---- C MSXgl: native CodeMirror completion source ----------------------
-export default function lspPlugin(CM) {
+export default function localLspPlugin(CM) {
     if (!available()) return [];
     startBridge();
 
-    const lspNativeSource = async function(ctx) {
+    const localLspNativeSource = async function(ctx) {
         try {
             if (bridge.disabled) return null;
             if (!bridge.ready || !bridge.working) return null;
@@ -195,7 +207,7 @@ export default function lspPlugin(CM) {
     };
 
     const config = CM.EditorState.languageData.of(function() {
-        return [{ autocomplete: lspNativeSource }];
+        return [{ autocomplete: localLspNativeSource }];
     });
     return [config];
 }

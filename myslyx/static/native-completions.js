@@ -290,13 +290,19 @@ async function nativeSource(ctx) {
         var pos = ctx.pos;
         var wordInfo = wordBefore(state, pos);
         // Member completion is C-only for now (CST + shared struct model);
-        // Pascal .json carries no structs and its parser has no tree.
+        // Pascal .json carries no structs and its parser has no tree. Member
+        // contexts ALWAYS stay curated: the in-browser LSP worker answers
+        // those with null on purpose (it cannot see in-file definitions).
         if (isMsxgl()) {
             var member = await memberContext(state, pos, wordInfo);
             if (member) {
                 return await memberSource(ctx, wordInfo, hints);
             }
         }
+        // Word completions come from the in-browser LSP worker (same
+        // dictionaries) when it is ready, so the curated word source stands
+        // down and each label completes exactly once.
+        if (window.__wbWebLspReady && (key === 'msxgl' || key === 'pascal')) return null;
         return wordSource(ctx, wordInfo, hints, isPascal());
     } catch (e) {
         return null;

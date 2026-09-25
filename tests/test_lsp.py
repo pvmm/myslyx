@@ -215,17 +215,17 @@ async def autodisable_on_failure(page, msgs):
 
 
 DEFAULT_SUITES = [
-    ('lsp/disabled-by-default', disabled_by_default, None),
+    ('local-lsp/disabled-by-default', disabled_by_default, None),
 ]
 
 ENABLED_SUITES = [
-    ('lsp/completions-msxgl-native', completions_msxgl_native, {'MYSLYX_LSP': 'clangd'}),
-    ('lsp/completions-c-custom', completions_c_custom, {'MYSLYX_LSP': 'clangd'}),
+    ('local-lsp/completions-msxgl-native', completions_msxgl_native, {'MYSLYX_LSP': 'clangd'}),
+    ('local-lsp/completions-c-custom', completions_c_custom, {'MYSLYX_LSP': 'clangd'}),
     # Same binary as the positive phase, but the server looks like a shared
     # Hugging Face Space: the local-only gates must keep everything inert.
-    ('lsp/local-gate', local_gate, {'MYSLYX_LSP': 'clangd', 'SPACE_ID': '1'}),
+    ('local-lsp/local-gate', local_gate, {'MYSLYX_LSP': 'clangd', 'SPACE_ID': '1'}),
     # Executable but not an LSP server: resolves, then fails at ping time.
-    ('lsp/autodisable-on-failure', autodisable_on_failure, {'MYSLYX_LSP': '/bin/false'}),
+    ('local-lsp/autodisable-on-failure', autodisable_on_failure, {'MYSLYX_LSP': '/bin/false'}),
 ]
 
 LSP_SUITES = DEFAULT_SUITES + ENABLED_SUITES

@@ -36,18 +36,25 @@ directories and binds each module to the editor through the runtime in
 
 2. (Optional) Add `static/plugins/<name>/plugin.json` to override defaults:
 
-   ```json
-   {
-     "languages": ["C MSXgl"],
-     "baseLang": ["c"],
-     "enabledByDefault": false,
-     "onlyLocal": true
-   }
-   ```
+    ```json
+    {
+      "languages": ["C MSXgl"],
+      "baseLang": ["c"],
+      "enabledByDefault": false,
+      "onlyLocal": true,
+      "languageServer": true
+    }
+    ```
 
-   Defaults: `languages: ["*"]` (all languages), `enabledByDefault: true`.
-   `name`, `dir` and `entry` (the module file) come from the directory name:
-   `static/plugins/<name>/<name>.js`.
+    Defaults: `languages: ["*"]` (all languages), `enabledByDefault: true`.
+    `name`, `dir` and `entry` (the module file) come from the directory name:
+    `static/plugins/<name>/<name>.js`.
+
+    `languageServer: true` marks the plugin as a language server. Language
+    servers are mutually exclusive: enabling one from Settings > PLUGINS
+    automatically disables the others (see `static/settings-menu.js`), so
+    exactly one server boots after the reload — e.g. turning on `weblsp`
+    stops `local-lsp` and vice versa.
 
    `onlyLocal: true` restricts the plugin to local runs. The page head injects
    `window.__wbLocal` (see `myslyx/local.py` — true unless the run looks like a
@@ -188,7 +195,7 @@ runtime toggle yet.
   autocomplete popup through a completion provider registered with
   `WBHintCompletions` (see `static/hints.js`). With no Python changes it
   covers plain C, the C MSXgl framework, and any future base-`c` language.
-- `static/plugins/lsp/` — local-only C completions from a Language Server
+- `static/plugins/local-lsp/` — local-only C completions from a Language Server
   (`onlyLocal`, `enabledByDefault`, `boot`). Its Python counterpart
   (`myslyx/lsp.py`, exposed as `POST /wb/lsp/{ping,complete,close}`) only
   activates when `MYSLYX_LSP=<binary>` is set on a local run; the page head
@@ -197,6 +204,21 @@ runtime toggle yet.
   plain C through a `WBHintCompletions` async provider, and **auto-disables**
   itself with a toast when the bridge reports a failure. See
   `docs/agents/lsp-local-only.md` and the README's "Local LSP completions".
+- `static/plugins/weblsp/` — in-browser LSP for the hinted languages
+  (`enabledByDefault`, `boot`, deliberately **not** `onlyLocal`, so it also
+  runs on shared deployments). A real `vscode-languageserver` server runs
+  inside a Web Worker (the committed `worker.bundle.js`, built by
+  `tools/weblsp/`) and serves completion + hover + signature help from the
+  same generated hints dictionaries (`static/hints/<key>.json`) that feed the
+  sidebar and popups, plus the user's exported symbols. It joins the native
+  popup for C MSXgl and Pascal and the custom popup for plain C (the same
+  split as `local-lsp`); while it is ready, `native-completions.js` stands
+  down for those keys so each label completes exactly once. While the
+  machine-installed bridge actually serves the current file it wins
+  completions and the worker stands down (hover/signature stay in-browser).
+  If the worker fails it auto-disables with a toast and the curated sources
+  take over. See
+  `docs/agents/weblsp-in-browser.md` and the README's "In-browser LSP".
 
 ### Completions providers
 
@@ -215,11 +237,11 @@ window.WBHintCompletions.register('my-completions', function(ctx) {
 `static/hints.js` runs the providers first; the first non-null result wins.
 A provider may also return a **Promise** for the same values — the popup is
 shown only after it resolves, and while it is pending the default keyword path
-is held off. This is how the bundled `lsp` plugin feeds live server results
+is held off. This is how the bundled `local-lsp` plugin feeds live server results
 into the popup. `apply` is optional (a string replaces the typed word). Because
 hints data can arrive asynchronously, a provider may load it and then dispatch
 `wb-hints-ready` on `window`; hints.js re-runs the completion check for you.
-See `c-struct-complete` for the sync pattern and `lsp` for the async one.
+See `c-struct-complete` for the sync pattern and `local-lsp` for the async one.
 
 ## Validation
 

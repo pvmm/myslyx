@@ -52,7 +52,7 @@ Running
 
 Local LSP completions (C / C MSXgl)
 - Myslyx can feed completions from a local Language Server over the plugin
-  system (the bundled `lsp` plugin). This is **local-only** by design: it is
+  system (the bundled `local-lsp` plugin). This is **local-only** by design: it is
   disabled in shared / multi-user deployments (e.g. a Hugging Face Space) and
   reads the file you are editing off your own disk — the server never stores it.
 - On a Linux machine, install a C language server (clangd) and start Myslyx with
@@ -70,6 +70,26 @@ Local LSP completions (C / C MSXgl)
   the editor falls back to the built-in hints — nothing breaks.
 - Set `MYSLYX_LOCAL=0` yourself to make Myslyx behave like a remote/shared run
   (useful to verify all local-only plugins stay off).
+
+In-browser LSP (C / C MSXgl / Pascal)
+- Myslyx also ships an LSP that runs entirely in your browser (the bundled
+  `weblsp` plugin): a real `vscode-languageserver` server in a Web Worker
+  serving completions, hover tips and signature help from the same generated
+  hints dictionaries as the sidebar (`static/hints/*.json`), plus your own
+  exported symbols. It needs no server binary and works on shared / remote
+  deployments too.
+- In a C MSXgl file, type `VDP_SetM` for worker-fed completions, hover a
+  builtin for its tip, or type `VDP_SetMode(` for signature help. Plain C
+  keeps the custom popup; Pascal completes through the native one.
+- The worker bundle (`myslyx/static/plugins/weblsp/worker.bundle.js`) is
+  committed so installs run without node. Rebuild it after editing the server
+  sources or upgrading dependencies with:
+
+  npm --prefix tools/weblsp install
+  npm --prefix tools/weblsp run build
+
+- Disable it in Settings > PLUGINS (`weblsp`); the curated dictionaries keep
+  working as fallback.
 
 Developer notes
 - Auto-reload is on for development (uvicorn watches `*.py`, `*.css`, `*.js`). Disable it with `--no-reload` (or `WB_TESTING=1`) when you need a single quiet process.
@@ -114,9 +134,9 @@ Tests
   complete set (`python -m tests.runner`) before finishing — never ship a
   feature on an untested suite or a skipped full run.
 
-- Timeouts: approximate 16 seconds per test in a run — the single suite gets
-  `timeout 16` (16 s), the complete 63-suite set (including the clangd-gated
-  LSP suites) `timeout 1020` (17 min).
+- Timeouts: approximate 25 seconds per test in a run — the single suite gets
+  `timeout 25` (25 s), the complete 72-suite set (including the clangd-gated
+  local-LSP suites) `timeout 1800` (30 min).
 
 - Browsers that cannot launch (e.g. missing host libraries) are reported as SKIP rather than failing the run.
 

@@ -23,6 +23,7 @@
             baseLang: def.baseLang ? (Array.isArray(def.baseLang) ? def.baseLang : [def.baseLang]) : null,
             enabledByDefault: def.enabledByDefault !== false,
             onlyLocal: def.onlyLocal === true,
+            languageServer: def.languageServer === true,
             extensions: function(view, CM, ctx) {
                 return import(url).then(function(mod) {
                     if (typeof mod.default !== 'function') {

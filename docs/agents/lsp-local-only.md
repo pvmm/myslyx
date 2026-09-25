@@ -25,8 +25,8 @@ files, delivered through the plugin system:
 - `myslyx/pages/editor_page.py` — injects `window.__wbLocal` and
   `window.__wbLsp = {enabled, server, error}`; the plugin manifest picks up
   `onlyLocal`.
-- `myslyx/static/plugins/lsp/` — the client plugin (`plugin.json` with
-  `"onlyLocal": true`, `"boot": true`; `lsp.js` bridge). Pings once at page
+- `myslyx/static/plugins/local-lsp/` — the client plugin (`plugin.json` with
+  `"onlyLocal": true`, `"boot": true`; `local-lsp.js` bridge). Pings once at page
   load, feeds C MSXgl through the **native** autocomplete popup
   (`EditorState.languageData.at("autocomplete")`, the same mechanism as
   `native-completions.js`) and plain C through a **custom** popup via a

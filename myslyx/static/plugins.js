@@ -19,7 +19,11 @@
         // menu. Read enabled state with _enabled().
         list: function() {
             return registry.map(function(d) {
-                return { name: d.name, enabledByDefault: d.enabledByDefault !== false };
+                return {
+                    name: d.name,
+                    enabledByDefault: d.enabledByDefault !== false,
+                    languageServer: d.languageServer === true,
+                };
             });
         },
 

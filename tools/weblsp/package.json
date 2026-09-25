@@ -1,0 +1,17 @@
+{
+  "name": "myslyx-weblsp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Build toolchain for the Myslyx in-browser LSP worker (static/plugins/weblsp/worker.bundle.js). Bundles vscode-languageserver/browser plus the hints-driven server in tools/weblsp/src/. The built bundle is committed so wheels and checkouts run without node; node is only needed to rebuild it.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.8"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

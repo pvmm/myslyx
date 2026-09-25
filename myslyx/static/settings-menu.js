@@ -186,6 +186,22 @@
                                 var cfg = window.WBStorage.loadConfig();
                                 cfg.plugins = cfg.plugins || {};
                                 cfg.plugins[def.name] = cb.checked;
+                                // Language servers are mutually exclusive:
+                                // enabling one stops the others (a disabled
+                                // plugin never boots after the reload in
+                                // close()). Their rows are unchecked too so
+                                // the menu shows the actual outcome.
+                                if (def.languageServer && cb.checked) {
+                                    window.WBPlugins.list().forEach(function(other) {
+                                        if (!other.languageServer || other.name === def.name) return;
+                                        cfg.plugins[other.name] = false;
+                                        submenu.querySelectorAll('.wb-plugin-row').forEach(function(r) {
+                                            var n = r.querySelector('.wb-plugin-name');
+                                            var c = r.querySelector('.wb-plugin-check');
+                                            if (n && c && n.textContent === other.name) c.checked = false;
+                                        });
+                                    });
+                                }
                                 window.WBStorage.saveConfig(cfg);
                                 // Reloading while choosing is jarring, so the
                                 // page refresh is deferred until the menu is

@@ -44,6 +44,7 @@ from tests.test_multiedit import MULTIEDIT_SUITES
 from tests.test_native import NATIVE_SUITES
 from tests.test_plugins import PLUGIN_SUITES, prepare_user_plugin_layout
 from tests.test_smoke import SMOKE_SUITES
+from tests.test_weblsp import WEBLSP_SUITES
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVER = ROOT / 'main.py'
@@ -54,7 +55,7 @@ DEFAULT_BROWSERS = ['chromium', 'firefox']
 # extra environment variables for the dedicated server phase that runs the
 # suite (see tests/test_lsp.py).
 _ALL_PLAIN = MULTIEDIT_SUITES + HEADER_SUITES + SMOKE_SUITES + PLUGIN_SUITES + NATIVE_SUITES
-ALL_SUITES = [(name, fn, None) for name, fn in _ALL_PLAIN] + LSP_SUITES
+ALL_SUITES = [(name, fn, None) for name, fn in _ALL_PLAIN] + LSP_SUITES + WEBLSP_SUITES
 
 
 def free_port() -> int:
