@@ -30,8 +30,22 @@ A real `vscode-languageserver` server inside a Web Worker, served as the
   definitions, so the worker additionally mines the synced document text
   itself on every completion (`parseDocumentSymbols` in `hintsmodel.js`):
   file-scope variables, function names, parameters and Pascal `var`-block
-  names rank first, ahead of framework names. Covered by
-  `weblsp/local-variables`.
+  names rank first, ahead of framework names. Local struct/union/enum
+  declarations are found the same way (`parseLocalTypes`, brace-depth
+  scanned): the type names and enum constants complete, and they join the
+  known-type set so declarators using them (`MySprite player;`) parse as
+  variables — while struct *fields* never leak as file-scope names (struct
+  bodies are masked for the declarator pass). Covered by
+  `weblsp/local-variables` and `weblsp/local-types`.
+- Member completion (`textDocument/completion` on `.` / `->`): framework
+  `structs` tables merged with locally declared aggregates (in-file wins
+  whole-struct), resolved through receiver chains
+  (`memberChainBefore`/`resolveMemberItems` in `hintsmodel.js`) fed by the
+  document's variable->type bindings (pointer vs. value not distinguished,
+  mirroring the curated model). While the worker is ready the curated
+  member sources stand down so each field completes exactly once; plain C
+  keeps its `c-struct-complete` member path and the local bridge keeps
+  clangd members when it serves. Covered by `weblsp/member-complete`.
 - `myslyx/static/native-completions.js` — stands down for `msxgl`/`pascal`
   while `window.__wbWebLspReady` is set, so each label completes exactly
   once; clears on worker failure and the curated path resumes.
@@ -62,8 +76,10 @@ A real `vscode-languageserver` server inside a Web Worker, served as the
   language server answers each popup. Hover and signature help stay with the
   worker, which the bridge does not provide. Covered by
   `weblsp/local-bridge-wins` (clangd phase).
-- Member contexts (`.` / `->`) answer `null`: the client's curated struct
-  machinery resolves in-file struct definitions the hints JSON cannot see.
+- Unresolvable member chains (unknown struct, call-result receivers like
+  `f(x).y` that need a syntax tree) answer `null`: the curated tree path
+  resumes automatically whenever the worker is down or the local bridge
+  serves, so silence here never loses a completion the old path had.
 - Signature help parses the rendered tip markdown (`hintsmodel.js`
   `parseTip`); free-form tips (c.json/pascal.json) yield no signature.
   Swap hook documented in `tools/weblsp/README.md`.

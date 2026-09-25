@@ -290,12 +290,17 @@ async function nativeSource(ctx) {
         var pos = ctx.pos;
         var wordInfo = wordBefore(state, pos);
         // Member completion is C-only for now (CST + shared struct model);
-        // Pascal .json carries no structs and its parser has no tree. Member
-        // contexts ALWAYS stay curated: the in-browser LSP worker answers
-        // those with null on purpose (it cannot see in-file definitions).
+        // Pascal .json carries no structs and its parser has no tree. While
+        // the in-browser LSP worker is ready (and the local bridge is not
+        // serving via clangd), the worker owns member completion from the
+        // same tables plus the live buffer, so the curated path stands down
+        // and each field completes exactly once. Otherwise the tree-based
+        // curated path serves (it also covers call-result receivers the
+        // worker's text heuristic cannot see).
         if (isMsxgl()) {
             var member = await memberContext(state, pos, wordInfo);
             if (member) {
+                if (window.__wbWebLspReady && !window.__wbLocalLspWorking) return null;
                 return await memberSource(ctx, wordInfo, hints);
             }
         }

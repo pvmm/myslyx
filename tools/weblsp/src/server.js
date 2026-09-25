@@ -16,13 +16,16 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
     normalizeHints,
-    memberTriggerInfo,
+    memberChainBefore,
+    resolveMemberItems,
+    parseDocumentModel,
+    parseDocumentSymbols,
+    wordBefore,
     buildWordItems,
     lookupTip,
     wordAt,
     parseTip,
     callInfo,
-    parseDocumentSymbols,
 } from './hintsmodel.js';
 
 const EMPTY = normalizeHints(null);
@@ -107,8 +110,18 @@ export function attach(connection) {
         } catch (e) {
             return null;
         }
-        const mt = memberTriggerInfo(text, offset);
-        if (mt.isMember) return null;
+        const mc = memberChainBefore(text, offset);
+        if (mc) {
+            // Struct/union member completion: framework `structs` tables
+            // merged with locally declared aggregates (in-file definitions
+            // win whole-struct, mirroring the curated merge), resolved
+            // through the document's variable->type bindings.
+            const docModel = parseDocumentModel(text, ctx.hintKey, model.types);
+            const allStructs = Object.assign({}, model.structs, docModel.members);
+            const items = resolveMemberItems(allStructs, docModel.typeOf, mc.parts, mc.word);
+            if (!items.length) return null;
+            return { isIncomplete: false, items };
+        }
         const caseInsensitive = ctx.hintKey === 'pascal';
         // In-file declarations first (they win over framework names on a
         // clash), then the persisted cross-file symbols, then the hints.
@@ -116,7 +129,8 @@ export function attach(connection) {
         // the live parse is what completes locals, params and file-scope
         // variables typed in this buffer.
         const docSyms = parseDocumentSymbols(text, ctx.hintKey, model.types);
-        const items = buildWordItems(model, docSyms.concat(symbols()), mt.word || '',
+        const items = buildWordItems(model, docSyms.concat(symbols()),
+            wordBefore(text, offset).word,
             caseInsensitive, builtinDetail);
         if (!items.length) return null;
         return { isIncomplete: false, items };

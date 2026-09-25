@@ -341,11 +341,102 @@ async def local_variables(page, msgs):
     assert not msgs, f'console errors: {msgs}'
 
 
+async def local_types(page, msgs):
+    """Struct/union/enum names declared locally complete — and so do
+    variables declared with those local types, plus members of a local
+    struct through the native popup (curated path; the worker yields)."""
+    bridge = _watch_lsp_bridge(page)
+    await _reset_config(page)
+    await _goto_new_file(page, 'C+MSXgl', 'msxgl')
+    await _wait_ready(page)
+    await h.focus_active_editor(page)
+    await _type_slow(
+        page,
+        'typedef struct { u8 x; u8 y; } MySprite;\n'
+        'typedef union { u16 w; u8 b[2]; } MyWord;\n'
+        'enum MyMode { MY_IDLE, MY_RUN };\n'
+        'MySprite player;\n'
+        'My',
+        pause=60)
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'MySprite'),
+                    timeout=20000, msg='local struct name never completed')
+    labels = await _native_labels(page)
+    for needle in ('MySprite', 'MyWord', 'MyMode', 'MY_IDLE', 'MY_RUN'):
+        assert any(needle in s for s in labels), f'{needle} missing from popup: {labels}'
+    details = await page.evaluate(
+        "() => Array.from(document.querySelectorAll("
+        "'.cm-tooltip-autocomplete .cm-completionDetail')).map(e => e.textContent)")
+    assert any('type' in (d or '') for d in details), f'type tag missing: {details}'
+
+    # A variable declared with the local type completes too (two-pass parse).
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('play')
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'player'),
+                    timeout=20000, msg='variable of local struct type never completed')
+
+    # Members of the local struct resolve natively (curated member path).
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('player.')
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'x'),
+                    timeout=20000, msg='local struct members never completed')
+    member_labels = await _native_labels(page)
+    assert 'x' in member_labels and 'y' in member_labels, \
+        f'local struct members missing: {member_labels}'
+    assert bridge['ping'] == 0, 'no local-bridge ping expected'
+    assert bridge['complete'] == 0, 'no local-bridge round trips expected'
+    assert not msgs, f'console errors: {msgs}'
+
+
+async def member_complete(page, msgs):
+    """Struct/union members after ./-> come from the worker (local struct
+    and framework struct alike); each field completes exactly once."""
+    bridge = _watch_lsp_bridge(page)
+    await _reset_config(page)
+    await _goto_new_file(page, 'C+MSXgl', 'msxgl')
+    await _wait_ready(page)
+    await h.focus_active_editor(page)
+    snippet = ('typedef struct { u8 x; u8 y; } MySprite;\n'
+               'MySprite player;\n'
+               'VDP_Sprite spr;\n')
+    await page.evaluate("""(text) => window.WBEditorActive.current(3000).then(v => {
+        v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: text } });
+        return true;
+    })""", snippet)
+    await h.doc_equals(page, snippet)
+    before = await page.evaluate("(window.__wbWebLsp && window.__wbWebLsp.completedRequests) || 0")
+    await page.keyboard.press('Control+End')
+    await page.keyboard.type('player.')
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'x'),
+                    timeout=20000, msg='local struct members never completed')
+    labels = await _native_labels(page)
+    assert 'x' in labels and 'y' in labels, f'local struct members missing: {labels}'
+    assert len(labels) == len(set(labels)), f'duplicate member labels: {labels}'
+    after = await page.evaluate("(window.__wbWebLsp && window.__wbWebLsp.completedRequests) || 0")
+    assert after > before, 'worker must serve completions in this file'
+
+    # Framework struct members resolve through the worker too.
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('spr.')
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'X'),
+                    timeout=20000, msg='framework struct members never completed')
+    fw_labels = await _native_labels(page)
+    assert 'X' in fw_labels and 'Y' in fw_labels, f'framework members missing: {fw_labels}'
+    assert len(fw_labels) == len(set(fw_labels)), f'duplicate member labels: {fw_labels}'
+    assert bridge['ping'] == 0, 'no local-bridge ping expected'
+    assert bridge['complete'] == 0, 'no local-bridge round trips expected'
+    assert not msgs, f'console errors: {msgs}'
+
+
 WEBLSP_DEFAULT_SUITES = [
     ('weblsp/completions-msxgl-native', completions_msxgl_native, None),
     ('weblsp/completions-c-custom', completions_c_custom, None),
     ('weblsp/completions-pascal-native', completions_pascal_native, None),
     ('weblsp/local-variables', local_variables, None),
+    ('weblsp/local-types', local_types, None),
+    ('weblsp/member-complete', member_complete, None),
     ('weblsp/hover', hover_tip, None),
     ('weblsp/signature-help', signature_help, None),
     ('weblsp/exclusive-toggle', exclusive_toggle, None),

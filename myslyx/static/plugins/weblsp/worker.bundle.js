@@ -8513,14 +8513,6 @@ ${JSON.stringify(message, null, 4)}`);
     while (end < text.length && /[A-Za-z0-9_]/.test(text[end])) end++;
     return { word: text.slice(start, end), start, end };
   }
-  function memberTriggerInfo(text, offset) {
-    const wb = wordBefore(text, offset);
-    const lineStart = text.lastIndexOf("\n", offset - 1) + 1;
-    const w = wb.word;
-    let prefix = text.slice(lineStart, wb.start).replace(/[ \t]*$/, "");
-    if (/(->|\.)$/.test(prefix)) return { isMember: true, word: w, from: wb.start };
-    return { isMember: false, word: w, from: wb.start };
-  }
   function buildWordItems(model, symbols, prefix, caseInsensitive, detailFor) {
     const lower = (prefix || "").toLowerCase();
     const upper = (prefix || "").toUpperCase();
@@ -8543,11 +8535,13 @@ ${JSON.stringify(message, null, 4)}`);
       isEnumConstant(t) ? Kind.Constant : Kind.Struct,
       isEnumConstant(t) ? "const" : "type"
     ));
-    (symbols || []).forEach((s) => push(
-      s.name,
-      s.kind === "function" ? Kind.Function : Kind.Variable,
-      s.kind || "symbol"
-    ));
+    (symbols || []).forEach((s) => {
+      if (!s || !s.name) return;
+      if (s.kind === "function") push(s.name, Kind.Function, "function");
+      else if (s.kind === "type") push(s.name, Kind.Struct, "type");
+      else if (s.kind === "constant") push(s.name, Kind.Constant, "const");
+      else push(s.name, Kind.Variable, s.kind || "symbol");
+    });
     const matched = out.filter((m) => !lower || m.label.toLowerCase().indexOf(lower) === 0);
     matched.forEach((m) => {
       if (lower && (caseInsensitive ? m.label.substring(0, prefix.length).toUpperCase() === upper : m.label.indexOf(prefix) === 0)) m._boost = 20;
@@ -8682,24 +8676,160 @@ ${JSON.stringify(message, null, 4)}`);
     "continue",
     "goto"
   ]);
+  function parseLocalTypes(text) {
+    const types = [];
+    const consts = [];
+    const vars = [];
+    const members = {};
+    const clean = stripCNoise(text);
+    const seenT = /* @__PURE__ */ new Set();
+    const seenC = /* @__PURE__ */ new Set();
+    const seenV = /* @__PURE__ */ new Set();
+    const addT = (n) => {
+      if (n && !seenT.has(n)) {
+        seenT.add(n);
+        types.push(n);
+      }
+    };
+    const addC = (n) => {
+      if (n && !seenC.has(n)) {
+        seenC.add(n);
+        consts.push(n);
+      }
+    };
+    const addV = (n, ofType) => {
+      if (n && !seenV.has(n)) {
+        seenV.add(n);
+        vars.push({ name: n, ofType });
+      }
+    };
+    function scanConsts(body) {
+      for (const part of body.split(",")) {
+        const cm = /^\s*([A-Za-z_]\w*)/.exec(part);
+        if (cm) addC(cm[1]);
+      }
+    }
+    function parseFields(body) {
+      const fields = [];
+      for (const seg of body.split(";")) {
+        if (!seg || /[{}}]/.test(seg) || seg.indexOf("(") >= 0) continue;
+        const fm = /^\s*(.+?)\s+([A-Za-z_]\w*(?:\s*\[[^\]]*\])?(?:\s*:\s*\d+)?)\s*$/.exec(seg);
+        if (!fm) continue;
+        const ftype = fm[1].trim();
+        const fname = fm[2].trim();
+        if (!ftype || !fname || /^(extern|typedef)$/.test(ftype)) continue;
+        fields.push([ftype, fname, ""]);
+      }
+      return fields;
+    }
+    function scanRange(from, to, depth) {
+      const re = /(typedef\s+)?\b(struct|union|enum)\b\s*([A-Za-z_]\w*)?/g;
+      re.lastIndex = from;
+      let m;
+      while ((m = re.exec(clean)) !== null && m.index < to) {
+        const isTypedef = !!m[1];
+        const kind = m[2];
+        const tag = m[3] || null;
+        let i = m.index + m[0].length;
+        const skipWs = () => {
+          while (i < to && /\s/.test(clean[i])) i++;
+        };
+        skipWs();
+        if (clean[i] === "{") {
+          let braceDepth = 0;
+          const start = i;
+          while (i < to) {
+            if (clean[i] === "{") braceDepth++;
+            else if (clean[i] === "}") {
+              braceDepth--;
+              if (braceDepth === 0) break;
+            }
+            i++;
+          }
+          const body = clean.slice(start + 1, i);
+          i++;
+          if (tag) addT(tag);
+          let fieldList = null;
+          if (kind === "enum") scanConsts(body);
+          else {
+            scanRange(start + 1, i - 1, depth + 1);
+            fieldList = parseFields(body);
+            if (tag && fieldList.length) members[tag] = fieldList;
+          }
+          skipWs();
+          const lm = /^(\*?\s*[A-Za-z_]\w*(?:\s*,\s*\*?\s*[A-Za-z_]\w*)*)\s*;/.exec(clean.slice(i, to));
+          if (lm) {
+            for (const nm of lm[1].split(",")) {
+              const w = nm.replace(/\*/g, "").trim();
+              if (!w) continue;
+              if (isTypedef) {
+                addT(w);
+                if (fieldList && fieldList.length) members[w] = fieldList;
+              } else if (depth === 0) addV(w);
+            }
+            i += lm[0].length;
+          }
+          re.lastIndex = i;
+          continue;
+        }
+        if (tag) addT(tag);
+      }
+    }
+    scanRange(0, clean.length, 0);
+    return { types, consts, vars, members };
+  }
+  function maskStructUnionBodies(clean) {
+    const spans = [];
+    const re = /(typedef\s+)?\b(struct|union)\b\s*([A-Za-z_]\w*)?\s*\{/g;
+    let m;
+    while ((m = re.exec(clean)) !== null) {
+      let depth = 0;
+      let i = m.index + m[0].length - 1;
+      while (i < clean.length) {
+        if (clean[i] === "{") depth++;
+        else if (clean[i] === "}") {
+          depth--;
+          if (depth === 0) break;
+        }
+        i++;
+      }
+      spans.push([m.index + m[0].length, i]);
+    }
+    const chars = clean.split("");
+    for (const [a, b] of spans) {
+      for (let k = a; k < b && k < chars.length; k++) chars[k] = " ";
+    }
+    return chars.join("");
+  }
+  function paramType(part) {
+    const toks = part.trim().replace(/\[[^\]]*\]/g, "").trim().split(/[\s*]+/).filter(Boolean);
+    if (toks.length < 2) return void 0;
+    const stop = new Set(["*"].concat(C_QUALIFIERS));
+    let k = toks.length - 2;
+    while (k >= 0 && stop.has(toks[k])) k--;
+    return k >= 0 ? toks[k] : void 0;
+  }
   function parseCDocumentSymbols(text, typeNames) {
     const out = [];
-    const known = new Set(C_TYPE_WORDS.concat(typeNames || []));
-    const clean = stripCNoise(text);
+    const local = parseLocalTypes(text);
+    const known = new Set(C_TYPE_WORDS.concat(typeNames || [], local.types));
+    const clean = maskStructUnionBodies(stripCNoise(text));
+    for (const t of local.types) out.push({ name: t, kind: "type" });
+    for (const cn of local.consts) out.push({ name: cn, kind: "constant" });
     const reFn = /(?:^|[^A-Za-z0-9_])((?:(?:const|static|inline|extern|volatile|unsigned|signed|long|short|register)\s+)*)([A-Za-z_]\w*)\s*(\*(?:\s*\*)*)?\s*([A-Za-z_]\w*)\s*\(([^;{}]*)\)\s*(\{?)/g;
     let m;
     while ((m = reFn.exec(clean)) !== null) {
       const type = m[2];
       const name = m[4];
       if (!known.has(type) || C_NOISE.has(name)) continue;
-      out.push({ name, kind: "function", params: m[5] || "" });
+      out.push({ name, kind: "function", ofType: type, params: m[5] || "" });
     }
     for (const fn of out) {
       if (fn.kind !== "function" || !fn.params) continue;
       for (const part of fn.params.split(",")) {
         const pm = /([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*$/.exec(part.trim());
         if (pm && pm[1] && !known.has(pm[1]) && !C_NOISE.has(pm[1]) && pm[1] !== "void" && !C_QUALIFIERS.includes(pm[1])) {
-          out.push({ name: pm[1], kind: "param" });
+          out.push({ name: pm[1], kind: "param", ofType: paramType(part) });
         }
       }
       delete fn.params;
@@ -8709,9 +8839,28 @@ ${JSON.stringify(message, null, 4)}`);
       const type = m[2];
       const name = m[4];
       if (!known.has(type) || C_NOISE.has(name) || known.has(name)) continue;
-      out.push({ name, kind: "variable" });
+      out.push({ name, kind: "variable", ofType: type });
+      const cont = /^(?:\s*=\s*[^,;()]+)?((?:\s*,\s*[A-Za-z_]\w*(?:\s*=\s*[^,;()]+)?)+)(?=\s*;)/.exec(
+        clean.slice(reVar.lastIndex)
+      );
+      if (cont) {
+        for (const cm of cont[1].matchAll(/[A-Za-z_]\w*/g)) {
+          if (!known.has(cm[0]) && !C_NOISE.has(cm[0])) {
+            out.push({ name: cm[0], kind: "variable", ofType: type });
+          }
+        }
+      }
     }
-    return out;
+    const reAlias = /typedef\s+([A-Za-z_][\w\s*]*?)\s+([A-Za-z_]\w*)\s*;/g;
+    while ((m = reAlias.exec(clean)) !== null) {
+      if (!C_NOISE.has(m[2])) out.push({ name: m[2], kind: "type" });
+    }
+    for (const v of local.vars) out.push({ name: v.name, kind: "variable", ofType: v.ofType });
+    const typeOf = /* @__PURE__ */ new Map();
+    for (const s of out) {
+      if (s.ofType && !typeOf.has(s.name)) typeOf.set(s.name, s.ofType);
+    }
+    return { symbols: out, members: local.members, typeOf };
   }
   function parsePascalDocumentSymbols(text) {
     const out = [];
@@ -8740,15 +8889,82 @@ ${JSON.stringify(message, null, 4)}`);
     return out;
   }
   function parseDocumentSymbols(text, hintKey, typeNames) {
+    return parseDocumentModel(text, hintKey, typeNames).symbols;
+  }
+  function parseDocumentModel(text, hintKey, typeNames) {
+    const empty = { symbols: [], members: {}, typeOf: /* @__PURE__ */ new Map() };
     try {
-      if (hintKey === "pascal") return parsePascalDocumentSymbols(text);
+      if (hintKey === "pascal") {
+        return { symbols: parsePascalDocumentSymbols(text), members: {}, typeOf: /* @__PURE__ */ new Map() };
+      }
       if (hintKey === "c" || hintKey === "msxgl") {
         return parseCDocumentSymbols(text, typeNames);
       }
-      return [];
+      return empty;
     } catch (e) {
-      return [];
+      return empty;
     }
+  }
+  function memberChainBefore(text, offset) {
+    const pos = Math.max(0, Math.min(offset, text.length));
+    const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+    const prefix = text.slice(lineStart, pos);
+    const wm = /[A-Za-z_][A-Za-z0-9_]*$/.exec(prefix);
+    const word = wm ? wm[0] : "";
+    const stem = (word ? prefix.slice(0, -word.length) : prefix).replace(/[ \t]*$/, "");
+    if (!/(->|\.)$/.test(stem)) return null;
+    const cm = /([A-Za-z_]\w*(?:\s*(?:->|\.)\s*[A-Za-z_]\w*)*)\s*(?:->|\.)\s*$/.exec(stem);
+    if (!cm) return null;
+    const parts = cm[1].split(/(?:->|\.)/).map((s) => s.trim()).filter((s) => s.length > 0);
+    if (!parts.length) return null;
+    return { parts, word, from: pos - word.length };
+  }
+  function stripTypeName(t) {
+    return String(t || "").replace(/\*/g, "").replace(/\[[^\]]*\]/g, "").trim();
+  }
+  function fieldsOf(structs, name) {
+    const s = structs[stripTypeName(name)];
+    return Array.isArray(s) ? s : null;
+  }
+  function memberFieldType(structs, structName, field) {
+    const fields = fieldsOf(structs, structName);
+    if (!fields) return null;
+    const hit = fields.find((f) => f && f[1] === field);
+    return hit ? hit[0] : null;
+  }
+  function resolveMemberItems(structs, typeOf, parts, word) {
+    if (!parts || !parts.length) return [];
+    const base = parts[0];
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(base)) return [];
+    let cur = typeOf && typeOf.has(base) ? typeOf.get(base) : base in structs ? base : null;
+    if (!cur) return [];
+    for (let i = 1; i < parts.length; i++) {
+      const tok = parts[i];
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(tok)) return [];
+      const nt = memberFieldType(structs, cur, tok);
+      if (!nt || !(stripTypeName(nt) in structs)) return [];
+      cur = stripTypeName(nt);
+    }
+    const fields = fieldsOf(structs, cur);
+    if (!fields) return [];
+    const lower = (word || "").toLowerCase();
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const f of fields) {
+      if (!f || !f[1] || seen.has(f[1])) continue;
+      seen.add(f[1]);
+      if (lower && f[1].toLowerCase().indexOf(lower) !== 0) continue;
+      out.push({ label: f[1], kind: 5, detail: (f[0] || "").trim(), _boost: 0 });
+    }
+    out.forEach((m) => {
+      if (lower && m.label.indexOf(word) === 0) m._boost = 20;
+    });
+    out.sort((a, b) => b._boost - a._boost || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+    return out.slice(0, MAX_ITEMS).map((m) => ({
+      label: m.label,
+      kind: m.kind,
+      detail: m.detail
+    }));
   }
 
   // src/server.js
@@ -8817,14 +9033,20 @@ ${JSON.stringify(message, null, 4)}`);
       } catch (e) {
         return null;
       }
-      const mt = memberTriggerInfo(text, offset);
-      if (mt.isMember) return null;
+      const mc = memberChainBefore(text, offset);
+      if (mc) {
+        const docModel = parseDocumentModel(text, ctx.hintKey, model.types);
+        const allStructs = Object.assign({}, model.structs, docModel.members);
+        const items2 = resolveMemberItems(allStructs, docModel.typeOf, mc.parts, mc.word);
+        if (!items2.length) return null;
+        return { isIncomplete: false, items: items2 };
+      }
       const caseInsensitive = ctx.hintKey === "pascal";
       const docSyms = parseDocumentSymbols(text, ctx.hintKey, model.types);
       const items = buildWordItems(
         model,
         docSyms.concat(symbols()),
-        mt.word || "",
+        wordBefore(text, offset).word,
         caseInsensitive,
         builtinDetail
       );

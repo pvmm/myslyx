@@ -135,8 +135,8 @@ Tests
   feature on an untested suite or a skipped full run.
 
 - Timeouts: approximate 25 seconds per test in a run — the single suite gets
-  `timeout 25` (25 s), the complete 73-suite set (including the clangd-gated
-  local-LSP suites) `timeout 1860` (31 min).
+  `timeout 25` (25 s), the complete 75-suite set (including the clangd-gated
+  local-LSP suites) `timeout 1900` (32 min).
 
 - Browsers that cannot launch (e.g. missing host libraries) are reported as SKIP rather than failing the run.
 

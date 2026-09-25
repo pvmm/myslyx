@@ -58,6 +58,8 @@ ever emits structured signatures, swap `parseTip()` (and `detailFor()` in
 - The worker talks raw LSP JSON-RPC objects over `postMessage`/`onmessage`
   (the browser transport needs no `Content-Length` framing); the main-thread
   client is hand-written in `myslyx/static/plugins/weblsp/client.js`.
-- Member contexts (caret after `.` / `->`) intentionally answer `null`: the
-  client keeps serving those from its curated struct machinery, which
-  resolves in-file struct definitions the hints JSON cannot see.
+- Member contexts (caret after `.` / `->`) resolve struct/union fields from
+  the hints `structs` tables merged with locally declared aggregates
+  (`parseLocalTypes` members, in-file wins), through receiver chains fed by
+  the document's variable->type bindings (`memberChainBefore` /
+  `resolveMemberItems`). Unresolvable chains answer `null`.

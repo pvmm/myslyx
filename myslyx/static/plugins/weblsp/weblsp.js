@@ -78,6 +78,11 @@ function customProvider(pctx) {
     if (localBridgeServing()) return null;
     const state = pctx.view.state;
     const pos = state.selection.main.head;
+    // Member contexts stay with the c-struct-complete plugin (it owns the
+    // custom popup's member path); the worker only feeds word completions
+    // here. matchBefore cannot see receivers, so detect from the line.
+    const line = state.doc.lineAt(pos);
+    if (/(->|\.)\s*([A-Za-z_][A-Za-z0-9_]*)?$/.test(state.sliceDoc(line.from, pos))) return null;
     return client.complete(state, pos).then(function(items) {
         if (!items || !items.length) return null;
         const prefix = (pctx.word || '').toLowerCase();
@@ -94,6 +99,18 @@ function customProvider(pctx) {
 }
 
 // ---- C MSXgl + Pascal: native CodeMirror completion source ----------------
+function tidyOptions(items, prefix) {
+    const lower = (prefix || '').toLowerCase();
+    return items
+        .filter(function(it) {
+            return !lower || (it.label || '').toLowerCase().indexOf(lower) === 0;
+        })
+        .slice(0, MAX_ROWS)
+        .map(function(it) {
+            return { label: it.label, detail: it.detail || '', type: kindToType(it.kind) };
+        });
+}
+
 async function weblspNativeSource(ctx) {
     try {
         const key = window.__wbHintKey || 'c';
@@ -101,19 +118,28 @@ async function weblspNativeSource(ctx) {
         if (key === 'msxgl' && localBridgeServing()) return null;
         const client = getClient();
         if (!client.isReady()) return null;
+        const state = ctx.state;
+        const pos = ctx.pos;
+        // Member context (dangling "./->", possibly with a partial field
+        // word): the worker resolves struct/union fields. matchBefore
+        // cannot see the receiver, so detect it from the line prefix; the
+        // server validates and filters. Pascal has no struct tables, so its
+        // member queries always answer null server-side.
+        const line = state.doc.lineAt(pos);
+        const tail = state.sliceDoc(line.from, pos);
+        const mm = /(->|\.)\s*([A-Za-z_][A-Za-z0-9_]*)?$/.exec(tail);
+        if (mm) {
+            const word = mm[2] || '';
+            const items = await client.complete(state, pos);
+            if (!items || !items.length) return null;
+            const options = tidyOptions(items, word);
+            return options.length ? { from: pos - word.length, options: options } : null;
+        }
         const w = ctx.matchBefore(/[A-Za-z_][A-Za-z0-9_]*/);
         if (!w || (!ctx.explicit && !w.text)) return null;
-        const items = await client.complete(ctx.state, ctx.pos);
+        const items = await client.complete(state, pos);
         if (!items || !items.length) return null;
-        const prefix = (w.text || '').toLowerCase();
-        const options = items
-            .filter(function(it) {
-                return !prefix || (it.label || '').toLowerCase().indexOf(prefix) === 0;
-            })
-            .slice(0, MAX_ROWS)
-            .map(function(it) {
-                return { label: it.label, detail: it.detail || '', type: kindToType(it.kind) };
-            });
+        const options = tidyOptions(items, w.text);
         return options.length ? { from: w.from, options: options } : null;
     } catch (e) {
         return null;
