@@ -26,7 +26,12 @@ A real `vscode-languageserver` server inside a Web Worker, served as the
   The worker fetches the dictionary for the active `__wbHintKey`
   (`c`, `msxgl`, `pascal`); the page pushes `{label, hintKey, symbols}`
   with `$/setContext` on every `wb-active-editor` (localStorage is
-  main-thread-only).
+  main-thread-only). The persisted store only knows top-level function
+  definitions, so the worker additionally mines the synced document text
+  itself on every completion (`parseDocumentSymbols` in `hintsmodel.js`):
+  file-scope variables, function names, parameters and Pascal `var`-block
+  names rank first, ahead of framework names. Covered by
+  `weblsp/local-variables`.
 - `myslyx/static/native-completions.js` — stands down for `msxgl`/`pascal`
   while `window.__wbWebLspReady` is set, so each label completes exactly
   once; clears on worker failure and the curated path resumes.

@@ -22,6 +22,7 @@ import {
     wordAt,
     parseTip,
     callInfo,
+    parseDocumentSymbols,
 } from './hintsmodel.js';
 
 const EMPTY = normalizeHints(null);
@@ -109,7 +110,13 @@ export function attach(connection) {
         const mt = memberTriggerInfo(text, offset);
         if (mt.isMember) return null;
         const caseInsensitive = ctx.hintKey === 'pascal';
-        const items = buildWordItems(model, symbols(), mt.word || '',
+        // In-file declarations first (they win over framework names on a
+        // clash), then the persisted cross-file symbols, then the hints.
+        // The persisted store only knows top-level function definitions, so
+        // the live parse is what completes locals, params and file-scope
+        // variables typed in this buffer.
+        const docSyms = parseDocumentSymbols(text, ctx.hintKey, model.types);
+        const items = buildWordItems(model, docSyms.concat(symbols()), mt.word || '',
             caseInsensitive, builtinDetail);
         if (!items.length) return null;
         return { isIncomplete: false, items };

@@ -193,3 +193,139 @@ export function callInfo(text, offset) {
     }
     return null;
 }
+
+// ---------------------------------------------------------------------------
+// Document-local declarations.
+//
+// The persisted symbol store (hints.js::scanSymbols, pushed in as `symbols`)
+// only discovers top-level function definitions, so variables, parameters
+// and file-scope names typed in the open buffer would never complete. The
+// worker already holds the synced document text, so it mines declarations
+// itself on every completion request (a few KB of regex scanning, well under
+// a millisecond). Heuristic and over-approximating on purpose: a stray
+// extra name in the popup beats a missing one.
+//
+// Returns [{name, kind}] with kind 'function' | 'variable' | 'param' (the
+// same shape as the pushed symbols). C names keep their case; Pascal names
+// are uppercased to match the scanner convention (case-insensitive).
+// typeNames: extra known type names (the active hints' `types` list).
+
+function stripCNoise(text) {
+    return String(text)
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/\/\/[^\n]*/g, ' ')
+        .replace(/'(?:\\.|[^'\\\n])*'/g, "'c'")
+        .replace(/"(?:\\.|[^"\\\n])*"/g, '"s"');
+}
+
+function stripPascalNoise(text) {
+    return String(text)
+        .replace(/\(\*[\s\S]*?\*\)/g, ' ')
+        .replace(/\{[^}]*\}/g, ' ')
+        .replace(/\/\/[^\n]*/g, ' ')
+        .replace(/'(?:[^']|'')*'/g, "'s'");
+}
+
+// Mirrors the scanner's C type set (hints.js::scanSymbols), extended with
+// common libc typedefs. struct/union/enum tags and the hints' own type
+// names arrive via typeNames.
+const C_TYPE_WORDS = [
+    'void', 'char', 'short', 'int', 'long', 'float', 'double',
+    'signed', 'unsigned', 'bool', 'size_t',
+    'u8', 'u16', 'u32', 'u64', 's8', 's16', 's32', 's64',
+    'f16', 'f32', 'fix16', 'fix32', 'fix16_16', 'f16_16', 'f32_32',
+    'FILE', 'time_t', 'clock_t', 'ptrdiff_t', 'wchar_t',
+];
+const C_QUALIFIERS = ['const', 'static', 'extern', 'volatile', 'register', 'inline', 'struct', 'union', 'enum'];
+// Control/keyword words that must never complete as variables.
+const C_NOISE = new Set([
+    'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'default',
+    'return', 'sizeof', 'typedef', 'break', 'continue', 'goto',
+]);
+
+function parseCDocumentSymbols(text, typeNames) {
+    const out = [];
+    const known = new Set(C_TYPE_WORDS.concat(typeNames || []));
+    const clean = stripCNoise(text);
+
+    // Function definitions (and prototypes): TYPE [+]name(...) [+{]
+    const reFn = /(?:^|[^A-Za-z0-9_])((?:(?:const|static|inline|extern|volatile|unsigned|signed|long|short|register)\s+)*)([A-Za-z_]\w*)\s*(\*(?:\s*\*)*)?\s*([A-Za-z_]\w*)\s*\(([^;{}]*)\)\s*(\{?)/g;
+    let m;
+    while ((m = reFn.exec(clean)) !== null) {
+        const type = m[2];
+        const name = m[4];
+        if (!known.has(type) || C_NOISE.has(name)) continue;
+        out.push({ name, kind: 'function', params: m[5] || '' });
+    }
+
+    // Parameters of the functions just found: last identifier of each
+    // top-level comma part ("const u8 *p", "char buf[16]" -> p, buf).
+    for (const fn of out) {
+        if (fn.kind !== 'function' || !fn.params) continue;
+        for (const part of fn.params.split(',')) {
+            const pm = /([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*$/.exec(part.trim());
+            if (pm && pm[1] && !known.has(pm[1]) && !C_NOISE.has(pm[1]) &&
+                pm[1] !== 'void' && !C_QUALIFIERS.includes(pm[1])) {
+                out.push({ name: pm[1], kind: 'param' });
+            }
+        }
+        delete fn.params;
+    }
+
+    // Variable declarations: [qualifiers] TYPE [*] name [,;=\[)\s].
+    // The type-set check keeps calls (`foo(bar)`), keywords (`if (x)`)
+    // and member access out; the lookahead keeps definitions and
+    // prototypes (`int f(`) out.
+    const reVar = /(?:^|[;{}()\s,])((?:(?:const|static|extern|volatile|register|inline|unsigned|signed|long|short|struct|union|enum)\s+)*)([A-Za-z_]\w*)(\s*\*(?:\s*\*)*)?\s*([A-Za-z_]\w*)(?=[\s,;=)\[])/g;
+    while ((m = reVar.exec(clean)) !== null) {
+        const type = m[2];
+        const name = m[4];
+        if (!known.has(type) || C_NOISE.has(name) || known.has(name)) continue;
+        out.push({ name, kind: 'variable' });
+    }
+    return out;
+}
+
+function parsePascalDocumentSymbols(text) {
+    const out = [];
+    const clean = stripPascalNoise(text);
+    let m;
+
+    // FUNCTION / PROCEDURE names (fresher than the persisted scan).
+    const reSub = /\b(?:function|procedure)\s+([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?/gi;
+    while ((m = reSub.exec(clean)) !== null) {
+        out.push({ name: m[1].toUpperCase(), kind: 'function' });
+        // Params: groups split by ';', names before ':' split by ','.
+        const groups = (m[2] || '').split(';');
+        for (const g of groups) {
+            const cm = /^([^:]*):/.exec(g);
+            if (!cm) continue;
+            for (const nm of cm[1].split(',')) {
+                const w = nm.trim();
+                if (/^[A-Za-z_]\w*$/.test(w)) out.push({ name: w.toUpperCase(), kind: 'param' });
+            }
+        }
+    }
+
+    // var-block style declarations: name[, name...]: Type;
+    const reVar = /\b([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)\s*:\s*[A-Za-z_]\w*\s*;/gi;
+    while ((m = reVar.exec(clean)) !== null) {
+        for (const nm of m[1].split(',')) {
+            const w = nm.trim();
+            if (/^[A-Za-z_]\w*$/.test(w)) out.push({ name: w.toUpperCase(), kind: 'variable' });
+        }
+    }
+    return out;
+}
+
+export function parseDocumentSymbols(text, hintKey, typeNames) {
+    try {
+        if (hintKey === 'pascal') return parsePascalDocumentSymbols(text);
+        if (hintKey === 'c' || hintKey === 'msxgl') {
+            return parseCDocumentSymbols(text, typeNames);
+        }
+        return [];
+    } catch (e) {
+        return [];
+    }
+}

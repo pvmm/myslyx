@@ -304,10 +304,48 @@ async def exclusive_toggle(page, msgs):
     assert not msgs, f'console errors: {msgs}'
 
 
+async def local_variables(page, msgs):
+    """Names declared in the open buffer complete: globals, params, locals.
+
+    The persisted symbol store only knows top-level function definitions, so
+    the worker mines the synced document text itself on every request.
+    """
+    bridge = _watch_lsp_bridge(page)
+    await _reset_config(page)
+    await _goto_new_file(page, 'C+MSXgl', 'msxgl')
+    await _wait_ready(page)
+    await h.focus_active_editor(page)
+    await _type_slow(
+        page,
+        'int myCounter = 0;\n'
+        'int helper(int myParam) {\n'
+        'int myLocal = myParam + myCounter;\n'
+        'my',
+        pause=60)
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'myCounter'),
+                    timeout=20000, msg='file-scope variable never completed')
+    labels = await _native_labels(page)
+    for needle in ('myCounter', 'myLocal', 'myParam'):
+        assert any(needle in s for s in labels), f'{needle} missing from popup: {labels}'
+
+    # Pascal: var-block names and routine params complete too.
+    await h.new_file(page, 3)
+    await h.set_language(page, 'Pascal')
+    await page.wait_for_function("window.__wbHintKey === 'pascal'")
+    await h.focus_active_editor(page)
+    await _type_slow(page, 'var myTotal: Integer;\nbegin\nmyT', pause=60)
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'MYTOTAL'),
+                    timeout=20000, msg='pascal var-block name never completed')
+    assert bridge['ping'] == 0, 'no local-bridge ping expected'
+    assert bridge['complete'] == 0, 'no local-bridge round trips expected'
+    assert not msgs, f'console errors: {msgs}'
+
+
 WEBLSP_DEFAULT_SUITES = [
     ('weblsp/completions-msxgl-native', completions_msxgl_native, None),
     ('weblsp/completions-c-custom', completions_c_custom, None),
     ('weblsp/completions-pascal-native', completions_pascal_native, None),
+    ('weblsp/local-variables', local_variables, None),
     ('weblsp/hover', hover_tip, None),
     ('weblsp/signature-help', signature_help, None),
     ('weblsp/exclusive-toggle', exclusive_toggle, None),
