@@ -35,12 +35,23 @@ A real `vscode-languageserver` server inside a Web Worker, served as the
 - `myslyx/static/native-completions.js` — stands down for `msxgl`/`pascal`
   while `window.__wbWebLspReady` is set, so each label completes exactly
   once; clears on worker failure and the curated path resumes.
-- Runner/tests — `tests/test_weblsp.py` (7 suites, default env + one
-  `SPACE_ID=1` phase; no binaries needed, never SKIP): native/custom/pascal
-  completions, hover, signature help, remote-works, disabled-by-config.
+- Runner/tests — `tests/test_weblsp.py` (10 suites, default env + one
+  `SPACE_ID=1` phase + one clangd phase; no binaries needed except the
+  clangd-gated one): native/custom/pascal completions, locals, hover,
+  signature help, exclusivity, remote-works, disabled-by-config.
 
 ## Deliberate limits
 
+- No semantic C support: `vscode-languageserver` is protocol plumbing only
+  (JSON-RPC + document sync + request routing; verified against
+  `tools/weblsp/node_modules/` — no parser, no AST, no type system). Every
+  scrap of C knowledge is ours: the regex-parsed hints dictionaries, the
+  `parseDocumentSymbols` heuristics, the top-level scanner. So the worker
+  offers no type-aware completion, no diagnostics, no go-to-definition, no
+  include/macro resolution and no scope-correct shadowing — it is a fast
+  offline text index, not a language engine. The only setup in Myslyx with a
+  genuine C frontend stays `local-lsp` + clangd (which is why the local
+  bridge wins completions when it is up).
 - Menu exclusivity: `weblsp` and `local-lsp` both declare
   `"languageServer": true`, so enabling one from Settings > PLUGINS stops
   the other (the loser never boots after the reload). Covered by
@@ -56,7 +67,6 @@ A real `vscode-languageserver` server inside a Web Worker, served as the
 - Signature help parses the rendered tip markdown (`hintsmodel.js`
   `parseTip`); free-form tips (c.json/pascal.json) yield no signature.
   Swap hook documented in `tools/weblsp/README.md`.
-- No diagnostics: the worker has no compiler (a future SDCC-WASM backend
-  would plug in behind the same protocol).
+- No diagnostics: the worker has no compiler.
 - `node_modules/` under `tools/weblsp/` is build-only and git-ignored; the
   bundle is the only committed artifact.
