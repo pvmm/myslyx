@@ -1,1 +1,2 @@
 - [x] add support for vscode-languageserver as an online LSP for Myslyx (directly in the browser) instead of relying on SDCC or clangd server in the machine. The support for in-browser LSP should be defined as a plugin for Myslyx. Don't delete lsp.py and lsp.js that already exist, they serve a different purpose (machine-installed LSP servers). Rename the old plugin to something like "local-lsp"
+- [ ] add ability to autocomplete #include with local .h filename or a .h file included in the module list of the MSXgl.
