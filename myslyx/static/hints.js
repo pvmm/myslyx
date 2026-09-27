@@ -603,9 +603,12 @@
         var wordInfo = getWord(state, sel.head);
         var from = wordInfo.line.from + wordInfo.start;
         var to = sel.head;
+        // Providers may supply `apply` (e.g. an #include completion appends
+        // its closing bracket); otherwise the label replaces the word.
+        var text = (match.apply != null) ? match.apply : match.label;
         view.dispatch({
-            changes: { from: from, to: to, insert: match.label },
-            selection: { anchor: from + match.label.length }
+            changes: { from: from, to: to, insert: text },
+            selection: { anchor: from + text.length }
         });
         removePopup();
         view.focus();

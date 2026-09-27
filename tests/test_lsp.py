@@ -214,6 +214,26 @@ async def autodisable_on_failure(page, msgs):
     assert not msgs, f'console errors: {msgs}'
 
 
+async def include_closers(page, msgs):
+    """Accepting a clangd-fed #include completion closes its bracket."""
+    state = _watch(page)
+    await _reload_setup(page)
+    info = await page.evaluate('window.__wbLsp')
+    assert info and info.get('enabled'), f'LSP must be advertised: {info}'
+    await _goto_new_file(page, 'C+MSXgl', 'msxgl')
+    await _type_slow(page, '#include <stdi')
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, '.h'),
+                    timeout=25000, msg='no header completion from the bridge')
+    await page.keyboard.press('Enter')
+    # Whatever header clangd offered, exactly one closing bracket lands.
+    await page.wait_for_function(
+        "() => window.WBEditorActive.current(3000).then(v => "
+        "!!v && /^#include <[^>\\n]*\\.h>$/.test(v.state.doc.toString()))",
+        timeout=10000)
+    assert state['complete'] >= 1, 'expected LSP round trips'
+    assert not msgs, f'console errors: {msgs}'
+
+
 DEFAULT_SUITES = [
     ('local-lsp/disabled-by-default', disabled_by_default, None),
 ]
@@ -221,6 +241,7 @@ DEFAULT_SUITES = [
 ENABLED_SUITES = [
     ('local-lsp/completions-msxgl-native', completions_msxgl_native, {'MYSLYX_LSP': 'clangd'}),
     ('local-lsp/completions-c-custom', completions_c_custom, {'MYSLYX_LSP': 'clangd'}),
+    ('local-lsp/include-closers', include_closers, {'MYSLYX_LSP': 'clangd'}),
     # Same binary as the positive phase, but the server looks like a shared
     # Hugging Face Space: the local-only gates must keep everything inert.
     ('local-lsp/local-gate', local_gate, {'MYSLYX_LSP': 'clangd', 'SPACE_ID': '1'}),

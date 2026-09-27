@@ -155,6 +155,39 @@ function tidyRow(it) {
     return row;
 }
 
+// Partial `#include` file name on the caret's line: {delimiter, prefix} or
+// null (open delimiter required; mirrors the weblsp plugin + worker).
+function includePrefix(state, pos) {
+    const line = state.doc.lineAt(pos);
+    const tail = state.sliceDoc(line.from, pos);
+    const m = /#\s*include\s*([<"])([^>"]*)$/.exec(tail);
+    if (!m) return null;
+    if (m[2] === '') {
+        const opens = (tail.match(m[1] === '"' ? /"/g : /</g) || []).length;
+        if (opens % 2 === 0) return null;
+    }
+    return { delimiter: m[1], prefix: m[2] || '' };
+}
+
+function includeCloser(delimiter) {
+    return delimiter === '<' ? '>' : '"';
+}
+
+// Native-popup apply for include options: replaces the partial name (plus
+// an already-typed filename suffix) and appends the closing bracket unless
+// it is already there; caret lands after the closer.
+function makeIncludeApply(closer) {
+    return function(view, completion, from, to) {
+        let insert = completion.label;
+        if (view.state.sliceDoc(to, to + 1) !== closer) insert += closer;
+        view.dispatch({
+            changes: { from: from, to: to, insert: insert },
+            selection: { anchor: from + insert.length },
+            scrollIntoView: true,
+        });
+    };
+}
+
 // ---- plain C: custom WBHintCompletions provider (async) ----------------
 function customProvider(pctx) {
     if (bridge.disabled) return null;
@@ -162,6 +195,11 @@ function customProvider(pctx) {
     if ((window.__wbCurrentLang || '') !== 'C') return null;
     const state = pctx.view.state;
     const pos = state.selection.main.head;
+    // Inside an include line, string-apply the closing bracket (unless it
+    // is already there); insertCompletion honors `apply`.
+    const inc = includePrefix(state, pos);
+    const closer = inc !== null ? includeCloser(inc.delimiter) : null;
+    const afterWord = closer !== null ? pctx.line.slice(pctx.col, pctx.col + 1) : '';
     return completeRequest(bufferParams(state, pos)).then(function(items) {
         if (!items || !items.length) return [];
         const prefix = (pctx.word || '').toLowerCase();
@@ -170,7 +208,13 @@ function customProvider(pctx) {
                 return !prefix || (it.label || '').toLowerCase().indexOf(prefix) === 0;
             })
             .slice(0, MAX_ROWS)
-            .map(tidyRow);
+            .map(function(it) {
+                const row = tidyRow(it);
+                if (closer !== null && /\.h$/i.test(it.label || '') && afterWord !== closer) {
+                    row.apply = it.label + closer;
+                }
+                return row;
+            });
     });
 }
 
@@ -188,6 +232,30 @@ export default function localLspPlugin(CM) {
             if (bridge.disabled) return null;
             if (!bridge.ready || !bridge.working) return null;
             if ((window.__wbHintKey || 'c') !== 'msxgl') return null;
+            const state = ctx.state;
+            const pos = ctx.pos;
+            // `#include` file completion closes its bracket on accept;
+            // clangd mixes words and headers, so only header-looking labels
+            // get the closer treatment.
+            const inc = includePrefix(state, pos);
+            if (inc !== null) {
+                const closer = includeCloser(inc.delimiter);
+                const items = await completeRequest(bufferParams(state, pos));
+                if (!items || !items.length) return null;
+                const options = items
+                    .filter(function(it) {
+                        return (it.label || '').toLowerCase().indexOf(inc.prefix.toLowerCase()) === 0;
+                    })
+                    .slice(0, MAX_ROWS)
+                    .map(function(it) {
+                        const row = tidyRow(it);
+                        if (/\.h$/i.test(it.label || '')) row.apply = makeIncludeApply(closer);
+                        return row;
+                    });
+                if (!options.length) return null;
+                const suffix = (/[A-Za-z0-9_./\\]*/.exec(state.sliceDoc(pos)) || [''])[0].length;
+                return { from: pos - inc.prefix.length, to: pos + suffix, options: options };
+            }
             const w = ctx.matchBefore(/[A-Za-z_][A-Za-z0-9_]*/);
             if (!w || (!ctx.explicit && !w.text)) return null;
             const items = await completeRequest(bufferParams(ctx.state, ctx.pos));

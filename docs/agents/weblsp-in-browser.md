@@ -51,16 +51,21 @@ A real `vscode-languageserver` server inside a Web Worker, served as the
   set, plus engine modules for MSXgl); `"..."` offers the project's own
   `.h` files (pushed with `$/setContext`) plus the engine `modules` for
   MSXgl. Quoted standard includes are intentionally not offered; closed
-  includes answer null. Covered by `weblsp/include-c-std`,
-  `weblsp/include-msxgl-modules`, `weblsp/include-local`.
+  includes answer null. Accepting a header appends its closing bracket
+  (custom popup via string `apply`, honored by `insertCompletion`; native
+  popup via a per-option apply function that also swallows an already-typed
+  filename suffix and never duplicates a present closer). Covered by
+  `weblsp/include-c-std`, `weblsp/include-msxgl-modules`,
+  `weblsp/include-local` and `weblsp/include-closers`
+  (plus `local-lsp/include-closers` for clangd).
 - `myslyx/static/native-completions.js` — stands down for `msxgl`/`pascal`
   while `window.__wbWebLspReady` is set, so each label completes exactly
   once; clears on worker failure and the curated path resumes.
-- Runner/tests — `tests/test_weblsp.py` (15 suites, default env + one
+- Runner/tests — `tests/test_weblsp.py` (16 suites, default env + one
   `SPACE_ID=1` phase + one clangd phase; no binaries needed except the
   clangd-gated one): native/custom/pascal completions, locals, types,
-  members, includes, hover, signature help, exclusivity, remote-works,
-  disabled-by-config.
+  members, includes, closers, hover, signature help, exclusivity,
+  remote-works, disabled-by-config.
 
 ## Deliberate limits
 

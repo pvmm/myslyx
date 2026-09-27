@@ -70,9 +70,10 @@ function wordRange(state, pos) {
     return { from: s, to: e };
 }
 
-// Partial `#include` file name on the caret's line, or null. Mirrors the
-// worker's includeContext (open delimiter required: a closed include must
-// never query, otherwise an empty word would fetch the whole dictionary).
+// Partial `#include` file name on the caret's line: {delimiter, prefix} or
+// null. Mirrors the worker's includeContext (open delimiter required: a
+// closed include must never query, otherwise an empty word would fetch the
+// whole dictionary).
 function includePrefix(state, pos) {
     const line = state.doc.lineAt(pos);
     const tail = state.sliceDoc(line.from, pos);
@@ -82,7 +83,26 @@ function includePrefix(state, pos) {
         const opens = (tail.match(m[1] === '"' ? /"/g : /</g) || []).length;
         if (opens % 2 === 0) return null;
     }
-    return m[2] || '';
+    return { delimiter: m[1], prefix: m[2] || '' };
+}
+
+function includeCloser(delimiter) {
+    return delimiter === '<' ? '>' : '"';
+}
+
+// Native-popup apply for include options: replaces the partial name (plus
+// any already-typed suffix like `.h`) and appends the closing bracket,
+// unless it is already there. Caret lands after the closer.
+function makeIncludeApply(closer) {
+    return function(view, completion, from, to) {
+        let insert = completion.label;
+        if (view.state.sliceDoc(to, to + 1) !== closer) insert += closer;
+        view.dispatch({
+            changes: { from: from, to: to, insert: insert },
+            selection: { anchor: from + insert.length },
+            scrollIntoView: true,
+        });
+    };
 }
 
 // ---- plain C: custom WBHintCompletions provider (async) --------------------
@@ -101,7 +121,12 @@ function customProvider(pctx) {
     // Empty word: only answer open `#include <|"` contexts (full header
     // list); anything else (e.g. `;`, closed includes) stays silent instead
     // of fetching the whole dictionary.
-    if (!pctx.word && includePrefix(state, pos) === null) return null;
+    const inc = includePrefix(state, pos);
+    if (!pctx.word && inc === null) return null;
+    // Inside an include line, string-apply the closing bracket (unless it
+    // is already there); insertCompletion honors `apply`.
+    const closer = inc !== null ? includeCloser(inc.delimiter) : null;
+    const afterWord = closer !== null ? pctx.line.slice(pctx.col, pctx.col + 1) : '';
     return client.complete(state, pos).then(function(items) {
         if (!items || !items.length) return null;
         const prefix = (pctx.word || '').toLowerCase();
@@ -111,7 +136,11 @@ function customProvider(pctx) {
             })
             .slice(0, MAX_ROWS)
             .map(function(it) {
-                return { label: it.label, detail: it.detail || '', type: kindToType(it.kind) };
+                const row = { label: it.label, detail: it.detail || '', type: kindToType(it.kind) };
+                if (closer !== null && /\.h$/i.test(it.label || '') && afterWord !== closer) {
+                    row.apply = it.label + closer;
+                }
+                return row;
             });
         return rows.length ? rows : null;
     }).catch(function() { return null; });
@@ -144,14 +173,22 @@ async function weblspNativeSource(ctx) {
         // matchBefore cannot see past the delimiter, so detect from the
         // line prefix; the server re-validates (closed includes answer
         // null). Pascal has no #include: its queries answer null there.
-        const line = state.doc.lineAt(pos);
-        const tail = state.sliceDoc(line.from, pos);
-        const incWord = includePrefix(state, pos);
-        if (incWord !== null) {
+        const inc = includePrefix(state, pos);
+        if (inc !== null) {
+            const closer = includeCloser(inc.delimiter);
             const items = await client.complete(state, pos);
             if (!items || !items.length) return null;
-            const options = tidyOptions(items, incWord);
-            return options.length ? { from: pos - incWord.length, options: options } : null;
+            const options = tidyOptions(items, inc.prefix).map(function(o) {
+                o.apply = makeIncludeApply(closer);
+                return o;
+            });
+            // Extend through an already-typed filename suffix (e.g. the
+            // `.h` in `"mydefs|.h"`) so accepting replaces it instead of
+            // duplicating it; the apply step still skips a present closer.
+            const suffix = (/[A-Za-z0-9_./\\]*/.exec(state.sliceDoc(pos)) || [''])[0].length;
+            const from = pos - inc.prefix.length;
+            return options.length
+                ? { from: from, to: pos + suffix, options: options } : null;
         }
         // Member context (dangling ./->, possibly with a partial field
         // word): the worker resolves struct/union fields. matchBefore

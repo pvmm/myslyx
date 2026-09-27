@@ -521,6 +521,36 @@ async def include_local_headers(page, msgs):
     assert not msgs, f'console errors: {msgs}'
 
 
+async def include_closers(page, msgs):
+    """Accepting an #include completion inserts its closing bracket."""
+    bridge = _watch_lsp_bridge(page)
+    await _reset_config(page)
+    await _goto_new_file(page, 'C', None)
+    await _wait_ready(page)
+    await h.focus_active_editor(page)
+    await _type_slow(page, '#include <stdi', pause=60)
+    await _wait_for(page, lambda: _labels_contain(page, _custom_labels, 'stdint.h'),
+                    timeout=20000, msg='stdint.h never rendered')
+    await page.keyboard.press('Enter')
+    await h.doc_equals(page, '#include <stdint.h>', timeout=10000,
+                       msg='accepting must close the bracket')
+
+    # Quoted includes close with a quote in C MSXgl too (native popup).
+    await h.new_file(page, 3)
+    await h.set_language(page, 'C+MSXgl')
+    await page.wait_for_function("window.__wbHintKey === 'msxgl'")
+    await h.focus_active_editor(page)
+    await _type_slow(page, '#include "msxg', pause=60)
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'msxgl.h'),
+                    timeout=20000, msg='msxgl.h never rendered')
+    await page.keyboard.press('Enter')
+    await h.doc_equals(page, '#include "msxgl.h"', timeout=10000,
+                       msg='accepting must close the quote')
+    assert bridge['ping'] == 0, 'no local-bridge ping expected'
+    assert bridge['complete'] == 0, 'no local-bridge round trips expected'
+    assert not msgs, f'console errors: {msgs}'
+
+
 WEBLSP_DEFAULT_SUITES = [
     ('weblsp/completions-msxgl-native', completions_msxgl_native, None),
     ('weblsp/completions-c-custom', completions_c_custom, None),
@@ -531,6 +561,7 @@ WEBLSP_DEFAULT_SUITES = [
     ('weblsp/include-c-std', include_c_std, None),
     ('weblsp/include-msxgl-modules', include_msxgl_modules, None),
     ('weblsp/include-local', include_local_headers, None),
+    ('weblsp/include-closers', include_closers, None),
     ('weblsp/hover', hover_tip, None),
     ('weblsp/signature-help', signature_help, None),
     ('weblsp/exclusive-toggle', exclusive_toggle, None),
