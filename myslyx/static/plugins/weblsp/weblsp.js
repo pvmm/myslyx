@@ -70,6 +70,21 @@ function wordRange(state, pos) {
     return { from: s, to: e };
 }
 
+// Partial `#include` file name on the caret's line, or null. Mirrors the
+// worker's includeContext (open delimiter required: a closed include must
+// never query, otherwise an empty word would fetch the whole dictionary).
+function includePrefix(state, pos) {
+    const line = state.doc.lineAt(pos);
+    const tail = state.sliceDoc(line.from, pos);
+    const m = /#\s*include\s*([<"])([^>"]*)$/.exec(tail);
+    if (!m) return null;
+    if (m[2] === '') {
+        const opens = (tail.match(m[1] === '"' ? /"/g : /</g) || []).length;
+        if (opens % 2 === 0) return null;
+    }
+    return m[2] || '';
+}
+
 // ---- plain C: custom WBHintCompletions provider (async) --------------------
 function customProvider(pctx) {
     const client = getClient();
@@ -83,6 +98,10 @@ function customProvider(pctx) {
     // here. matchBefore cannot see receivers, so detect from the line.
     const line = state.doc.lineAt(pos);
     if (/(->|\.)\s*([A-Za-z_][A-Za-z0-9_]*)?$/.test(state.sliceDoc(line.from, pos))) return null;
+    // Empty word: only answer open `#include <|"` contexts (full header
+    // list); anything else (e.g. `;`, closed includes) stays silent instead
+    // of fetching the whole dictionary.
+    if (!pctx.word && includePrefix(state, pos) === null) return null;
     return client.complete(state, pos).then(function(items) {
         if (!items || !items.length) return null;
         const prefix = (pctx.word || '').toLowerCase();
@@ -120,14 +139,25 @@ async function weblspNativeSource(ctx) {
         if (!client.isReady()) return null;
         const state = ctx.state;
         const pos = ctx.pos;
-        // Member context (dangling "./->", possibly with a partial field
-        // word): the worker resolves struct/union fields. matchBefore
-        // cannot see the receiver, so detect it from the line prefix; the
-        // server validates and filters. Pascal has no struct tables, so its
-        // member queries always answer null server-side.
+        // `#include` file completion: the worker knows the header lists
+        // (standard C, engine modules) and the project's own .h files.
+        // matchBefore cannot see past the delimiter, so detect from the
+        // line prefix; the server re-validates (closed includes answer
+        // null). Pascal has no #include: its queries answer null there.
         const line = state.doc.lineAt(pos);
         const tail = state.sliceDoc(line.from, pos);
-        const mm = /(->|\.)\s*([A-Za-z_][A-Za-z0-9_]*)?$/.exec(tail);
+        const incWord = includePrefix(state, pos);
+        if (incWord !== null) {
+            const items = await client.complete(state, pos);
+            if (!items || !items.length) return null;
+            const options = tidyOptions(items, incWord);
+            return options.length ? { from: pos - incWord.length, options: options } : null;
+        }
+        // Member context (dangling ./->, possibly with a partial field
+        // word): the worker resolves struct/union fields. matchBefore
+        // cannot see the receiver, so detect it from the line prefix instead.
+        const lineTail = state.sliceDoc(state.doc.lineAt(pos).from, pos);
+        const mm = /(->|\.)\s*([A-Za-z_][A-Za-z0-9_]*)?$/.exec(lineTail);
         if (mm) {
             const word = mm[2] || '';
             const items = await client.complete(state, pos);

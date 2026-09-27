@@ -430,6 +430,97 @@ async def member_complete(page, msgs):
     assert not msgs, f'console errors: {msgs}'
 
 
+async def include_c_std(page, msgs):
+    """Plain C `#include <...>` completes standard headers from the worker."""
+    bridge = _watch_lsp_bridge(page)
+    await _reset_config(page)
+    await _goto_new_file(page, 'C', None)
+    await _wait_ready(page)
+    await h.focus_active_editor(page)
+    await _type_slow(page, '#include <stdi', pause=60)
+    await _wait_for(page, lambda: _labels_contain(page, _custom_labels, 'stdio.h'),
+                    timeout=20000, msg='stdio.h never rendered in the custom popup')
+    labels = await _custom_labels(page)
+    for needle in ('stdio.h', 'stdint.h'):
+        assert any(needle in s for s in labels), f'{needle} missing: {labels}'
+    details = await page.evaluate(
+        "() => Array.from(document.querySelectorAll("
+        "'.wb-autocomplete-popup > div')).map(e => e.lastChild ? e.lastChild.textContent : '')")
+    assert any('header' in (d or '') for d in details), f'header tag missing: {details}'
+
+    # Bare delimiter lists every standard header.
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('#include <')
+    await _wait_for(page, lambda: _labels_contain(page, _custom_labels, 'string.h'),
+                    timeout=20000, msg='full header list never rendered')
+    assert bridge['ping'] == 0, 'no local-bridge ping expected'
+    assert bridge['complete'] == 0, 'no local-bridge round trips expected'
+    assert not msgs, f'console errors: {msgs}'
+
+
+async def include_msxgl_modules(page, msgs):
+    """C MSXgl `#include "..."` completes the engine modules natively."""
+    bridge = _watch_lsp_bridge(page)
+    await _reset_config(page)
+    await _goto_new_file(page, 'C+MSXgl', 'msxgl')
+    await _wait_ready(page)
+    await h.focus_active_editor(page)
+    await _type_slow(page, '#include "msxg', pause=60)
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'msxgl.h'),
+                    timeout=20000, msg='msxgl.h never rendered in the native popup')
+    labels = await _native_labels(page)
+    assert any('msxgl.h' in s for s in labels), f'msxgl.h missing: {labels}'
+
+    # Bracket includes reach the engine headers too.
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('#include <vd')
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'vdp.h'),
+                    timeout=20000, msg='vdp.h never rendered for bracket includes')
+    assert bridge['ping'] == 0, 'no local-bridge ping expected'
+    assert bridge['complete'] == 0, 'no local-bridge round trips expected'
+    assert not msgs, f'console errors: {msgs}'
+
+
+async def include_local_headers(page, msgs):
+    """Both languages complete the project's own .h files (quoted only)."""
+    bridge = _watch_lsp_bridge(page)
+    await _reset_config(page)
+    # Import a project header through the upload drop path.
+    before = await page.evaluate("document.querySelectorAll('.wb-file-tab').length")
+    await page.evaluate("""() => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['#pragma once\\nint shared_value;\\n'], 'mydefs.h', {type: 'text/plain'}));
+        const ev = new Event('drop', {bubbles: true, cancelable: true});
+        try { Object.defineProperty(ev, 'dataTransfer', {value: dt}); } catch(e) { ev.dataTransfer = dt; }
+        document.dispatchEvent(ev);
+    }""")
+    await page.wait_for_function(
+        f"document.querySelectorAll('.wb-file-tab').length > {before}", timeout=15000)
+    n = await page.evaluate("document.querySelectorAll('.wb-file-tab').length")
+    await h.new_file(page, n + 1)
+    await h.set_language(page, 'C')
+    await _wait_ready(page)
+    await h.focus_active_editor(page)
+    await _type_slow(page, '#include "myd', pause=60)
+    await _wait_for(page, lambda: _labels_contain(page, _custom_labels, 'mydefs.h'),
+                    timeout=20000, msg='project header never rendered')
+    labels = await _custom_labels(page)
+    assert any('mydefs.h' in s for s in labels), f'mydefs.h missing: {labels}'
+
+    # Bracket includes never offer project headers.
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('#include <myd')
+    await page.wait_for_timeout(1200)
+    assert not await page.evaluate("!!document.querySelector('.wb-autocomplete-popup')"), \
+        'project headers must not complete inside <...>'
+    assert bridge['ping'] == 0, 'no local-bridge ping expected'
+    assert bridge['complete'] == 0, 'no local-bridge round trips expected'
+    assert not msgs, f'console errors: {msgs}'
+
+
 WEBLSP_DEFAULT_SUITES = [
     ('weblsp/completions-msxgl-native', completions_msxgl_native, None),
     ('weblsp/completions-c-custom', completions_c_custom, None),
@@ -437,6 +528,9 @@ WEBLSP_DEFAULT_SUITES = [
     ('weblsp/local-variables', local_variables, None),
     ('weblsp/local-types', local_types, None),
     ('weblsp/member-complete', member_complete, None),
+    ('weblsp/include-c-std', include_c_std, None),
+    ('weblsp/include-msxgl-modules', include_msxgl_modules, None),
+    ('weblsp/include-local', include_local_headers, None),
     ('weblsp/hover', hover_tip, None),
     ('weblsp/signature-help', signature_help, None),
     ('weblsp/exclusive-toggle', exclusive_toggle, None),

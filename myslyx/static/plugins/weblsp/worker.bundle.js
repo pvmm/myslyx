@@ -8483,6 +8483,7 @@ ${JSON.stringify(message, null, 4)}`);
     Field: 5,
     Variable: 6,
     Keyword: 14,
+    File: 17,
     Constant: 21,
     Struct: 22
   };
@@ -8497,7 +8498,9 @@ ${JSON.stringify(message, null, 4)}`);
       builtins: (h.builtins || []).slice(),
       types: (h.types || []).slice(),
       structs: h.structs || {},
-      tips: h.tips || {}
+      tips: h.tips || {},
+      headers: (h.headers || []).slice(),
+      modules: (h.modules || []).slice()
     };
   }
   function wordBefore(text, offset) {
@@ -8966,6 +8969,32 @@ ${JSON.stringify(message, null, 4)}`);
       detail: m.detail
     }));
   }
+  function includeContext(text, offset) {
+    const pos = Math.max(0, Math.min(offset, text.length));
+    const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+    const prefix = text.slice(lineStart, pos);
+    const m = /#\s*include\s*([<"])([^>"]*)$/.exec(prefix);
+    if (!m) return null;
+    if (m[2] === "") {
+      const opens = (prefix.match(m[1] === '"' ? /"/g : /</g) || []).length;
+      if (opens % 2 === 0) return null;
+    }
+    return { delimiter: m[1], prefix: m[2] || "" };
+  }
+  function buildIncludeItems(headers, localFiles, prefix) {
+    const lower = (prefix || "").toLowerCase();
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const name of (headers || []).concat(localFiles || [])) {
+      const label = String(name || "");
+      if (!label || seen.has(label.toLowerCase())) continue;
+      seen.add(label.toLowerCase());
+      if (lower && label.toLowerCase().indexOf(lower) !== 0) continue;
+      out.push({ label, kind: Kind.File, detail: "header" });
+    }
+    out.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
+    return out.slice(0, MAX_ITEMS);
+  }
 
   // src/server.js
   var EMPTY = normalizeHints(null);
@@ -9003,7 +9032,7 @@ ${JSON.stringify(message, null, 4)}`);
         textDocumentSync: import_browser.TextDocumentSyncKind.Full,
         completionProvider: {
           resolveProvider: false,
-          triggerCharacters: [".", ">", "(", "#"]
+          triggerCharacters: [".", ">", "(", "#", "<", '"', "/"]
         },
         hoverProvider: true,
         signatureHelpProvider: { triggerCharacters: ["("] }
@@ -9019,6 +9048,7 @@ ${JSON.stringify(message, null, 4)}`);
       ctx.label = String(p.label || "");
       if (typeof p.hintKey === "string" && p.hintKey) ctx.hintKey = p.hintKey;
       ctx.symbols = Array.isArray(p.symbols) ? p.symbols : [];
+      ctx.headers = (Array.isArray(p.headers) ? p.headers : []).filter((n) => typeof n === "string" && n.length > 0 && n.length < 256).slice(0, 500);
       ensureHints(ctx.hintKey).catch(() => {
       });
     });
@@ -9032,6 +9062,14 @@ ${JSON.stringify(message, null, 4)}`);
         offset = doc.offsetAt(params.position);
       } catch (e) {
         return null;
+      }
+      const inc = includeContext(text, offset);
+      if (inc && (ctx.hintKey === "c" || ctx.hintKey === "msxgl")) {
+        const pool = (ctx.headers || []).filter((n) => /\.h$/i.test(n));
+        const dict = inc.delimiter === "<" ? model.headers : pool.concat(ctx.hintKey === "msxgl" ? model.modules : []);
+        const items2 = buildIncludeItems(dict, [], inc.prefix);
+        if (!items2.length) return null;
+        return { isIncomplete: false, items: items2 };
       }
       const mc = memberChainBefore(text, offset);
       if (mc) {

@@ -14,6 +14,13 @@
     "strcpy", "strncpy", "strcat", "strcmp", "strchr", "strstr",
     "atoi", "atof", "strtol", "abs", "rand", "srand", "exit", "time", "clock"
   ],
+  "headers": [
+    "assert.h", "complex.h", "ctype.h", "errno.h", "fenv.h", "float.h",
+    "inttypes.h", "iso646.h", "limits.h", "locale.h", "math.h",
+    "setjmp.h", "signal.h", "stdarg.h", "stdbool.h", "stddef.h",
+    "stdint.h", "stdio.h", "stdlib.h", "string.h", "tgmath.h",
+    "time.h", "wchar.h", "wctype.h"
+  ],
   "tips": {
     "PRINTF": "Formatted output: `printf(\"value = %d\\n\", x);`\nSpecifiers: `%d` int, `%f` double, `%s` string, `%c` char.\nA literal `%` is written as `%%`.",
     "SCANF": "Read formatted input: `scanf(\"%d\", &x);`\nScalars need an address (`&`); arrays and strings are passed as-is.",

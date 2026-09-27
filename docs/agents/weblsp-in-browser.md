@@ -46,13 +46,21 @@ A real `vscode-languageserver` server inside a Web Worker, served as the
   member sources stand down so each field completes exactly once; plain C
   keeps its `c-struct-complete` member path and the local bridge keeps
   clangd members when it serves. Covered by `weblsp/member-complete`.
+- `#include` file completion (`includeContext`/`buildIncludeItems` in
+  `hintsmodel.js`): `<...>` offers the dictionary `headers` (standard C
+  set, plus engine modules for MSXgl); `"..."` offers the project's own
+  `.h` files (pushed with `$/setContext`) plus the engine `modules` for
+  MSXgl. Quoted standard includes are intentionally not offered; closed
+  includes answer null. Covered by `weblsp/include-c-std`,
+  `weblsp/include-msxgl-modules`, `weblsp/include-local`.
 - `myslyx/static/native-completions.js` — stands down for `msxgl`/`pascal`
   while `window.__wbWebLspReady` is set, so each label completes exactly
   once; clears on worker failure and the curated path resumes.
-- Runner/tests — `tests/test_weblsp.py` (10 suites, default env + one
+- Runner/tests — `tests/test_weblsp.py` (15 suites, default env + one
   `SPACE_ID=1` phase + one clangd phase; no binaries needed except the
-  clangd-gated one): native/custom/pascal completions, locals, hover,
-  signature help, exclusivity, remote-works, disabled-by-config.
+  clangd-gated one): native/custom/pascal completions, locals, types,
+  members, includes, hover, signature help, exclusivity, remote-works,
+  disabled-by-config.
 
 ## Deliberate limits
 

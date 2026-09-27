@@ -18,6 +18,8 @@ import {
     normalizeHints,
     memberChainBefore,
     resolveMemberItems,
+    includeContext,
+    buildIncludeItems,
     parseDocumentModel,
     parseDocumentSymbols,
     wordBefore,
@@ -76,7 +78,7 @@ export function attach(connection) {
             textDocumentSync: TextDocumentSyncKind.Full,
             completionProvider: {
                 resolveProvider: false,
-                triggerCharacters: ['.', '>', '(', '#'],
+                triggerCharacters: ['.', '>', '(', '#', '<', '"', '/'],
             },
             hoverProvider: true,
             signatureHelpProvider: { triggerCharacters: ['('] },
@@ -89,13 +91,17 @@ export function attach(connection) {
         ensureHints(ctx.hintKey || 'c').catch(() => {});
     });
 
-    // Main-thread context: active file label, hints key (__wbHintKey), and
-    // the exported user symbols (localStorage lives on the main thread).
+    // Main-thread context: active file label, hints key (__wbHintKey), the
+    // exported user symbols and the project's own header files
+    // (localStorage lives on the main thread).
     connection.onNotification('$/setContext', (params) => {
         const p = params || {};
         ctx.label = String(p.label || '');
         if (typeof p.hintKey === 'string' && p.hintKey) ctx.hintKey = p.hintKey;
         ctx.symbols = Array.isArray(p.symbols) ? p.symbols : [];
+        ctx.headers = (Array.isArray(p.headers) ? p.headers : [])
+            .filter((n) => typeof n === 'string' && n.length > 0 && n.length < 256)
+            .slice(0, 500);
         ensureHints(ctx.hintKey).catch(() => {});
     });
 
@@ -109,6 +115,23 @@ export function attach(connection) {
             offset = doc.offsetAt(params.position);
         } catch (e) {
             return null;
+        }
+        // `#include` file completion comes first: a member-looking tail
+        // inside an include line (e.g. a dotted path) must not route to
+        // member resolution.
+        const inc = includeContext(text, offset);
+        if (inc && (ctx.hintKey === 'c' || ctx.hintKey === 'msxgl')) {
+            // `<...>` offers the dictionary headers (standard C set, plus
+            // the engine modules for MSXgl); `"..."` offers the project's
+            // own headers plus the engine modules for MSXgl — quoted
+            // standard includes are intentionally not offered.
+            const pool = (ctx.headers || []).filter((n) => /\.h$/i.test(n));
+            const dict = inc.delimiter === '<'
+                ? model.headers
+                : pool.concat(ctx.hintKey === 'msxgl' ? model.modules : []);
+            const items = buildIncludeItems(dict, [], inc.prefix);
+            if (!items.length) return null;
+            return { isIncomplete: false, items };
         }
         const mc = memberChainBefore(text, offset);
         if (mc) {

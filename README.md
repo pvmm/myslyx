@@ -81,6 +81,9 @@ In-browser LSP (C / C MSXgl / Pascal)
 - In a C MSXgl file, type `VDP_SetM` for worker-fed completions, hover a
   builtin for its tip, or type `VDP_SetMode(` for signature help. Plain C
   keeps the custom popup; Pascal completes through the native one.
+- `#include` completes header files: `<...>` offers the standard C headers
+  (plus the MSXgl engine modules in C MSXgl files), `"..."` offers your
+  project's own `.h` files (plus the engine modules in C MSXgl).
 - The worker bundle (`myslyx/static/plugins/weblsp/worker.bundle.js`) is
   committed so installs run without node. Rebuild it after editing the server
   sources or upgrading dependencies with:
@@ -135,8 +138,8 @@ Tests
   feature on an untested suite or a skipped full run.
 
 - Timeouts: approximate 25 seconds per test in a run — the single suite gets
-  `timeout 25` (25 s), the complete 75-suite set (including the clangd-gated
-  local-LSP suites) `timeout 1900` (32 min).
+  `timeout 25` (25 s), the complete 78-suite set (including the clangd-gated
+  local-LSP suites) `timeout 1980` (33 min).
 
 - Browsers that cannot launch (e.g. missing host libraries) are reported as SKIP rather than failing the run.
 

@@ -19,6 +19,7 @@ const MAX_ROWS = 200;
 const KIND_TYPE = {
     3: 'function',
     14: 'keyword',
+    17: 'file',
     22: 'type',
     21: 'constant',
     5: 'field',
@@ -185,10 +186,21 @@ function createClient() {
 
     function pushContext() {
         if (!c.initialized || c.disabled) return;
+        var headers = [];
+        try {
+            var files = window.WBStorage && window.WBStorage.loadFiles
+                ? window.WBStorage.loadFiles() : [];
+            files.forEach(function(f) {
+                if (f && typeof f.name === 'string' && /\.h$/i.test(f.name)) {
+                    headers.push(f.name);
+                }
+            });
+        } catch (e) {}
         notify('$/setContext', {
             label: window.__wbCurrentLang || '',
             hintKey: window.__wbHintKey || 'c',
             symbols: getAllSymbols(),
+            headers: headers,
         });
     }
 

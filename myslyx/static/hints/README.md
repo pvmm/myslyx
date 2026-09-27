@@ -83,7 +83,21 @@ variable's type against these entries, so `BIOS_SpriteAttributes attr; attr.`
 offers `y`, `x` and `pattern`. The key is the struct name as written after the
 `typedef` (e.g. `BIOS_SpriteAttributes`); the MSXgl generator emits them for
 every struct and union declared in the headers (documented or not), so union
-members autocomplete after `.`/`->` too.
+ members autocomplete after `.`/`->` too.
+
+## `headers` / `modules` (`#include` completion)
+
+Optional. Lists of header filenames (with extension, subdirectories as
+relpaths like `compress/zx0.h`) driving `#include` autocompletion in the
+in-browser LSP worker:
+
+- `headers` — offered inside `#include <...>`: the standard C set for
+  `c.json` (hand-maintained; mirrors `C_STD_HEADERS` in
+  `tools/gen_msxgl_hints.py` — keep both in sync), engine headers plus the
+  standard C set for `msxgl.json` (generated, umbrella `msxgl.h` first).
+- `modules` — engine headers only, offered inside `#include "..."` next
+  to the project's own `.h` files (pool files). Only `msxgl.json` carries
+  it (generated); quoted standard-C includes are intentionally not offered.
 
 ## Cross-links between pages (`hint:` scheme)
 

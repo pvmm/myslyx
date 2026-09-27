@@ -30,6 +30,7 @@ export const Kind = {
     Field: 5,
     Variable: 6,
     Keyword: 14,
+    File: 17,
     Constant: 21,
     Struct: 22,
 };
@@ -51,6 +52,8 @@ export function normalizeHints(json) {
         types: (h.types || []).slice(),
         structs: h.structs || {},
         tips: h.tips || {},
+        headers: (h.headers || []).slice(),
+        modules: (h.modules || []).slice(),
     };
 }
 
@@ -599,4 +602,42 @@ export function resolveMemberItems(structs, typeOf, parts, word) {
     return out.slice(0, MAX_ITEMS).map((m) => ({
         label: m.label, kind: m.kind, detail: m.detail,
     }));
+}
+
+// `#include` file context on the caret's line: {delimiter, prefix} where
+// delimiter is '<' or '"' and prefix the partial name being typed (possibly
+// empty, right after the delimiter), or null. Matches mid-include carets
+// (`<stdio.h|>` still completes) but not closed ones (`<stdio.h>`).
+export function includeContext(text, offset) {
+    const pos = Math.max(0, Math.min(offset, text.length));
+    const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+    const prefix = text.slice(lineStart, pos);
+    const m = /#\s*include\s*([<"])([^>"]*)$/.exec(prefix);
+    if (!m) return null;
+    if (m[2] === '') {
+        // An empty prefix after a delimiter only counts when the delimiter
+        // is still open: otherwise the match used a *closing* quote of an
+        // already completed include (`"mydefs.h"` + caret at end).
+        const opens = (prefix.match(m[1] === '"' ? /"/g : /</g) || []).length;
+        if (opens % 2 === 0) return null;
+    }
+    return { delimiter: m[1], prefix: m[2] || '' };
+}
+
+// Header-file completion items for an include context: the dictionary's
+// `headers`/`modules` lists plus the project's own headers, prefix-filtered
+// (case-insensitive: filesystems and typing habits vary), capped.
+export function buildIncludeItems(headers, localFiles, prefix) {
+    const lower = (prefix || '').toLowerCase();
+    const seen = new Set();
+    const out = [];
+    for (const name of (headers || []).concat(localFiles || [])) {
+        const label = String(name || '');
+        if (!label || seen.has(label.toLowerCase())) continue;
+        seen.add(label.toLowerCase());
+        if (lower && label.toLowerCase().indexOf(lower) !== 0) continue;
+        out.push({ label, kind: Kind.File, detail: 'header' });
+    }
+    out.sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+    return out.slice(0, MAX_ITEMS);
 }

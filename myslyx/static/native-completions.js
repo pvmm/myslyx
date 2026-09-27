@@ -305,8 +305,10 @@ async function nativeSource(ctx) {
             }
         }
         // Word completions come from the in-browser LSP worker (same
-        // dictionaries) when it is ready, so the curated word source stands
-        // down and each label completes exactly once.
+        // dictionaries, plus header lists inside `#include` lines where the
+        // curated source would only offer keyword noise) when it is ready,
+        // so the curated word source stands down and each label completes
+        // exactly once.
         if (window.__wbWebLspReady && (key === 'msxgl' || key === 'pascal')) return null;
         return wordSource(ctx, wordInfo, hints, isPascal());
     } catch (e) {

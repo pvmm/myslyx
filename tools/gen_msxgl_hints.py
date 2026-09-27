@@ -50,6 +50,17 @@ C_KEYWORDS = [
     "typedef", "union", "unsigned", "void", "volatile", "while",
 ]
 
+# Standard C headers for `#include <...>` completion. The same list is
+# hand-mirrored in static/hints/c.json ("headers"); keep both in sync
+# (see static/hints/README.md).
+C_STD_HEADERS = [
+    "assert.h", "complex.h", "ctype.h", "errno.h", "fenv.h", "float.h",
+    "inttypes.h", "iso646.h", "limits.h", "locale.h", "math.h",
+    "setjmp.h", "signal.h", "stdarg.h", "stdbool.h", "stddef.h",
+    "stdint.h", "stdio.h", "stdlib.h", "string.h", "tgmath.h",
+    "time.h", "wchar.h", "wctype.h",
+]
+
 # SDCC compiler keywords/extensions (only valid for the MSXgl C dialect, so
 # they are appended to the msxgl.json keyword list after C_KEYWORDS; c.json for
 # plain C keeps the standard C set). Includes the MSXgl engine's own __-prefixed
@@ -789,6 +800,16 @@ def main():
         for n, t in all_types.items() if t["kind"] in ("struct", "union")
     }
 
+    # --- Headers (`#include` completion) --------------------------------------
+    # Every engine header as the user would include it (include path =
+    # engine/src), umbrella first. The deprecated/ subdirectory is skipped,
+    # mirroring the function merge. `headers` (for `#include <...>`) appends
+    # the standard C set SDCC ships, like keywords do; `modules` (for
+    # `#include "..."`) carries engine headers only.
+    header_rels = [r for r in scandir_files(src)
+                   if not r.rstrip("/").startswith("deprecated")]
+    engine_headers = ["msxgl.h"] + [r for r in header_rels if r != "msxgl.h"]
+
     data = {
         "root": root_markdown(modules, all_doc_enums, all_doc_structs,
                               all_doc_unions) or "# MSXgl",
@@ -798,6 +819,8 @@ def main():
         "tips": tips,
         "patterns": [],
         "structs": structs,
+        "headers": engine_headers + C_STD_HEADERS,
+        "modules": engine_headers,
     }
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
