@@ -31,6 +31,19 @@ Install (as a package)
 
 - The install provides a `myslyx` console command and a `python -m myslyx` module. To uninstall later: `pip uninstall myslyx`.
 
+Deploy (fly.io, shared mode)
+- The repo ships a `Dockerfile` + `fly.toml` + `.dockerignore`. Deploy with:
+
+  fly launch        # first time: reuses fly.toml, creates the app
+  fly deploy        # ship it
+
+- The image installs the package non-editable (bundled static files ship
+  inside it) and runs `myslyx --no-reload` as a single process. The app
+  reads `$PORT` itself, so it binds where fly routes traffic.
+- Both files set `MYSLYX_LOCAL=0`, which forces shared-deployment mode:
+  local-only plugins and the machine-LSP bridge stay off (same as the
+  Hugging Face Space), while the in-browser LSP keeps working.
+
 Running
 - Start the server (default port 8080) with any of:
 
