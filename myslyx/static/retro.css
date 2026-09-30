@@ -783,14 +783,27 @@ html, body {
 }
 
 /* Keep markdown headings inside the HINTS panel small. Without this, marked's
-   `<h1>` renders at the browser default 2em and dwarfs the hint text. */
-.wb-hints-sidebar .hints-content h1,
+   `<h1>` renders at the browser default 2em and dwarfs the hint text. The h1
+   (page title, e.g. a language root page) stays slightly larger than the
+   body text so the hierarchy reads at the panel's tiny pixel font. */
+.wb-hints-sidebar .hints-content h1 {
+    font-size: 1.4em;
+    line-height: 1.5;
+    margin: 8px 0 4px;
+}
+
 .wb-hints-sidebar .hints-content h2,
 .wb-hints-sidebar .hints-content h3,
 .wb-hints-sidebar .hints-content h4 {
     font-size: 1.1em;
     line-height: 1.5;
     margin: 8px 0 4px;
+}
+
+/* Collapsible sections (e.g. the MSXgl root page modules) are clickable:
+   show the same hand cursor as the hint: links above. */
+.wb-hints-sidebar .hints-content summary {
+    cursor: pointer;
 }
 
 /* ===== App Header ===== */
