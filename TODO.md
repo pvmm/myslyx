@@ -1,3 +1,8 @@
+Commit individually each entry when fixed:
 - [x] add support for vscode-languageserver as an online LSP for Myslyx (directly in the browser) instead of relying on SDCC or clangd server in the machine. The support for in-browser LSP should be defined as a plugin for Myslyx. Don't delete lsp.py and lsp.js that already exist, they serve a different purpose (machine-installed LSP servers). Rename the old plugin to something like "local-lsp"
 - [x] add ability to autocomplete #include with local .h filename or a .h file included in the module list of the MSXgl.
-- [ ] change files like weblsp.js and worker.bundle.js to use the subjacent language attribute ("C" for both plain C and "MSXgl+C") instead of hardcoding "msxgl" or any other language bindings. Make this a rule that no generic plugin that can be used for any language will hardcode any specific language binding like "MSXgl+C" or any future language binding. Update the testing routines to fix any problems that will surface from this.
+- [ ] Fix local-lsp/completions-c-custom (TimeoutError: strlen never rendered in the custom popup)
+- [ ] extract language constant from weblsp.js and worker.bundle.js (replace hardcoded "msxgl" references with base language attribute) but make sure it still works as before
+- [ ] add test suite for language-agnostic plugin behavior (C vs MSXgl+C completion round trips)
+- [ ] verify weblsp.js plugin.json base language attribute is generic (not language-specific)
+- [ ] update worker.bundle.js to respect the editor's language setting instead of fixed binding
