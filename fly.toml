@@ -1,21 +1,10 @@
-# Myslyx on fly.io (shared deployment).
+# fly.toml app configuration file generated for myslyx-crimson-valley-1539 on 2026-09-30T18:20:42-03:00
 #
-#   fly launch        # first time: reuses this file, creates the app
-#   fly deploy        # ship it
-#   fly open          # open /editor in a browser
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# Notes:
-# - MYSLYX_LOCAL=0 forces "remote/shared" mode (see myslyx/local.py), so
-#   local-only plugins and the machine-LSP bridge stay off, exactly like on
-#   the Hugging Face Space. The in-browser LSP (weblsp) keeps working.
-# - The app reads $PORT itself (app.py); fly sets PORT automatically, and
-#   8080 is the fallback both here and in [http_service].
-# - min_machines_running = 0 stops the machine when idle (cold start on
-#   next visit). Set it to 1 if you want it always warm.
 
-app = 'myslyx'
-
-[build]
+app = 'myslyx-crimson-valley-1539'
+primary_region = 'gru'
 
 [env]
   MYSLYX_LOCAL = '0'
@@ -29,6 +18,6 @@ app = 'myslyx'
   processes = ['app']
 
 [[vm]]
-  memory = '512mb'
+  memory = '1gb'
   cpu_kind = 'shared'
-  cpus = 1
+  memory_mb = 1024
