@@ -1,0 +1,15 @@
+# Keep the build context (and image) lean.
+.venv/
+.git/
+build/
+dist/
+*.egg-info/
+__pycache__/
+node_modules/
+tools/weblsp/node_modules/
+tests/
+.gitignore
+tests.tar.gz
+debug_suite.py
+*.swp
+.DS_Store
