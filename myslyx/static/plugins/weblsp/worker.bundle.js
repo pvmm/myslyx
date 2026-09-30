@@ -8516,9 +8516,27 @@ ${JSON.stringify(message, null, 4)}`);
     while (end < text.length && /[A-Za-z0-9_]/.test(text[end])) end++;
     return { word: text.slice(start, end), start, end };
   }
+  function matchScore(label, query, caseInsensitive) {
+    const q = query || "";
+    if (!q) return { tier: 0, index: 0 };
+    const name = String(label || "");
+    if (!name) return null;
+    if (!caseInsensitive && name.indexOf(q) === 0) return { tier: 1, index: 0 };
+    const lower = name.toLowerCase();
+    const ql = q.toLowerCase();
+    if (lower.indexOf(ql) === 0) return { tier: 2, index: 0 };
+    const at = lower.indexOf(ql);
+    if (at < 0) return null;
+    return { tier: 3, index: at };
+  }
+  function tierBoost(score) {
+    if (!score) return 0;
+    if (score.tier === 1) return 1e4;
+    if (score.tier === 2) return 5e3;
+    if (score.tier === 0) return 0;
+    return Math.max(100, 1e3 - Math.min(score.index, 900));
+  }
   function buildWordItems(model, symbols, prefix, caseInsensitive, detailFor) {
-    const lower = (prefix || "").toLowerCase();
-    const upper = (prefix || "").toUpperCase();
     const seen = /* @__PURE__ */ new Set();
     const out = [];
     function push(label, kind, detail) {
@@ -8545,15 +8563,20 @@ ${JSON.stringify(message, null, 4)}`);
       else if (s.kind === "constant") push(s.name, Kind.Constant, "const");
       else push(s.name, Kind.Variable, s.kind || "symbol");
     });
-    const matched = out.filter((m) => !lower || m.label.toLowerCase().indexOf(lower) === 0);
-    matched.forEach((m) => {
-      if (lower && (caseInsensitive ? m.label.substring(0, prefix.length).toUpperCase() === upper : m.label.indexOf(prefix) === 0)) m._boost = 20;
-    });
-    matched.sort((a, b) => b._boost - a._boost || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+    const matched = [];
+    for (const m of out) {
+      const s = matchScore(m.label, prefix, caseInsensitive);
+      if (!s) continue;
+      m._boost = tierBoost(s);
+      m._at = s.index;
+      matched.push(m);
+    }
+    matched.sort((a, b) => b._boost - a._boost || a._at - b._at || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
     return matched.slice(0, MAX_ITEMS).map((m) => ({
       label: m.label,
       kind: m.kind,
-      detail: m.detail
+      detail: m.detail,
+      boost: m._boost
     }));
   }
   function lookupTip(model, name) {
@@ -8950,23 +8973,21 @@ ${JSON.stringify(message, null, 4)}`);
     }
     const fields = fieldsOf(structs, cur);
     if (!fields) return [];
-    const lower = (word || "").toLowerCase();
     const seen = /* @__PURE__ */ new Set();
     const out = [];
     for (const f of fields) {
       if (!f || !f[1] || seen.has(f[1])) continue;
       seen.add(f[1]);
-      if (lower && f[1].toLowerCase().indexOf(lower) !== 0) continue;
-      out.push({ label: f[1], kind: 5, detail: (f[0] || "").trim(), _boost: 0 });
+      const s = matchScore(f[1], word, false);
+      if (!s) continue;
+      out.push({ label: f[1], kind: 5, detail: (f[0] || "").trim(), _boost: tierBoost(s), _at: s.index });
     }
-    out.forEach((m) => {
-      if (lower && m.label.indexOf(word) === 0) m._boost = 20;
-    });
-    out.sort((a, b) => b._boost - a._boost || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+    out.sort((a, b) => b._boost - a._boost || a._at - b._at || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
     return out.slice(0, MAX_ITEMS).map((m) => ({
       label: m.label,
       kind: m.kind,
-      detail: m.detail
+      detail: m.detail,
+      boost: m._boost
     }));
   }
   function includeContext(text, offset) {
@@ -8982,18 +9003,23 @@ ${JSON.stringify(message, null, 4)}`);
     return { delimiter: m[1], prefix: m[2] || "" };
   }
   function buildIncludeItems(headers, localFiles, prefix) {
-    const lower = (prefix || "").toLowerCase();
     const seen = /* @__PURE__ */ new Set();
     const out = [];
     for (const name of (headers || []).concat(localFiles || [])) {
       const label = String(name || "");
       if (!label || seen.has(label.toLowerCase())) continue;
       seen.add(label.toLowerCase());
-      if (lower && label.toLowerCase().indexOf(lower) !== 0) continue;
-      out.push({ label, kind: Kind.File, detail: "header" });
+      const s = matchScore(label, prefix, true);
+      if (!s) continue;
+      out.push({ label, kind: Kind.File, detail: "header", _boost: tierBoost(s), _at: s.index });
     }
-    out.sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
-    return out.slice(0, MAX_ITEMS);
+    out.sort((a, b) => b._boost - a._boost || a._at - b._at || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+    return out.slice(0, MAX_ITEMS).map((m) => ({
+      label: m.label,
+      kind: m.kind,
+      detail: m.detail,
+      boost: m._boost
+    }));
   }
 
   // src/server.js

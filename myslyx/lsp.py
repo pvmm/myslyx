@@ -127,6 +127,7 @@ class _Session:
         self._seq = 1
         self._open = False
         self._last_text: str | None = None
+        self._doc_version = 1
         self._stderr: list[str] = []
 
     # ----- process + wire helpers -----------------------------------------

@@ -129,11 +129,10 @@ function customProvider(pctx) {
     const afterWord = closer !== null ? pctx.line.slice(pctx.col, pctx.col + 1) : '';
     return client.complete(state, pos).then(function(items) {
         if (!items || !items.length) return null;
-        const prefix = (pctx.word || '').toLowerCase();
+        // No client-side filtering: the server scored, sorted and capped
+        // these (substring tiers included); re-filtering here would strip
+        // substring matches. Order is the server's ranking.
         const rows = items
-            .filter(function(it) {
-                return !prefix || (it.label || '').toLowerCase().indexOf(prefix) === 0;
-            })
             .slice(0, MAX_ROWS)
             .map(function(it) {
                 const row = { label: it.label, detail: it.detail || '', type: kindToType(it.kind) };
@@ -147,15 +146,21 @@ function customProvider(pctx) {
 }
 
 // ---- C MSXgl + Pascal: native CodeMirror completion source ----------------
-function tidyOptions(items, prefix) {
-    const lower = (prefix || '').toLowerCase();
+// The server scored, sorted and capped these (substring tiers included);
+// the client passes them through with their boosts. CodeMirror adds its own
+// fuzzy score on top, but the tier gaps (10000/5000/1000) dwarf its spread,
+// so the server ranking survives exactly — including substring hits, which
+// CodeMirror's default fuzzy filter passes natively (and highlights).
+function tidyOptions(items) {
     return items
-        .filter(function(it) {
-            return !lower || (it.label || '').toLowerCase().indexOf(lower) === 0;
-        })
         .slice(0, MAX_ROWS)
         .map(function(it) {
-            return { label: it.label, detail: it.detail || '', type: kindToType(it.kind) };
+            return {
+                label: it.label,
+                detail: it.detail || '',
+                type: kindToType(it.kind),
+                boost: (it.boost != null ? it.boost : 0),
+            };
         });
 }
 
@@ -178,7 +183,7 @@ async function weblspNativeSource(ctx) {
             const closer = includeCloser(inc.delimiter);
             const items = await client.complete(state, pos);
             if (!items || !items.length) return null;
-            const options = tidyOptions(items, inc.prefix).map(function(o) {
+            const options = tidyOptions(items).map(function(o) {
                 o.apply = makeIncludeApply(closer);
                 return o;
             });
@@ -199,14 +204,14 @@ async function weblspNativeSource(ctx) {
             const word = mm[2] || '';
             const items = await client.complete(state, pos);
             if (!items || !items.length) return null;
-            const options = tidyOptions(items, word);
+            const options = tidyOptions(items);
             return options.length ? { from: pos - word.length, options: options } : null;
         }
         const w = ctx.matchBefore(/[A-Za-z_][A-Za-z0-9_]*/);
         if (!w || (!ctx.explicit && !w.text)) return null;
         const items = await client.complete(state, pos);
         if (!items || !items.length) return null;
-        const options = tidyOptions(items, w.text);
+        const options = tidyOptions(items);
         return options.length ? { from: w.from, options: options } : null;
     } catch (e) {
         return null;

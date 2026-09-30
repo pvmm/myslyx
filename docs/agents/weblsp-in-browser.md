@@ -61,13 +61,22 @@ A real `vscode-languageserver` server inside a Web Worker, served as the
 - `myslyx/static/native-completions.js` — stands down for `msxgl`/`pascal`
   while `window.__wbWebLspReady` is set, so each label completes exactly
   once; clears on worker failure and the curated path resumes.
-- Runner/tests — `tests/test_weblsp.py` (16 suites, default env + one
+- Runner/tests — `tests/test_weblsp.py` (20 suites, default env + one
   `SPACE_ID=1` phase + one clangd phase; no binaries needed except the
   clangd-gated one): native/custom/pascal completions, locals, types,
-  members, includes, closers, hover, signature help, exclusivity,
-  remote-works, disabled-by-config.
+  members, includes, closers, substring, hover, signature help,
+  exclusivity, remote-works, disabled-by-config.
 
 ## Deliberate limits
+
+- Matching is substring everywhere (words, members, headers), ranked
+  exact-case prefix, case-insensitive prefix, substring by position
+  (`matchScore`/`tierBoost` in `hintsmodel.js`, mirrored in
+  `native-completions.js`, `hints.js` and `c-struct-model.js` so the curated
+  fallbacks behave identically). Clients pass worker/clangd results through
+  with their boosts and set `filter: false` so CodeMirror reproduces the
+  server ranking instead of hiding substring hits. Covered by the
+  `weblsp/substring-*` suites.
 
 - No semantic C support: `vscode-languageserver` is protocol plumbing only
   (JSON-RPC + document sync + request routing; verified against
