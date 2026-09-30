@@ -229,9 +229,34 @@ function looksLikeEnumConstant(name) {
     return /^[A-Z][A-Z0-9_]*$/.test(name) && name.indexOf('_') >= 0;
 }
 
+// Substring matching score. Canonical implementation lives in
+// tools/weblsp/src/hintsmodel.js (matchScore); mirrored here so the curated
+// fallback behaves identically when the worker is down. Tiers: exact-case
+// prefix, case-insensitive prefix, substring by position. Empty query
+// matches everything (tier 0).
+function matchScore(label, query, caseInsensitive) {
+    var q = query || '';
+    if (!q) return { tier: 0, index: 0 };
+    var name = String(label || '');
+    if (!name) return null;
+    if (!caseInsensitive && name.indexOf(q) === 0) return { tier: 1, index: 0 };
+    var lower = name.toLowerCase();
+    var ql = q.toLowerCase();
+    if (lower.indexOf(ql) === 0) return { tier: 2, index: 0 };
+    var at = lower.indexOf(ql);
+    if (at < 0) return null;
+    return { tier: 3, index: at };
+}
+
+function tierBoost(score) {
+    if (!score) return 0;
+    if (score.tier === 1) return 10000;
+    if (score.tier === 2) return 5000;
+    if (score.tier === 0) return 0;
+    return Math.max(100, 1000 - Math.min(score.index, 900));
+}
+
 function buildWordOptions(hints, word, caseInsensitive) {
-    var lower = (word || '').toLowerCase();
-    var upper = (word || '').toUpperCase();
     var seen = {};
     var out = [];
 
@@ -239,7 +264,7 @@ function buildWordOptions(hints, word, caseInsensitive) {
         var up = label.toUpperCase();
         if (up in seen) return;
         seen[up] = 1;
-        out.push({ label: label, detail: detail, type: type });
+        out.push({ label: label, detail: detail, type: type, boost: 0 });
     }
 
     (hints.keywords || []).forEach(function(k) { push(k, 'keyword', 'keyword'); });
@@ -256,19 +281,17 @@ function buildWordOptions(hints, word, caseInsensitive) {
         push(x.name, x.kind || 'symbol', x.kind === 'function' ? 'function' : 'variable');
     });
 
-    var matched = out.filter(function(m) {
-        return !lower || m.label.toLowerCase().indexOf(lower) === 0;
-    });
-    matched.forEach(function(m) {
-        // Exact-case prefix (the normal C convention) ranks first; the native
-        // popup otherwise falls back to its own label sort. Pascal is
-        // case-insensitive, so its boost compares case-indifferently.
-        if (lower && (caseInsensitive
-            ? m.label.substring(0, word.length).toUpperCase() === upper
-            : m.label.indexOf(word) === 0)) m.boost = 20;
+    var matched = [];
+    out.forEach(function(m) {
+        var sc = matchScore(m.label, word, caseInsensitive);
+        if (!sc) return;
+        m.boost = tierBoost(sc);
+        m._at = sc.index;
+        matched.push(m);
     });
     matched.sort(function(a, b) {
-        return (b.boost || 0) - (a.boost || 0) || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
+        return (b.boost || 0) - (a.boost || 0) || (a._at - b._at) ||
+            (a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
     });
     return matched.slice(0, MAX_WORD_OPTIONS);
 }

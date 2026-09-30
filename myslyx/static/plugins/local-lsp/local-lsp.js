@@ -152,6 +152,7 @@ function bufferParams(state, pos) {
 function tidyRow(it) {
     const row = { label: it.label, detail: it.detail, type: it.type };
     if (it.apply) row.apply = it.apply;
+    if (typeof it.boost === 'number') row.boost = it.boost;
     return row;
 }
 
@@ -202,11 +203,9 @@ function customProvider(pctx) {
     const afterWord = closer !== null ? pctx.line.slice(pctx.col, pctx.col + 1) : '';
     return completeRequest(bufferParams(state, pos)).then(function(items) {
         if (!items || !items.length) return [];
-        const prefix = (pctx.word || '').toLowerCase();
+        // No client-side filtering: clangd scored and ranked these (its
+        // fuzzy matches included); re-filtering here would strip them.
         return items
-            .filter(function(it) {
-                return !prefix || (it.label || '').toLowerCase().indexOf(prefix) === 0;
-            })
             .slice(0, MAX_ROWS)
             .map(function(it) {
                 const row = tidyRow(it);
@@ -243,12 +242,10 @@ export default function localLspPlugin(CM) {
                 const items = await completeRequest(bufferParams(state, pos));
                 if (!items || !items.length) return null;
                 const options = items
-                    .filter(function(it) {
-                        return (it.label || '').toLowerCase().indexOf(inc.prefix.toLowerCase()) === 0;
-                    })
                     .slice(0, MAX_ROWS)
                     .map(function(it) {
                         const row = tidyRow(it);
+                        if (typeof row.boost !== 'number') row.boost = 0;
                         if (/\.h$/i.test(it.label || '')) row.apply = makeIncludeApply(closer);
                         return row;
                     });
@@ -260,13 +257,13 @@ export default function localLspPlugin(CM) {
             if (!w || (!ctx.explicit && !w.text)) return null;
             const items = await completeRequest(bufferParams(ctx.state, ctx.pos));
             if (!items || !items.length) return null;
-            const prefix = (w.text || '').toLowerCase();
             const options = items
-                .filter(function(it) {
-                    return !prefix || (it.label || '').toLowerCase().indexOf(prefix) === 0;
-                })
                 .slice(0, MAX_ROWS)
-                .map(tidyRow);
+                .map(function(it) {
+                    const row = tidyRow(it);
+                    if (typeof row.boost !== 'number') row.boost = 0;
+                    return row;
+                });
             return options.length ? { from: w.from, options: options } : null;
         } catch (e) {
             disable('completion failed');

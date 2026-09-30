@@ -192,12 +192,45 @@ export function memberNamed(allStructs, structName, name) {
 export function fieldsToShow(allStructs, structName, word) {
     var list = membersOf(allStructs, structName);
     if (!list || !list.length) return [];
-    var lower = (word || '').toLowerCase();
     var out = [];
     for (var i = 0; i < list.length; i++) {
         var f = list[i];
-        if (lower && f.name.toLowerCase().indexOf(lower) !== 0) continue;
-        out.push({ label: f.name, detail: f.raw || f.type });
+        // Substring matching score. Canonical implementation lives in
+        // tools/weblsp/src/hintsmodel.js (matchScore); mirrored here so the
+        // curated member path behaves identically when the worker is down.
+        var sc = matchScoreField(f.name, word);
+        if (!sc) continue;
+        out.push({ label: f.name, detail: f.raw || f.type, boost: tierBoostField(sc), _at: sc.index });
     }
+    out.sort(function(a, b) {
+        return (b.boost - a.boost) || (a._at - b._at) ||
+            (a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
+    });
     return out;
+}
+
+// See matchScore above (canonical: tools/weblsp/src/hintsmodel.js).
+// Struct fields are C identifiers: exact-case prefix, ci prefix, substring.
+function matchScoreField(label, query) {
+    var q = query || '';
+    if (!q) return { tier: 0, index: 0 };
+    var name = String(label || '');
+    if (!name) return null;
+    if (name.indexOf(q) === 0) return { tier: 1, index: 0 };
+    var lower = name.toLowerCase();
+    var ql = q.toLowerCase();
+    if (lower.indexOf(ql) === 0) return { tier: 2, index: 0 };
+    var at = lower.indexOf(ql);
+    if (at < 0) return null;
+    return { tier: 3, index: at };
+}
+
+// Numeric boost carrying a tiered score into the popup ordering (mirrors
+// tierBoost in tools/weblsp/src/hintsmodel.js).
+function tierBoostField(score) {
+    if (!score) return 0;
+    if (score.tier === 1) return 10000;
+    if (score.tier === 2) return 5000;
+    if (score.tier === 0) return 0;
+    return Math.max(100, 1000 - Math.min(score.index, 900));
 }

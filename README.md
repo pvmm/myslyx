@@ -81,6 +81,8 @@ In-browser LSP (C / C MSXgl / Pascal)
 - In a C MSXgl file, type `VDP_SetM` for worker-fed completions, hover a
   builtin for its tip, or type `VDP_SetMode(` for signature help. Plain C
   keeps the custom popup; Pascal completes through the native one.
+  Matching is substring everywhere: `sprite` also offers
+  `VDP_DisableSprite`, ranked after prefix hits like `SpriteFX_Mask16`.
 - `#include` completes header files: `<...>` offers the standard C headers
   (plus the MSXgl engine modules in C MSXgl files), `"..."` offers your
   project's own `.h` files (plus the engine modules in C MSXgl). Accepting
@@ -139,8 +141,8 @@ Tests
   feature on an untested suite or a skipped full run.
 
 - Timeouts: approximate 25 seconds per test in a run — the single suite gets
-  `timeout 25` (25 s), the complete 80-suite set (including the clangd-gated
-  local-LSP suites) `timeout 2040` (34 min).
+  `timeout 25` (25 s), the complete 84-suite set (including the clangd-gated
+  local-LSP suites) `timeout 2100` (35 min).
 
 - Browsers that cannot launch (e.g. missing host libraries) are reported as SKIP rather than failing the run.
 
