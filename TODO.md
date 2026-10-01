@@ -3,6 +3,6 @@ Commit individually each entry when fixed:
 - [x] add ability to autocomplete #include with local .h filename or a .h file included in the module list of the MSXgl.
 - [x] Fix local-lsp/completions-c-custom (TimeoutError: strlen never rendered in the custom popup)
 - [x] extract language constant from weblsp.js and worker.bundle.js (replace hardcoded "msxgl" references with base language attribute) but make sure it still works as before
-- [ ] add test suite for language-agnostic plugin behavior (C vs MSXgl+C completion round trips)
+- [x] add test suite for language-agnostic plugin behavior (C vs MSXgl+C completion round trips) - tests/test_langagnostic.py
 - [x] verify weblsp.js plugin.json base language attribute is generic (not language-specific) - it declares no language filter on purpose (runtime scoping, see docs/agents/weblsp-in-browser.md)
 - [x] update worker.bundle.js to respect the editor's language setting instead of fixed binding
