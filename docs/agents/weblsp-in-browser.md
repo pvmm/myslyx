@@ -15,16 +15,17 @@ A real `vscode-languageserver` server inside a Web Worker, served as the
   + `esbuild`; `src/worker.js` bootstrap, `src/server.js` LSP handlers,
   `src/hintsmodel.js` pure hints logic, `build.mjs`). `npm run build`
   re-emits the committed `myslyx/static/plugins/weblsp/worker.bundle.js`
-  (386 KB IIFE; wheels run without node). See `tools/weblsp/README.md`.
-- `myslyx/static/plugins/weblsp/` — `plugin.json`, `weblsp.js` (factory:
-  native source for C MSXgl + Pascal, custom `WBHintCompletions` provider
-  for plain C, hover tooltip, `#wb-sighelp` signature box),
+  (401 KB IIFE; wheels run without node). See `tools/weblsp/README.md`.
+- `myslyx/static/plugins/weblsp/` — `plugin.json` (no language filter on
+  purpose, see "Deliberate limits"), `weblsp.js` (factory: native source for
+  the dictionary-backed languages, custom `WBHintCompletions` provider for the
+  rest, hover tooltip, `#wb-sighelp` signature box),
   `client.js` (hand-written JSON-RPC over `worker.postMessage`, full-text
   sync, `window.__wbWebLsp` marker), `worker.bundle.js` (committed).
 - Knowledge base: the SAME generated hints dictionaries the sidebar and
   popups use (`static/hints/<key>.json` — `gen_msxgl_hints.py` untouched).
-  The worker fetches the dictionary for the active `__wbHintKey`
-  (`c`, `msxgl`, `pascal`); the page pushes `{label, hintKey, symbols}`
+  The worker fetches the dictionary for the active `__wbHintKey`;
+  the page pushes `{label, hintKey, base, symbols}`
   with `$/setContext` on every `wb-active-editor` (localStorage is
   main-thread-only). The persisted store only knows top-level function
   definitions, so the worker additionally mines the synced document text
@@ -88,6 +89,31 @@ A real `vscode-languageserver` server inside a Web Worker, served as the
   offline text index, not a language engine. The only setup in Myslyx with a
   genuine C frontend stays `local-lsp` + clangd (which is why the local
   bridge wins completions when it is up).
+- Language scoping is **runtime, not manifest**. `weblsp/plugin.json`
+  declares no `languages` and no `baseLang` filter, and that is deliberate:
+  `WBPlugins.install()` runs once per view and evaluates `_langOk` at that
+  moment only (plugins.js:84), so a language filter on a `boot` plugin would
+  freeze its scope at load time and the LANG combo could never widen it. The
+  manifest stays generic (any language may load the plugin) and the plugin
+  decides per query, through `window.WBLanguage`:
+  - `baseLang` is the right scope for a *non-boot* plugin (see
+    `c-struct-complete`, which scopes `["c"]` and covers plain C and C MSXgl
+    with one entry).
+  - a boot language server must self-gate: `weblsp.js` `served()` (family
+    known) and `lang().usesNativePopup()` (this language renders in the
+    native tooltip) at completion time, hover time and signature time.
+- `window.WBLanguage` (retro.js) is the single language constant for the
+  whole client: it answers from the attributes the server publishes per file
+  (`__wbBaseLang` for the family, `__wbHintKey` for the dictionary) which
+  popup applies, the LSP `languageId`, whether the family has `#include`
+  headers, and whether the machine bridge may serve it. `hints.js`,
+  `native-completions.js`, `weblsp.js`, `local-lsp.js` and `client.js` all
+  read it and **name no language**, so a new C-derived dialect is a data
+  change: its `hints/<key>.json` plus rows in editor_page.py's
+  `HINT_KEYS`/`BASE_LANG` (no plugin edits). The worker mirrors this — the
+  page sends `base` in `$/setContext` and the server picks a parser family,
+  so only a genuinely new *parser* family (a new `DOCUMENT_PARSERS` entry in
+  `hintsmodel.js`) is a code change.
 - Menu exclusivity: `weblsp` and `local-lsp` both declare
   `"languageServer": true`, so enabling one from Settings > PLUGINS stops
   the other (the loser never boots after the reload). Covered by
