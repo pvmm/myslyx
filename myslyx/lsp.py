@@ -263,8 +263,13 @@ class _Session:
             self._open = True
         elif text != self._last_text:
             self._buffer.write_text(text, encoding='utf-8')
+            # The version must grow with every change: clangd's DraftStore
+            # drops notifications whose version is not strictly newer, so a
+            # constant version freezes the server-side copy of the buffer and
+            # every later completion is computed against stale text.
+            self._doc_version += 1
             self._notify('textDocument/didChange', {
-                'textDocument': {'uri': self._uri, 'version': 2},
+                'textDocument': {'uri': self._uri, 'version': self._doc_version},
                 'contentChanges': [{'text': text}],
             })
             self._last_text = text

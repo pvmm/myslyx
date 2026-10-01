@@ -71,8 +71,15 @@ async def _wait_for(page, probe, timeout=15000, msg='condition not met'):
 
 
 async def _type_slow(page, text, pause=120):
-    """Type per character with small pauses so clangd can index between keys."""
+    """Type per character with small pauses so clangd can index between keys.
+
+    A newline first dismisses any open completion popup: Enter/Tab accept the
+    highlighted item (see hints.js), so without the Escape the pending
+    `#include` completion would swallow the line break and corrupt the buffer.
+    """
     for i, ch in enumerate(text):
+        if ch == '\n':
+            await page.keyboard.press('Escape')
         await page.keyboard.type(ch)
         if i % 2 == 1:
             await page.wait_for_timeout(pause)
