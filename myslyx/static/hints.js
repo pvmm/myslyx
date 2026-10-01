@@ -288,8 +288,7 @@
     // static/native-completions.js); the custom popup below must sit these
     // languages out so the two popups never fight.
     function usesNativeAutocomplete() {
-        var key = getHintKey();
-        return key === 'msxgl' || key === 'pascal';
+        return window.WBLanguage.usesNativePopup();
     }
 
     // ===== User symbol scanning (language-aware) =====

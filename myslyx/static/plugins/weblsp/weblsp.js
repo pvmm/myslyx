@@ -23,26 +23,29 @@
 import { getClient, kindToType } from './client.js';
 
 const MAX_ROWS = 200;
-const SERVED_KEYS = { c: 1, msxgl: 1, pascal: 1 };
 
 let customRegistered = false;
 
-function servedKey() {
-    const k = window.__wbHintKey || 'c';
-    return !!SERVED_KEYS[k];
+// The current language, resolved by the editor (window.WBLanguage, built in
+// retro.js from the server-set __wbBaseLang/__wbHintKey attributes). Nothing
+// here names a language: a family joins the worker simply by existing in
+// WBLanguage's table, so plain C and C MSXgl are both served as base 'c'.
+function lang() {
+    return window.WBLanguage;
+}
+
+function served() {
+    return !!lang().hasFamily();
 }
 
 // Mutual exclusion with the machine-installed bridge (local-lsp plugin):
 // while it is actually serving the current file, the worker stands down its
 // completion sources so exactly one language server answers each popup.
-// Mirrors local-lsp's own gates — it serves plain C and C MSXgl, never
-// Pascal — and only completions stand down: hover and signature help stay
+// Mirrors local-lsp's own gate (it drives clangd/SDCC, so it never claims
+// Pascal) — and only completions stand down: hover and signature help stay
 // with the worker, which the bridge does not provide.
 function localBridgeServing() {
-    if (!window.__wbLocalLspWorking) return false;
-    const lang = window.__wbCurrentLang || '';
-    const key = window.__wbHintKey || 'c';
-    return lang === 'C' || key === 'msxgl';
+    return !!(window.__wbLocalLspWorking && lang().localLspServes());
 }
 
 function esc(s) {
@@ -105,11 +108,15 @@ function makeIncludeApply(closer) {
     };
 }
 
-// ---- plain C: custom WBHintCompletions provider (async) --------------------
+// ---- custom .wb-autocomplete-popup provider (async) ------------------------
+// Languages the editor renders in the retro popup. The worker's member path
+// stays out: that context belongs to the c-struct-complete plugin, which owns
+// the popup's member completion.
 function customProvider(pctx) {
     const client = getClient();
     if (!client.isReady()) return null;
-    if ((window.__wbCurrentLang || '') !== 'C') return null;
+    if (!served()) return null;
+    if (lang().usesNativePopup()) return null;
     if (localBridgeServing()) return null;
     const state = pctx.view.state;
     const pos = state.selection.main.head;
@@ -166,9 +173,9 @@ function tidyOptions(items) {
 
 async function weblspNativeSource(ctx) {
     try {
-        const key = window.__wbHintKey || 'c';
-        if (key !== 'msxgl' && key !== 'pascal') return null;
-        if (key === 'msxgl' && localBridgeServing()) return null;
+        if (!served()) return null;
+        if (!lang().usesNativePopup()) return null;
+        if (localBridgeServing()) return null;
         const client = getClient();
         if (!client.isReady()) return null;
         const state = ctx.state;
@@ -177,7 +184,7 @@ async function weblspNativeSource(ctx) {
         // (standard C, engine modules) and the project's own .h files.
         // matchBefore cannot see past the delimiter, so detect from the
         // line prefix; the server re-validates (closed includes answer
-        // null). Pascal has no #include: its queries answer null there.
+        // null) and families without headers (Pascal) never match.
         const inc = includePrefix(state, pos);
         if (inc !== null) {
             const closer = includeCloser(inc.delimiter);
@@ -223,7 +230,7 @@ function hoverExtension(CM) {
     if (!CM.hoverTooltip) return [];
     return CM.hoverTooltip(async function(view, pos) {
         try {
-            if (!servedKey()) return null;
+            if (!served()) return null;
             const client = getClient();
             if (!client.isReady()) return null;
             const h = await client.hover(view.state, pos);
@@ -309,7 +316,7 @@ function scheduleSigCheck(view, client) {
 
 async function checkSig(view, client) {
     try {
-        if (!servedKey()) { hideSigBox(); return; }
+        if (!served()) { hideSigBox(); return; }
         if (!client.isReady()) { hideSigBox(); return; }
         const state = view.state;
         const pos = state.selection.main.head;

@@ -542,22 +542,30 @@ function parsePascalDocumentSymbols(text) {
     return out;
 }
 
-export function parseDocumentSymbols(text, hintKey, typeNames) {
-    return parseDocumentModel(text, hintKey, typeNames).symbols;
+export function parseDocumentSymbols(text, base, typeNames) {
+    return parseDocumentModel(text, base, typeNames).symbols;
 }
 
 // Full document model for the server: word symbols plus the struct member
 // tables and variable->type bindings that receiver resolution needs.
-export function parseDocumentModel(text, hintKey, typeNames) {
+// `base` is the editor's base-language attribute (window.__wbBaseLang, sent by
+// the main thread), NOT a hints key: every dialect of a family shares one
+// parser, so plain C and the MSXgl C framework both parse as 'c'. Each entry
+// normalizes its parser to the full model shape.
+const DOCUMENT_PARSERS = {
+    c: (text, typeNames) => parseCDocumentSymbols(text, typeNames),
+    pascal: (text) => ({
+        symbols: parsePascalDocumentSymbols(text),
+        members: {},
+        typeOf: new Map(),
+    }),
+};
+
+export function parseDocumentModel(text, base, typeNames) {
     const empty = { symbols: [], members: {}, typeOf: new Map() };
     try {
-        if (hintKey === 'pascal') {
-            return { symbols: parsePascalDocumentSymbols(text), members: {}, typeOf: new Map() };
-        }
-        if (hintKey === 'c' || hintKey === 'msxgl') {
-            return parseCDocumentSymbols(text, typeNames);
-        }
-        return empty;
+        const parse = DOCUMENT_PARSERS[base];
+        return parse ? parse(text, typeNames) : empty;
     } catch (e) {
         return empty;
     }

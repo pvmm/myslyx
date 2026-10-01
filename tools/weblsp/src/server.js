@@ -35,7 +35,7 @@ const HINT_KEY_RE = /^[a-z0-9]+$/;
 
 export function attach(connection) {
     const documents = new TextDocuments(TextDocument);
-    const ctx = { label: '', hintKey: 'c', symbols: [] };
+    const ctx = { label: '', hintKey: 'c', base: 'c', symbols: [] };
     const cache = {}; // hintKey -> {model} once fetched
 
     function symbols() {
@@ -91,13 +91,16 @@ export function attach(connection) {
         ensureHints(ctx.hintKey || 'c').catch(() => {});
     });
 
-    // Main-thread context: active file label, hints key (__wbHintKey), the
-    // exported user symbols and the project's own header files
-    // (localStorage lives on the main thread).
+    // Main-thread context: active file label, the editor's language
+    // attributes (hints dictionary + base language), the exported user symbols
+    // and the project's own header files (localStorage lives on the main
+    // thread). The editor owns the language registry, so the server never
+    // hardcodes a language: it asks for a dictionary and a parser family.
     connection.onNotification('$/setContext', (params) => {
         const p = params || {};
         ctx.label = String(p.label || '');
         if (typeof p.hintKey === 'string' && p.hintKey) ctx.hintKey = p.hintKey;
+        if (typeof p.base === 'string' && p.base) ctx.base = p.base;
         ctx.symbols = Array.isArray(p.symbols) ? p.symbols : [];
         ctx.headers = (Array.isArray(p.headers) ? p.headers : [])
             .filter((n) => typeof n === 'string' && n.length > 0 && n.length < 256)
@@ -120,15 +123,17 @@ export function attach(connection) {
         // inside an include line (e.g. a dotted path) must not route to
         // member resolution.
         const inc = includeContext(text, offset);
-        if (inc && (ctx.hintKey === 'c' || ctx.hintKey === 'msxgl')) {
+        if (inc && ctx.base === 'c') {
             // `<...>` offers the dictionary headers (standard C set, plus
             // the engine modules for MSXgl); `"..."` offers the project's
             // own headers plus the engine modules for MSXgl — quoted
-            // standard includes are intentionally not offered.
+            // standard includes are intentionally not offered. A dictionary
+            // that carries no `modules` list contributes none, so no language
+            // check is needed here.
             const pool = (ctx.headers || []).filter((n) => /\.h$/i.test(n));
             const dict = inc.delimiter === '<'
                 ? model.headers
-                : pool.concat(ctx.hintKey === 'msxgl' ? model.modules : []);
+                : pool.concat(model.modules || []);
             const items = buildIncludeItems(dict, [], inc.prefix);
             if (!items.length) return null;
             return { isIncomplete: false, items };
@@ -139,19 +144,19 @@ export function attach(connection) {
             // merged with locally declared aggregates (in-file definitions
             // win whole-struct, mirroring the curated merge), resolved
             // through the document's variable->type bindings.
-            const docModel = parseDocumentModel(text, ctx.hintKey, model.types);
+            const docModel = parseDocumentModel(text, ctx.base, model.types);
             const allStructs = Object.assign({}, model.structs, docModel.members);
             const items = resolveMemberItems(allStructs, docModel.typeOf, mc.parts, mc.word);
             if (!items.length) return null;
             return { isIncomplete: false, items };
         }
-        const caseInsensitive = ctx.hintKey === 'pascal';
+        const caseInsensitive = ctx.base === 'pascal';
         // In-file declarations first (they win over framework names on a
         // clash), then the persisted cross-file symbols, then the hints.
         // The persisted store only knows top-level function definitions, so
         // the live parse is what completes locals, params and file-scope
         // variables typed in this buffer.
-        const docSyms = parseDocumentSymbols(text, ctx.hintKey, model.types);
+        const docSyms = parseDocumentSymbols(text, ctx.base, model.types);
         const items = buildWordItems(model, docSyms.concat(symbols()),
             wordBefore(text, offset).word,
             caseInsensitive, builtinDetail);

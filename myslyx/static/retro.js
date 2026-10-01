@@ -114,6 +114,72 @@
         }
     };
 
+    // ===== Language descriptor (the one language constant) =====
+    // Every language-aware consumer (hints.js, native-completions.js and the
+    // LSP plugins) resolves the current language HERE instead of hardcoding
+    // hint keys like 'msxgl' in its own gates. The server publishes three
+    // attributes per file (editor_page.py): __wbCurrentLang (the LANGUAGES
+    // key, e.g. "C MSXgl"), __wbHintKey (its hints dictionary) and
+    // __wbBaseLang (the family it belongs to — plain C and the MSXgl C
+    // framework are both 'c').
+    //
+    // A new C-derived framework only needs its own hints/<key>.json plus a
+    // row in editor_page.py's HINT_KEYS/BASE_LANG: no plugin changes.
+    window.WBLanguage = (function() {
+        // Two orthogonal concerns, both keyed by what the server published:
+        //
+        // 1. POPUP: which popup renders completions. Dictionary-backed
+        //    languages (a rich hints/<key>.json) drive CodeMirror's own
+        //    tooltip; the rest use the retro .wb-autocomplete-popup.
+        // 2. FAMILY: what a language server needs for the language's family
+        //    (base). Plain C and the MSXgl C framework are both 'c'.
+        //
+        // A new language is a data change: drop its hints/<key>.json, add its
+        // row to editor_page.py's HINT_KEYS/BASE_LANG, and — if a language
+        // server should serve it — to FAMILIES below. No consumer changes.
+        var POPUP_NATIVE_KEYS = { msxgl: 1, pascal: 1 };
+
+        var FAMILIES = {
+            c: { languageId: 'c', headers: true, local: true },
+            pascal: { languageId: 'pascal', headers: false, local: false },
+        };
+
+        function base() {
+            return window.__wbBaseLang || 'text';
+        }
+
+        function family() {
+            return FAMILIES[base()] || null;
+        }
+
+        return {
+            base: base,
+            // Exact hints dictionary of the current language.
+            hintKey: function() { return window.__wbHintKey || 'c'; },
+            // The LANGUAGES key, e.g. "C MSXgl" (label/status text).
+            label: function() { return window.__wbCurrentLang || ''; },
+            family: family,
+            isBase: function(b) { return base() === b; },
+            hasFamily: function() { return !!family(); },
+            usesNativePopup: function() { return !!POPUP_NATIVE_KEYS[this.hintKey()]; },
+            lspLanguageId: function() {
+                var f = family();
+                return f ? f.languageId : null;
+            },
+            hasHeaders: function() {
+                var f = family();
+                return !!(f && f.headers);
+            },
+            // True when the machine-installed bridge is allowed to serve the
+            // current language (it drives clangd/SDCC, so it never claims
+            // Pascal).
+            localLspServes: function() {
+                var f = family();
+                return !!(f && f.local);
+            }
+        };
+    })();
+
     // ===== Active editor view resolution =====
     // __wbEditorId is published by the server before the CodeMirror view for
     // the new file finishes mounting, so everyone used to hand-roll the same

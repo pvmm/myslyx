@@ -8914,19 +8914,22 @@ ${JSON.stringify(message, null, 4)}`);
     }
     return out;
   }
-  function parseDocumentSymbols(text, hintKey, typeNames) {
-    return parseDocumentModel(text, hintKey, typeNames).symbols;
+  function parseDocumentSymbols(text, base, typeNames) {
+    return parseDocumentModel(text, base, typeNames).symbols;
   }
-  function parseDocumentModel(text, hintKey, typeNames) {
+  var DOCUMENT_PARSERS = {
+    c: (text, typeNames) => parseCDocumentSymbols(text, typeNames),
+    pascal: (text) => ({
+      symbols: parsePascalDocumentSymbols(text),
+      members: {},
+      typeOf: /* @__PURE__ */ new Map()
+    })
+  };
+  function parseDocumentModel(text, base, typeNames) {
     const empty = { symbols: [], members: {}, typeOf: /* @__PURE__ */ new Map() };
     try {
-      if (hintKey === "pascal") {
-        return { symbols: parsePascalDocumentSymbols(text), members: {}, typeOf: /* @__PURE__ */ new Map() };
-      }
-      if (hintKey === "c" || hintKey === "msxgl") {
-        return parseCDocumentSymbols(text, typeNames);
-      }
-      return empty;
+      const parse = DOCUMENT_PARSERS[base];
+      return parse ? parse(text, typeNames) : empty;
     } catch (e) {
       return empty;
     }
@@ -9027,7 +9030,7 @@ ${JSON.stringify(message, null, 4)}`);
   var HINT_KEY_RE = /^[a-z0-9]+$/;
   function attach(connection2) {
     const documents = new import_browser.TextDocuments(TextDocument2);
-    const ctx = { label: "", hintKey: "c", symbols: [] };
+    const ctx = { label: "", hintKey: "c", base: "c", symbols: [] };
     const cache = {};
     function symbols() {
       return Array.isArray(ctx.symbols) ? ctx.symbols : [];
@@ -9073,6 +9076,7 @@ ${JSON.stringify(message, null, 4)}`);
       const p = params || {};
       ctx.label = String(p.label || "");
       if (typeof p.hintKey === "string" && p.hintKey) ctx.hintKey = p.hintKey;
+      if (typeof p.base === "string" && p.base) ctx.base = p.base;
       ctx.symbols = Array.isArray(p.symbols) ? p.symbols : [];
       ctx.headers = (Array.isArray(p.headers) ? p.headers : []).filter((n) => typeof n === "string" && n.length > 0 && n.length < 256).slice(0, 500);
       ensureHints(ctx.hintKey).catch(() => {
@@ -9090,23 +9094,23 @@ ${JSON.stringify(message, null, 4)}`);
         return null;
       }
       const inc = includeContext(text, offset);
-      if (inc && (ctx.hintKey === "c" || ctx.hintKey === "msxgl")) {
+      if (inc && ctx.base === "c") {
         const pool = (ctx.headers || []).filter((n) => /\.h$/i.test(n));
-        const dict = inc.delimiter === "<" ? model.headers : pool.concat(ctx.hintKey === "msxgl" ? model.modules : []);
+        const dict = inc.delimiter === "<" ? model.headers : pool.concat(model.modules || []);
         const items2 = buildIncludeItems(dict, [], inc.prefix);
         if (!items2.length) return null;
         return { isIncomplete: false, items: items2 };
       }
       const mc = memberChainBefore(text, offset);
       if (mc) {
-        const docModel = parseDocumentModel(text, ctx.hintKey, model.types);
+        const docModel = parseDocumentModel(text, ctx.base, model.types);
         const allStructs = Object.assign({}, model.structs, docModel.members);
         const items2 = resolveMemberItems(allStructs, docModel.typeOf, mc.parts, mc.word);
         if (!items2.length) return null;
         return { isIncomplete: false, items: items2 };
       }
-      const caseInsensitive = ctx.hintKey === "pascal";
-      const docSyms = parseDocumentSymbols(text, ctx.hintKey, model.types);
+      const caseInsensitive = ctx.base === "pascal";
+      const docSyms = parseDocumentSymbols(text, ctx.base, model.types);
       const items = buildWordItems(
         model,
         docSyms.concat(symbols()),

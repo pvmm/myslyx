@@ -197,8 +197,9 @@ function createClient() {
             });
         } catch (e) {}
         notify('$/setContext', {
-            label: window.__wbCurrentLang || '',
-            hintKey: window.__wbHintKey || 'c',
+            label: window.WBLanguage.label(),
+            hintKey: window.WBLanguage.hintKey(),
+            base: window.WBLanguage.base(),
             symbols: getAllSymbols(),
             headers: headers,
         });
@@ -251,8 +252,11 @@ function createClient() {
         return 'inmemory://weblsp/' + (fid || 'untitled');
     }
 
+    // The document language the worker serves. Resolved from the editor's
+    // language descriptor (window.WBLanguage, built in retro.js), i.e. from
+    // the active file's language — never from a language hardcoded here.
     function languageId() {
-        return (window.__wbHintKey === 'pascal') ? 'pascal' : 'c';
+        return window.WBLanguage.lspLanguageId() || window.WBLanguage.base();
     }
 
     function syncDoc(state, pos) {

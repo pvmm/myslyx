@@ -26,27 +26,31 @@ import * as CM from 'nicegui-codemirror';
 import { parseModel, collectVars, membersOf, memberNamed, fieldsToShow }
     from './plugins/c-struct-complete/c-struct-model.js';
 
-const MSXGL_HINT_KEY = 'msxgl';
-const PASCAL_HINT_KEY = 'pascal';
 const MAX_WORD_OPTIONS = 200;
 
 const hintsCache = {};
 const modelCache = new WeakMap();
 
-function hintKey() {
-    return window.__wbHintKey || 'c';
+// The current language comes from the editor's shared descriptor
+// (window.WBLanguage, built in retro.js): no language is named here.
+function lang() {
+    return window.WBLanguage;
 }
 
-function isMsxgl() {
-    return hintKey() === MSXGL_HINT_KEY;
+function hintKey() {
+    return lang().hintKey();
+}
+
+function isC() {
+    return lang().isBase('c');
 }
 
 function isPascal() {
-    return hintKey() === PASCAL_HINT_KEY;
+    return lang().isBase('pascal');
 }
 
 function isNativeAutocomplete() {
-    return isMsxgl() || isPascal();
+    return lang().usesNativePopup();
 }
 
 function loadHints(key) {
@@ -320,7 +324,7 @@ async function nativeSource(ctx) {
         // and each field completes exactly once. Otherwise the tree-based
         // curated path serves (it also covers call-result receivers the
         // worker's text heuristic cannot see).
-        if (isMsxgl()) {
+        if (isC()) {
             var member = await memberContext(state, pos, wordInfo);
             if (member) {
                 if (window.__wbWebLspReady && !window.__wbLocalLspWorking) return null;
@@ -332,7 +336,7 @@ async function nativeSource(ctx) {
         // curated source would only offer keyword noise) when it is ready,
         // so the curated word source stands down and each label completes
         // exactly once.
-        if (window.__wbWebLspReady && (key === 'msxgl' || key === 'pascal')) return null;
+        if (window.__wbWebLspReady && isNativeAutocomplete()) return null;
         return wordSource(ctx, wordInfo, hints, isPascal());
     } catch (e) {
         return null;

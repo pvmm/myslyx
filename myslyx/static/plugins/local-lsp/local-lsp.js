@@ -8,14 +8,19 @@
 //     POST /wb/lsp/ping      capability + connectivity check
 //     POST /wb/lsp/complete  buffer round trip -> CompletionItems
 //
-// The plugin joins both editor popups:
-//   - C MSXgl completes through CodeMirror's NATIVE popup via a completion
-//     source appended with EditorState.languageData "autocomplete" (the same
-//     mechanism native-completions.js uses); LSP results augment the curated
-//     msxgl hints automatically.
-//   - plain C keeps the CUSTOM .wb-autocomplete-popup through a
+// The plugin joins the editor's two popups, picked per language by
+// window.WBLanguage (the shared language descriptor in retro.js):
+//   - dictionary-backed languages complete through CodeMirror's NATIVE popup
+//     via a completion source appended with EditorState.languageData
+//     "autocomplete" (the same mechanism native-completions.js uses); LSP
+//     results augment the curated hints automatically.
+//   - the rest keep the CUSTOM .wb-autocomplete-popup through a
 //     WBHintCompletions provider, which is allowed to return a Promise (see
 //     hints.js).
+//
+// Nothing below names a language: which families the bridge serves comes from
+// window.WBLanguage.localLspServes(), so a new C-derived language is served
+// without touching this file.
 //
 // It is a "boot" + "onlyLocal" plugin (plugin.json): it only activates on a
 // local machine. If the LSP cannot be reached (binary fails to start, the
@@ -141,7 +146,7 @@ function bufferParams(state, pos) {
     const line = state.doc.lineAt(pos);
     return {
         fid: window.__wbActiveFid || '',
-        language: window.__wbCurrentLang || 'C',
+        language: window.WBLanguage.lspLanguageId() || window.WBLanguage.base(),
         name: '',
         content: state.doc.toString(),
         line: line.number - 1,
@@ -189,11 +194,15 @@ function makeIncludeApply(closer) {
     };
 }
 
-// ---- plain C: custom WBHintCompletions provider (async) ----------------
+// ---- custom .wb-autocomplete-popup provider (async) ----------------
+// Languages the editor renders in the retro popup; the bridge only claims a
+// family that it can actually drive (window.WBLanguage.localLspServes, which
+// is false for Pascal — clangd would answer noise for it).
 function customProvider(pctx) {
     if (bridge.disabled) return null;
     if (!bridge.ready || !bridge.working) return null;
-    if ((window.__wbCurrentLang || '') !== 'C') return null;
+    if (!window.WBLanguage.localLspServes()) return null;
+    if (window.WBLanguage.usesNativePopup()) return null;
     const state = pctx.view.state;
     const pos = state.selection.main.head;
     // Inside an include line, string-apply the closing bracket (unless it
@@ -230,7 +239,8 @@ export default function localLspPlugin(CM) {
         try {
             if (bridge.disabled) return null;
             if (!bridge.ready || !bridge.working) return null;
-            if ((window.__wbHintKey || 'c') !== 'msxgl') return null;
+            if (!window.WBLanguage.localLspServes()) return null;
+            if (!window.WBLanguage.usesNativePopup()) return null;
             const state = ctx.state;
             const pos = ctx.pos;
             // `#include` file completion closes its bracket on accept;
