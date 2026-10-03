@@ -106,6 +106,16 @@ async def descriptor(page, msgs):
     assert d['hasHeaders'] is False, f'Pascal has no #include headers: {d}'
     assert d['localLspServes'] is False, f'Pascal must not be bridge-servable: {d}'
 
+    # Pascal+Lammassaari: same family as Pascal, its own dictionary -> native.
+    await _set_language(page, 'Pascal+Lammassaari', 'lammassaari')
+    d = await _descriptor(page)
+    assert d['base'] == 'pascal', f'Lammassaari family: {d}'
+    assert d['hintKey'] == 'lammassaari', f'Lammassaari dictionary: {d}'
+    assert d['languageId'] == 'pascal', f'Lammassaari LSP languageId: {d}'
+    assert d['usesNativePopup'] is True, f'Lammassaari uses the native popup: {d}'
+    assert d['hasHeaders'] is False, f'Lammassaari has no #include headers: {d}'
+    assert d['localLspServes'] is False, f'Lammassaari must not be bridge-servable: {d}'
+
     # Plain text: no family at all -> every language server stays out.
     await _set_language(page, 'Text', 'plaintext')
     d = await _descriptor(page)

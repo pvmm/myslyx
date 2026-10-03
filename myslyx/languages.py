@@ -28,6 +28,10 @@ LANGUAGES: dict[str, str] = {
     # and declares "'" as the line-comment token, so Ctrl-/ works in BASIC.
     'HitBasic': 'HitBasic',
     'Pascal': 'Pascal',
+    # Pascal with Kari Lammassaari's Turbo Pascal 3 MSX routine library. Shares
+    # the CodeMirror 'Pascal' mode; only the hints (static/hints/lammassaari.json)
+    # differ.
+    'Pascal Lammassaari': 'Pascal+Lammassaari',
     'C': 'C',
     # C with the MSXgl engine API (SDCC/ZX81-style fixed-width types). Shares
     # the CodeMirror 'C' mode; only the hints (static/hints/msxgl.json) differ.
@@ -53,6 +57,7 @@ LEGACY_LANGUAGES: dict[str, str] = {
 HINT_KEYS: dict[str, str] = {
     'HitBasic': 'hitbasic',
     'Pascal': 'pascal',
+    'Pascal Lammassaari': 'lammassaari',
     'C': 'c',
     'C MSXgl': 'msxgl',
     'Z80': 'plaintext',
@@ -67,6 +72,7 @@ HINT_KEYS: dict[str, str] = {
 BASE_LANG: dict[str, str] = {
     'HitBasic': 'basic',
     'Pascal': 'pascal',
+    'Pascal Lammassaari': 'pascal',
     'C': 'c',
     'C MSXgl': 'c',
     'Z80': 'asm',
@@ -81,10 +87,13 @@ def _cm_mode(lang: str) -> str:
     """Map a stored language value to the CodeMirror mode to use.
 
     MSXgl is a C framework, so 'C MSXgl' keeps the 'C' syntax highlighting.
+    Kari Lammassaari's dialect is plain Turbo Pascal, so it keeps 'Pascal'.
     Any other stored value is already a valid CodeMirror mode name.
     """
     if lang == 'C MSXgl':
         return 'C'
+    if lang == 'Pascal Lammassaari':
+        return 'Pascal'
     return lang
 
 

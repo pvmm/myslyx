@@ -8587,7 +8587,7 @@ ${JSON.stringify(message, null, 4)}`);
   function parseTip(tip) {
     if (!tip) return { signature: null, params: [] };
     let signature = null;
-    const m = /```c\n([\s\S]*?)\n```/.exec(tip);
+    const m = /```(?:c|pascal)\n([\s\S]*?)\n```/.exec(tip);
     if (m) {
       const first = m[1].split("\n")[0].trim();
       if (first && m[1].indexOf("\n") < 0) signature = first;

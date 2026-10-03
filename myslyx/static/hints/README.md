@@ -15,6 +15,7 @@ in `static/retro.js` and rendered by `static/hints.js` (markdown via
 | `C`               | `c.json`              |
 | `C MSXgl`         | `msxgl.json`          |
 | `Pascal`          | `pascal.json`         |
+| `Pascal Lammassaari` | `lammassaari.json` |
 | `Text`            | `plaintext.json`      |
 
 Any unrecognized language (`Z80`, etc.) falls back to `plaintext`.
@@ -42,6 +43,27 @@ Because MSXgl targets SDCC, the generated `keywords` list is the standard C set
 `__PRESERVES`, `__FASTCALL`, `__CALLEE`). Any keyword that collides with a
 generated builtin or type name is dropped so each name completes only once.
 `c.json` (plain C) keeps the plain C keyword set.
+
+## `lammassaari.json` is generated
+
+`lammassaari.json` (the `Pascal Lammassaari` dialect) is **not hand-edited**:
+it is generated from Kari Lammassaari's Turbo Pascal 3 MSX routine library
+(`KARI/*.INC` plus the prose `KARI/*.TXT`) by
+`tools/gen_lammassaari_hints.py`. Its `root` page groups every procedure and
+function by include file in collapsible sections (plus one
+*Constants, types & variables* section split into Constants / Types /
+Variables), each name becoming an autocomplete builtin with a tip (signature,
+description, parameters). Descriptions prefer the `.TXT` prose, then the
+`.INC` header catalog, then inline `{...}` comments. To regenerate:
+
+```bash
+.venv/bin/python tools/gen_lammassaari_hints.py \
+    --src <path to KARI> --out myslyx/static/hints/lammassaari.json
+```
+
+The generated `keywords` list is the plain Pascal set
+(`tools/gen_lammassaari_hints.py`'s `PASCAL_KEYWORDS`, shared with
+`pascal.json`); it does not duplicate the base `pascal.json` builtins or tips.
 
 ## Schema
 

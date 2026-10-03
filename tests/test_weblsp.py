@@ -153,6 +153,40 @@ async def completions_pascal_native(page, msgs):
     assert not msgs, f'console errors: {msgs}'
 
 
+async def completions_lammassaari_native(page, msgs):
+    """Pascal+Lammassaari native popup and signature help come from the worker.
+
+    The dialect uses its own dictionary (lammassaari.json) with the ``pascal``
+    family; signature help parses the generator's ```pascal signature block.
+    """
+    bridge = _watch_lsp_bridge(page)
+    await _reset_config(page)
+    await _goto_new_file(page, 'Pascal+Lammassaari', 'lammassaari')
+    await _wait_ready(page)
+    await h.focus_active_editor(page)
+    await _type_slow(page, 'Copy_x', pause=60)
+    await _wait_for(page, lambda: _labels_contain(page, _native_labels, 'Copy_xy'),
+                    timeout=20000, msg='Copy_xy never rendered in the native popup')
+    labels = await _native_labels(page)
+    assert any('Copy_xy' in s for s in labels), f'Copy_xy missing: {labels}'
+
+    # Signature help reads the ```pascal block (generalized parseTip).
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Control+a')
+    await page.keyboard.press('Backspace')
+    await _type_slow(page, 'Copy_xy(', pause=60)
+    await page.wait_for_selector('#wb-sighelp', timeout=10000)
+    await page.wait_for_function(
+        "() => { const el = document.getElementById('wb-sighelp');"
+        " return !!el && el.style.display !== 'none' && el.textContent.includes('Copy_xy'); }",
+        timeout=10000)
+    text = await page.text_content('#wb-sighelp')
+    assert 'Copy_xy' in (text or ''), f'signature missing: {text!r}'
+    assert bridge['ping'] == 0, 'no local-bridge ping expected'
+    assert bridge['complete'] == 0, 'no local-bridge round trips expected'
+    assert not msgs, f'console errors: {msgs}'
+
+
 async def hover_tip(page, msgs):
     """Hovering a builtin shows its generated tip markdown."""
     bridge = _watch_lsp_bridge(page)
@@ -555,6 +589,7 @@ WEBLSP_DEFAULT_SUITES = [
     ('weblsp/completions-msxgl-native', completions_msxgl_native, None),
     ('weblsp/completions-c-custom', completions_c_custom, None),
     ('weblsp/completions-pascal-native', completions_pascal_native, None),
+    ('weblsp/completions-lammassaari-native', completions_lammassaari_native, None),
     ('weblsp/local-variables', local_variables, None),
     ('weblsp/local-types', local_types, None),
     ('weblsp/member-complete', member_complete, None),

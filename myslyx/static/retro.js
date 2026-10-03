@@ -137,7 +137,7 @@
         // A new language is a data change: drop its hints/<key>.json, add its
         // row to editor_page.py's HINT_KEYS/BASE_LANG, and — if a language
         // server should serve it — to FAMILIES below. No consumer changes.
-        var POPUP_NATIVE_KEYS = { msxgl: 1, pascal: 1 };
+        var POPUP_NATIVE_KEYS = { msxgl: 1, pascal: 1, lammassaari: 1 };
 
         var FAMILIES = {
             c: { languageId: 'c', headers: true, local: true },

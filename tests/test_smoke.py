@@ -956,6 +956,77 @@ async def hints_msxgl_types_section(page, msgs):
     assert msgs == []
 
 
+async def hints_lammassaari_root_and_builtins(page, msgs):
+    # The Pascal+Lammassaari dialect maps to static/hints/lammassaari.json: its
+    # root page must group the library routines by include file (collapsible
+    # <details>) plus one Constants/types/variables section split into topic
+    # subsections, and routines must be autocomplete builtins with full tips.
+    await h.new_file(page, 2)
+    await h.set_language(page, 'Pascal+Lammassaari')
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'Pascal + Lammassaari';
+    }""", timeout=15000)
+    body = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text').textContent || ''""")
+    assert 'Lammassaari' in body, 'root page must credit Kari Lammassaari'
+    assert 'MOUSE.INC' in body, 'root page must list an include-file section'
+    assert 'Constants, types & variables' in body, \
+        'root page must have a constants/types/variables section'
+    h3s = await page.evaluate("""() =>
+        Array.from(document.querySelectorAll('#hints-content .hint-text h3'))
+            .map(el => el.textContent.trim())""")
+    for topic in ('Constants', 'Types', 'Variables'):
+        assert topic in h3s, f'root page must list a {topic} topic, got {h3s!r}'
+    # A hint: link jumps to the routine's tip (expand the MOUSE module first).
+    await page.evaluate("""() => {
+        const d = Array.from(document.querySelectorAll('#hints-content details'))
+            .find(d => d.querySelector('summary').textContent.includes('MOUSE.INC'));
+        if (d) d.open = true;
+    }""")
+    await page.click('#hints-content .hint-text a[href="hint:MOUSEDETECTED"]')
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'MOUSEDETECTED'""")
+    tip = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text')?.textContent || ''""")
+    assert 'searches both joystic ports' in tip, \
+        f'MouseDetected tip must include the description, got {tip!r}'
+    # A routine with parameters renders the Parameters section.
+    await page.keyboard.press('F2')
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'Pascal + Lammassaari';
+    }""", timeout=15000)
+    await page.evaluate("""() => {
+        const d = Array.from(document.querySelectorAll('#hints-content details'))
+            .find(d => d.querySelector('summary').textContent.includes('COPY_XY.INC'));
+        if (d) d.open = true;
+    }""")
+    await page.click('#hints-content .hint-text a[href="hint:COPY_XY"]')
+    await page.wait_for_function("""() =>
+        document.querySelector('#hints-content .hint-title')?.textContent === 'COPY_XY'""")
+    tip = await page.evaluate("""() =>
+        document.querySelector('#hints-content .hint-text')?.textContent || ''""")
+    assert 'Parameters:' in tip, 'tip must render the Parameters section'
+    assert 'Source_x' in tip, 'tip must list the parameters'
+    # F2 restores the module index root page.
+    await page.keyboard.press('F2')
+    await page.wait_for_function("""() => {
+        const h1 = document.querySelector('#hints-content .hint-text h1');
+        return !!h1 && h1.textContent.trim() === 'Pascal + Lammassaari';
+    }""", timeout=15000)
+    # Routines are native autocomplete builtins.
+    await h.active_cm(page).click()
+    await page.keyboard.type('Copy_x')
+    labels = await _native_autocomplete_labels(page, 'Copy_xy')
+    assert any('Copy_xy' in t for t in labels), \
+        f'autocomplete must offer Copy_xy, got {labels!r}'
+    details = await _native_autocomplete_details(page)
+    assert any('builtin' in (t or '') for t in details), \
+        f'routines must be tagged builtin, got {details!r}'
+    assert msgs == []
+
+
 async def hints_msxgl_angle_brackets(page, msgs):
     # MSXgl descriptions reference other API items with angle brackets (see
     # <VDP_MODE>). The browser would swallow those as HTML element names, so
@@ -1429,6 +1500,7 @@ SMOKE_SUITES = [
     ('smoke/hint-link-jumps-to-tip', hint_link_jumps_to_tip),
     ('smoke/hints-msxgl-root-builtins', hints_msxgl_root_and_builtins),
     ('smoke/hints-msxgl-types', hints_msxgl_types_section),
+    ('smoke/hints-lammassaari-root-builtins', hints_lammassaari_root_and_builtins),
     ('smoke/hints-msxgl-angle-brackets', hints_msxgl_angle_brackets),
     ('smoke/hints-font-size-slider', hints_font_size_slider),
     ('smoke/storage-pool-hardened', storage_pool_hardened),

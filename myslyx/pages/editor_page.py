@@ -363,6 +363,7 @@ def editor_page() -> None:
         return {
             'hitbasic': 'bas', 'HitBasic': 'bas', 'vbscript': 'bas', 'VBScript': 'bas',
             'pascal': 'pas', 'Pascal': 'pas',
+            'Pascal Lammassaari': 'pas',
             'c': 'c', 'C': 'c', 'C MSXgl': 'c',
             'z80': 'asm', 'Z80': 'asm',
             'plaintext': 'txt', 'Text': 'txt',
@@ -387,6 +388,7 @@ def editor_page() -> None:
         return {
             'hitbasic': 'BAS', 'HitBasic': 'BAS', 'vbscript': 'BAS', 'VBScript': 'BAS',
             'pascal': 'PAS', 'Pascal': 'PAS',
+            'Pascal Lammassaari': 'PAS',
             'c': 'C', 'C': 'C', 'C MSXgl': 'C',
             'z80': 'ASM', 'Z80': 'ASM',
             'plaintext': 'TXT', 'Text': 'TXT',

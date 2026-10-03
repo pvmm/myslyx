@@ -93,7 +93,10 @@ In-browser LSP (C / C MSXgl / Pascal)
   deployments too.
 - In a C MSXgl file, type `VDP_SetM` for worker-fed completions, hover a
   builtin for its tip, or type `VDP_SetMode(` for signature help. Plain C
-  keeps the custom popup; Pascal completes through the native one.
+  keeps the custom popup; Pascal completes through the native one. The
+  **Pascal+Lammassaari** dialect (Kari Lammassaari's Turbo Pascal 3 MSX
+  routine library, `static/hints/lammassaari.json`) joins the same native
+  popup with its own module-by-module help page.
   Matching is substring everywhere: `sprite` also offers
   `VDP_DisableSprite`, ranked after prefix hits like `SpriteFX_Mask16`.
 - `#include` completes header files: `<...>` offers the standard C headers

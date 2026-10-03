@@ -18,11 +18,11 @@
 //   - tips are looked up case-insensitively (msxgl.json keys every tip by the
 //     UPPER-CASE symbol name; c.json and pascal.json do the same);
 //   - parseTip() recovers a structured {signature, params} from a rendered
-//     tip markdown. The generator (tools/gen_msxgl_hints.py::tip_markdown)
-//     always emits the signature as the first ```c block and the parameters
-//     as a "**Parameters:**" list of "- `name` - desc" lines, so the parse is
-//     deterministic. If the generator ever emits structured signatures,
-//     swap this function out and keep the callers.
+//     tip markdown. The generators emit the signature as the first ```c
+//     (tools/gen_msxgl_hints.py) or ```pascal (tools/gen_lammassaari_hints.py)
+//     block and the parameters as a "**Parameters:**" list of "- `name` - desc"
+//     lines, so the parse is deterministic. If the generators ever emit
+//     structured signatures, swap this function out and keep the callers.
 
 // LSP CompletionItemKind numbers we emit (kept numeric so the module stays
 // free of the vscode-languageserver import; see server.js for the mapping).
@@ -166,11 +166,12 @@ export function lookupTip(model, name) {
 
 // Recover {signature, params} from a rendered tip markdown. Only the
 // generator-shaped functions carry both; free-form tips (c.json/pascal.json)
-// yield {signature: null, params: []}.
+// yield {signature: null, params: []}. The generator emits the signature as
+// the first ```c (C+MSXgl) or ```pascal (Pascal+Lammassaari) block.
 export function parseTip(tip) {
     if (!tip) return { signature: null, params: [] };
     let signature = null;
-    const m = /```c\n([\s\S]*?)\n```/.exec(tip);
+    const m = /```(?:c|pascal)\n([\s\S]*?)\n```/.exec(tip);
     if (m) {
         const first = m[1].split('\n')[0].trim();
         // Multi-line bodies (enum/struct type tips) are not signatures.
