@@ -16,13 +16,16 @@
         },
 
         // List installed plugins as plain definitions, for UIs like the plugins
-        // menu. Read enabled state with _enabled().
+        // menu. Read enabled state with _enabled(), and whether a plugin is
+        // withheld by the deployment's disabled-language gate with _disabledOk().
         list: function() {
             return registry.map(function(d) {
                 return {
                     name: d.name,
                     enabledByDefault: d.enabledByDefault !== false,
                     languageServer: d.languageServer === true,
+                    languages: d.languages || ['*'],
+                    baseLang: d.baseLang || null,
                 };
             });
         },
@@ -70,6 +73,27 @@
             return !(def.onlyLocal && !window.__wbLocal);
         },
 
+        // A deployment may hide languages via MYSLYX_DISABLED_LANGS (published
+        // as window.__wbDisabledLangs / __wbDisabledBaseLangs). A plugin scoped
+        // to a disabled language is withheld entirely and greyed out in the
+        // menu. Exact-scope plugins match a disabled language key; base-scope
+        // plugins match a base family only once NO dialect of it is enabled
+        // (so disabling just "C MSXgl" leaves a baseLang:["c"] plugin useful
+        // for plain C).
+        _disabledOk: function(def) {
+            var langs = def.languages || [];
+            var disLangs = window.__wbDisabledLangs || [];
+            for (var i = 0; i < langs.length; i++) {
+                if (langs[i] !== '*' && disLangs.indexOf(langs[i]) >= 0) return false;
+            }
+            var bases = def.baseLang || [];
+            var disBases = window.__wbDisabledBaseLangs || [];
+            for (var j = 0; j < bases.length; j++) {
+                if (disBases.indexOf(bases[j]) >= 0) return false;
+            }
+            return true;
+        },
+
         // Attach the enabled plugins' extensions to a CodeMirror view. Runs once
         // per view; config changes take effect on the next page load. Extension
         // providers may be synchronous (an array) or asynchronous (a Promise,
@@ -81,7 +105,7 @@
                 if (!view) return;
                 var providers = registry.map(function(def) {
                     return Promise.resolve().then(function() {
-                        if (WBPlugins._enabled(def) && WBPlugins._langOk(def) && WBPlugins._localOk(def)) {
+                        if (WBPlugins._enabled(def) && WBPlugins._langOk(def) && WBPlugins._localOk(def) && WBPlugins._disabledOk(def)) {
                             return def.extensions(view, CM, { config: (window.WBStorage.loadConfig().plugins || {})[def.name] || {} });
                         }
                         return [];

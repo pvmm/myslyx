@@ -5,8 +5,10 @@ FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     # Shared deployment (as on the Hugging Face Space): disables local-only
-    # plugins and the machine-LSP bridge. Overridable at run/deploy time.
+    # plugins and the machine-LSP bridge, and hides the HitBasic language
+    # (see myslyx/languages.py). Overridable at run/deploy time.
     MYSLYX_LOCAL=0 \
+    MYSLYX_DISABLED_LANGS="HitBasic" \
     PORT=8080
 
 WORKDIR /app

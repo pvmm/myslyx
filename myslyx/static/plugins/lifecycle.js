@@ -48,6 +48,9 @@
         import('nicegui-codemirror').then(function(CM) {
             boot.forEach(function(plugin) {
                 if (!WBPlugins._enabled(plugin)) return;
+                // A plugin scoped to a language hidden by the deployment's
+                // MYSLYX_DISABLED_LANGS gate must not run either.
+                if (!WBPlugins._disabledOk(plugin)) return;
                 // A local-only plugin must not run on a shared deployment
                 // (window.__wbLocal is published by pages/editor_page.py).
                 if (plugin.onlyLocal && !window.__wbLocal) return;

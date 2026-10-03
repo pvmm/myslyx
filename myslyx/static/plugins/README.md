@@ -63,6 +63,11 @@ directories and binds each module to the editor through the runtime in
    the whole plugin on remote runs, so local-only services (LSP bridges, local
    file access) can never leak into a shared deployment.
 
+   An operator can also hide a set of languages with `MYSLYX_DISABLED_LANGS`
+   (see "Language scoping" below). A plugin scoped to a hidden language is
+   disabled and greyed out in Settings > PLUGINS: the runtime skips it in both
+   `install()` and the `lifecycle.js` boot pass (`plugins.js` `_disabledOk`).
+
    Set `"boot": true` when the plugin has global side effects that must be
    in place before any editor exists — the canonical example is registering a
    language in the CodeMirror catalog (see `hitbasic`). A boot plugin's module
@@ -77,8 +82,8 @@ directories and binds each module to the editor through the runtime in
 A plugin declares which languages it cares about on two orthogonal axes:
 
 - `languages` scopes to the exact stored language ids — the `LANGUAGES` keys in
-  `pages/editor_page.py` (`HitBasic`, `Pascal`, `C`, `C MSXgl`, `Z80`,
-  `Text`). A stored id that matches is enough on its own.
+  `myslyx/languages.py` (`HitBasic`, `Pascal`, `C`, `C MSXgl`, `Z80`, `Text`). A
+  stored id that matches is enough on its own.
 - `baseLang` scopes to a *base* language family shared by several ids. The
   runtime publishes `window.__wbBaseLang` (HitBasic -> `basic`, Pascal ->
   `pascal`, C and C MSXgl -> `c`, Z80 -> `asm`, Text -> `text`), so a generic
@@ -91,6 +96,21 @@ A plugin declares which languages it cares about on two orthogonal axes:
 The check lives in `static/plugins.js` (`_langOk`); `lifecycle.js` forwards
 `baseLang` from the manifest. For compatibility, a plugin whose `languages`
 says `"VBScript"` (the pre-rename BASIC id) also runs on `HitBasic` files.
+
+### Disabled languages (deployment)
+
+`MYSLYX_DISABLED_LANGS` is a comma-separated list of language keys and/or base
+families hidden for a deployment (read by `myslyx/languages.py`, published as
+`window.__wbDisabledLangs` / `window.__wbDisabledBaseLangs`). It interacts with
+scoping as follows:
+
+- An exact-scope plugin (`languages`) is withheld when any of its ids is in the
+  disabled list.
+- A base-scope plugin (`baseLang`) is withheld only once *no* dialect of that
+  base is enabled (i.e. the base appears in `window.__wbDisabledBaseLangs`), so
+  hiding just `C MSXgl` leaves a `baseLang: ["c"]` plugin serving plain C.
+- Hidden languages are removed from the LANG combo box; stored files using one
+  are re-resolved to an enabled dialect of the same base, else `Text`.
 
 ### User plugins directory
 

@@ -172,15 +172,24 @@
                         return;
                     }
                     defs.forEach(function(def) {
+                        // A plugin scoped to a language hidden by the deployment
+                        // (MYSLYX_DISABLED_LANGS) is greyed out and cannot be
+                        // toggled on.
+                        var locked = !window.WBPlugins._disabledOk(def);
                         var row = document.createElement('label');
-                        row.className = 'wb-plugin-row';
+                        row.className = 'wb-plugin-row' + (locked ? ' wb-plugin-disabled' : '');
                         var name = document.createElement('span');
                         name.className = 'wb-plugin-name';
                         name.textContent = def.name;
                         var cb = document.createElement('input');
                         cb.type = 'checkbox';
                         cb.className = 'wb-plugin-check';
-                        cb.checked = !!window.WBPlugins._enabled(def);
+                        cb.checked = !locked && !!window.WBPlugins._enabled(def);
+                        if (locked) {
+                            cb.disabled = true;
+                            name.title = 'Disabled: its language is hidden by this deployment';
+                            row.title = name.title;
+                        }
                         cb.addEventListener('change', function() {
                             try {
                                 var cfg = window.WBStorage.loadConfig();

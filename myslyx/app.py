@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from nicegui import app, ui
 
 from myslyx import lsp
+from myslyx.languages import validate_disabled_langs
 from myslyx.paths import user_plugins_dir
 
 # Register pages (importing triggers @ui.page decorator registration)
@@ -144,6 +145,11 @@ def _get_server_options() -> tuple[str, int, bool]:
 
 def run() -> None:
     """Launch the Myslyx server (uvicorn auto-reload unless --no-reload or `python -m`)."""
+    try:
+        validate_disabled_langs()
+    except ValueError as exc:
+        logging.error('%s', exc)
+        raise SystemExit(2)
     host, port, reload_enabled = _get_server_options()
     ui.run(
         title='Myslyx Text Editor',

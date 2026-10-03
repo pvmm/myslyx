@@ -965,6 +965,22 @@ html, body {
     cursor: pointer;
 }
 
+/* A plugin scoped to a language hidden by MYSLYX_DISABLED_LANGS: shown but
+   not togglable. */
+.wb-plugin-row.wb-plugin-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.wb-plugin-row.wb-plugin-disabled:hover {
+    background: var(--wb-white);
+    color: var(--wb-text);
+}
+
+.wb-plugin-row.wb-plugin-disabled .wb-plugin-check {
+    cursor: not-allowed;
+}
+
 .wb-plugin-empty {
     font-size: 8px;
     color: #888;

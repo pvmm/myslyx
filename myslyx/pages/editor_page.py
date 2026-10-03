@@ -5,61 +5,22 @@ from typing import Any
 from nicegui import ui
 
 from myslyx import lsp
+from myslyx.languages import (
+    BASE_LANG,
+    DEFAULT_LANG,
+    HINT_KEYS,
+    LANGUAGES,
+    _cm_mode,
+    disabled_base_langs,
+    disabled_languages,
+    enabled_languages,
+    resolve_lang,
+)
 from myslyx.local import is_local
 from myslyx.paths import user_plugins_dir
 
 
 FAVICON_PATH = str(Path(__file__).resolve().parents[1] / 'static' / 'favicon.svg')
-
-# Language options offered by the LANG combo box. Keys are the values stored
-# with files (CodeMirror language names), values are the labels shown here.
-LANGUAGES: dict[str, str] = {
-    # HitBasic is a BASIC dialect. Its CodeMirror language support ships as a
-    # plugin (static/plugins/hitbasic/): it builds on the VBScript highlighter
-    # and declares "'" as the line-comment token, so Ctrl-/ works in BASIC.
-    'HitBasic': 'HitBasic',
-    'Pascal': 'Pascal',
-    'C': 'C',
-    # C with the MSXgl engine API (SDCC/ZX81-style fixed-width types). Shares
-    # the CodeMirror 'C' mode; only the hints (static/hints/msxgl.json) differ.
-    'C MSXgl': 'C+MSXgl',
-    'Z80': 'Z80 Assembly',
-    'Text': 'Text',
-}
-
-# Default language for newly created files. The LANG combo box mirrors the
-# language of the currently visible file (see _load_file_into_editor), so
-# new files keep this fixed default instead of inheriting the active file's.
-DEFAULT_LANG = 'HitBasic'
-
-# Stored language ids that once existed in LANGUAGES but are no longer
-# offered by the combo box. Files saved with such an id keep working: they
-# resolve to the current id instead of falling back to plain text.
-LEGACY_LANGUAGES: dict[str, str] = {
-    'VBScript': 'HitBasic',
-}
-
-
-def _cm_mode(lang: str) -> str:
-    """Map a stored language value to the CodeMirror mode to use.
-
-    MSXgl is a C framework, so 'C MSXgl' keeps the 'C' syntax highlighting.
-    Any other stored value is already a valid CodeMirror mode name.
-    """
-    if lang == 'C MSXgl':
-        return 'C'
-    return lang
-
-
-def _canonical_lang(lang: str | None) -> str | None:
-    """Resolve a stored language value to a current LANGUAGES key.
-
-    Returns None only for values that were never a real language id.
-    """
-    if lang in LANGUAGES:
-        return lang
-    return LEGACY_LANGUAGES.get(lang) if lang is not None else None
-
 
 MAX_FILE_SIZE = 2 * 1024 * 1024
 
@@ -104,7 +65,7 @@ def _normalize_storage_pool(files: Any) -> list[dict[str, Any]]:
         name = str(name) if name is not None else 'untitled.txt'
         lang = raw.get('language')
         lang = str(lang) if lang is not None else ''
-        canon = _canonical_lang(lang)
+        canon = resolve_lang(lang)
         content = _sanitize_content(raw.get('content'))
         readonly = bool(raw.get('readonly'))
         # The bundled STARTUP file is always locked; a client that drops the
@@ -115,37 +76,12 @@ def _normalize_storage_pool(files: Any) -> list[dict[str, Any]]:
         out.append({
             'id': fid,
             'name': name,
-            'language': canon if canon is not None else 'Text',
+            'language': canon,
             'content': content,
             'readonly': readonly,
             'export_symbols': bool(raw.get('export_symbols', True)),
         })
     return out
-
-# Maps stored CodeMirror language values to hint dictionary keys (files under
-# static/hints/<key>.json). Unknown languages fall back to plain text.
-HINT_KEYS: dict[str, str] = {
-    'HitBasic': 'hitbasic',
-    'Pascal': 'pascal',
-    'C': 'c',
-    'C MSXgl': 'msxgl',
-    'Z80': 'plaintext',
-    'Text': 'plaintext',
-}
-
-# Base-language attribute: the normalized family/dialect a language belongs
-# to, shared by every variant of the same base (plain C and the MSXgl C
-# framework both are 'c'). Plugins scope on this with "baseLang": ["c"] so a
-# future C-derived framework only needs entries here (and in LANGUAGES) to be
-# picked up automatically.
-BASE_LANG: dict[str, str] = {
-    'HitBasic': 'basic',
-    'Pascal': 'pascal',
-    'C': 'c',
-    'C MSXgl': 'c',
-    'Z80': 'asm',
-    'Text': 'text',
-}
 
 # Editor font choices (CSS font-family values)
 FONTS: dict[str, str] = {
@@ -224,6 +160,14 @@ def editor_page() -> None:
     # local-lsp plugin whether the server can talk to an LSP (see myslyx/lsp.py).
     ui.add_head_html(f'<script>window.__wbLocal = {str(is_local()).lower()};</script>')
     ui.add_head_html(f'<script>window.__wbLsp = {json.dumps(lsp.available())};</script>')
+    # Languages hidden for this deployment by MYSLYX_DISABLED_LANGS. The plugin
+    # runtime reads these to disable/grey out plugins scoped to a disabled
+    # language (see static/plugins.js and static/settings-menu.js).
+    ui.add_head_html(
+        '<script>'
+        f'window.__wbDisabledLangs = {json.dumps(disabled_languages())};'
+        f'window.__wbDisabledBaseLangs = {json.dumps(disabled_base_langs())};'
+        '</script>')
     # C MSXgl and Pascal complete through CodeMirror's native autocomplete
     # (module: runs after the classic scripts above, and imports the shared
     # struct model used by the c-struct-complete plugin). C MSXgl is the
@@ -251,6 +195,8 @@ def editor_page() -> None:
         ui.add_head_html('<script src="/static/plugins/lifecycle.js"></script>')
 
     hints_content_id = 'hints-content'
+    # Languages still selectable this run (disabled ones are hidden).
+    langs_offered = enabled_languages()
 
     with ui.element('div').classes('wb-root'):
         # === App Header ===
@@ -269,8 +215,9 @@ def editor_page() -> None:
                 )
                 lang_select = (
                     ui.select(
-                        LANGUAGES,
-                        value=DEFAULT_LANG,
+                        langs_offered,
+                        value=(DEFAULT_LANG if DEFAULT_LANG in langs_offered
+                               else next(iter(langs_offered))),
                         on_change=lambda e: _on_language_change(e.value),
                     )
                     .classes('wb-select')
@@ -580,10 +527,9 @@ def editor_page() -> None:
         if fid in editor_slots:
             return editor_slots[fid]
         cm_lang = f.get('language', 'Text')
-        canonical = _canonical_lang(cm_lang)
-        if canonical is None:
-            canonical = 'Text'
-            f['language'] = 'Text'
+        canonical = resolve_lang(cm_lang)
+        if canonical != cm_lang:
+            f['language'] = canonical
         cm_lang = canonical
         with editor_host:
             with ui.element('div').props(f'id=wb-edit-slot-{fid}').classes('wb-editor-slot wb-editor-hidden') as slot:
@@ -614,8 +560,7 @@ def editor_page() -> None:
         fid = str(file.get('id') or f'file_{random.randint(100000, 999999)}')
         name = str(file.get('name') or 'untitled.txt')
         lang = str(file.get('language') or _lang_for_name(name))
-        canonical = _canonical_lang(lang)
-        lang = canonical if canonical is not None else 'Text'
+        lang = resolve_lang(lang)
         content = _sanitize_content(file.get('content'))
         target = next((f for f in client_state['files'] if f['id'] == fid), None)
         if target is None:
@@ -668,10 +613,10 @@ def editor_page() -> None:
         readonly = bool(f.get('readonly', False))
         file_name_label.set_text(f['name'] + (' 🔒' if readonly else ''))
         cm_lang = f.get('language', 'Text')
-        canon = _canonical_lang(cm_lang)
         # Migrate files saved with a language that no longer exists (or with a
-        # legacy id superseded by a rename) to the current stored value.
-        f['language'] = canon if canon is not None else 'Text'
+        # legacy id superseded by a rename, or one hidden by
+        # MYSLYX_DISABLED_LANGS) to an available stored value.
+        f['language'] = resolve_lang(cm_lang)
         cm_lang = f['language']
         if cm_lang == 'Text':
             # Plain text: clear the language extension instead of passing the

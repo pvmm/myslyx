@@ -110,6 +110,26 @@ In-browser LSP (C / C MSXgl / Pascal)
 - Disable it in Settings > PLUGINS (`weblsp`); the curated dictionaries keep
   working as fallback.
 
+Hiding languages per deployment
+- An operator can remove languages from the LANG combo box with the
+  `MYSLYX_DISABLED_LANGS` environment variable (comma-separated):
+
+  MYSLYX_DISABLED_LANGS="C MSXgl, Pascal" python main.py
+
+- Each entry matches a stored language key (`C MSXgl`, `Pascal`, ...) or its
+  base family (`c`, `pascal`, `basic`, `asm`, `text`). Matching a family hides
+  every dialect of it, so `c` hides both `C` and `C+MSXgl`.
+- Disabled languages disappear from the combo. A file already stored with one
+  opens in another enabled dialect of the same base when one exists (e.g. a
+  `C MSXgl` file opens as `C` when only `C MSXgl` is hidden), otherwise as
+  plain `Text`.
+- Plugins scoped to a hidden language (via `languages` or `baseLang` in their
+  `plugin.json`) are disabled and greyed out in Settings > PLUGINS. A
+  base-scoped plugin is only withheld once the whole base is hidden, so hiding
+  `C MSXgl` alone still leaves a `baseLang: ["c"]` plugin serving plain C.
+- At least one language must stay enabled; the server refuses to start (exit
+  code 2) if the variable hides them all.
+
 Developer notes
 - Auto-reload is on for development (uvicorn watches `*.py`, `*.css`, `*.js`). Disable it with `--no-reload` (or `WB_TESTING=1`) when you need a single quiet process.
 - To quickly check Python syntax for pages, run:
